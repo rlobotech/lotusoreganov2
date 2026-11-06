@@ -147,11 +147,28 @@ Balance simulator: run N fights and print win rate, average rounds and survivors
 pnpm --filter @game/engine balance --fights 2000
 ```
 
+## Replay viewer (web app)
+Start the web app (Vite dev server, http://127.0.0.1:5173). It runs the combat engine in the browser, so it works without the API or database:
+```bash
+pnpm --filter @game/web dev
+```
+
+Two screens: **Return slideshow** (fake "while you were away" feed with skip this / skip all, then a replays list) and **Replay lab** (run any seed, or load a log made with `simulate --json`).
+Controls: play/pause, 1x/2x/4x, previous/next turn, scrub bar, End. Camera: drag to pan, mouse wheel or pinch or the +/- buttons to zoom (whole-number steps), Fit to see the whole arena. Tap a unit to see its HP and statuses.
+
+Sprites: units are drawn as placeholders until a PNG with the sprite's name exists in `apps/web/public/sprites/` (for example `human_warrior.png`, `goblin.png`; the names come from each unit's `sprite` field). A 32x32 image facing south-east is expected, the west-facing version is the same image flipped.
+
+Build for production:
+```bash
+pnpm --filter @game/web build
+```
+
 ## Project layout
 ```
 apps/server/      Fastify API, migrations (src/db/migrations), tests
 packages/shared/  zod schemas and types shared by server and client
 packages/engine/  deterministic combat engine (pure TypeScript, no I/O), CLI simulator
+apps/web/         Svelte + PixiJS client: replay viewer, return slideshow
 docs/art/         AI prompts for character and tile sprites
 assets/raw/       original generated sprites (characters, monsters, tiles, vfx, ui)
 infra/            database init scripts

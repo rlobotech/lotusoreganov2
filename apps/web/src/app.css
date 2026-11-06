@@ -1,0 +1,93 @@
+:root {
+  --bg: #0d0b10;
+  --panel: #17141c;
+  --panel-2: #1f1b27;
+  --line: #3a3345;
+  --text: #e6e1d3;
+  --muted: #9a93a6;
+  --gold: #c9a24a;
+  --gold-bright: #f2d04a;
+  --red: #b04a4a;
+  --green: #5ad05a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Georgia, 'Times New Roman', serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--gold);
+}
+
+button:active {
+  background: #2a2434;
+}
+
+button.primary {
+  background: #3a2f12;
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+button.active {
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+input[type='number'],
+input[type='text'] {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+}
+
+input[type='range'] {
+  accent-color: var(--gold);
+  width: 100%;
+  min-height: 32px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: normal;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
