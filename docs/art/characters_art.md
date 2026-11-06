@@ -461,3 +461,153 @@ Palette:
 ```
 #1a120c #4e3420 #7c5634 #4a8a2a #84c83a #c8f070 #a82a2a #e05a4a #a4b04e #7e8a36 #565e22 #ece4c8 #5a3a22
 ```
+
+## Warlock
+
+### Human Warlock
+
+Prompt:
+```
+Pixel art fantasy RPG character of a human man, sallow pale skin, slicked-back black hair with a streak of white, goatee, warlock class, defiant casting pose. Wears a wine-red and black high-collared coat with tarnished gold clasps, small curved horn shoulder pieces, one hand wreathed in magenta hellfire, a grimoire chained to the belt. Color identity: wine red, black, infernal magenta.
+```
+
+Palette:
+```
+#0e080c #26101a #4e1428 #7e1e3c #a8803a #d8b45a #8a1a6a #d42a98 #ff8ad0 #ffe0f0 #ecd0bc #c4a08c #8c6c5c
+```
+
+### Elf Warlock
+
+Prompt:
+```
+Pixel art fantasy RPG character of an elf, pale lavender-tinted skin, long pointed ears, long jet-black hair, glowing amber eyes, warlock class, defiant casting pose. Wears sleek charcoal and deep burnt-orange robes with fine gold chains and sigil tattoos on the hands, a cursed dagger in one hand and swirling ember-orange fire in the other. Color identity: charcoal, burnt orange, ember glow.
+```
+
+Palette:
+```
+#0c0a0c #24201e #403a38 #6a625c #8a3a10 #cc5a1a #ff9a2a #ffd870 #fff0c0 #e4d0dc #bca4b4 #8c7488 #c8a040
+```
+
+### Dwarf Warlock
+
+Prompt:
+```
+Pixel art fantasy RPG character of a dwarf, short and stocky, ruddy soot-stained skin, thick black beard with ash-gray streaks, warlock class, defiant casting pose. Wears blackened plate bracers and a heavy hooded cloak of dark plum, a chained iron tome, small horned imp perched on the shoulder, violet-pink flames around the fist. Color identity: soot black, dark plum, hot pink-violet fire.
+```
+
+Palette:
+```
+#0a080c #1c1620 #34283c #52405c #7a8088 #4a1a5a #8a2aa8 #d85ae8 #ffb0f4 #d49478 #a86a54 #7a4638 #2a2024
+```
+
+### Orc Warlock
+
+Prompt:
+```
+Pixel art fantasy RPG character of an orc, gray-brown skin with glowing red-violet scars, broken lower tusks, bald with black tattoos on the scalp, warlock class, defiant casting pose. Wears ragged blood-red and black leather robes, spiked iron collar, bone horns on the shoulders, a jagged black staff crackling with magenta hellfire. Color identity: blood red, black, magenta hellfire.
+```
+
+Palette:
+```
+#0c0608 #20101a #3c1420 #6e1a2c #a82a38 #8a1a6a #d42a98 #ff8ad0 #ecdcc0 #8c8070 #6c6256 #4a4238 #1a1418
+```
+
+## Shaman
+
+### Human Shaman
+
+Prompt:
+```
+Pixel art fantasy RPG character of a human woman, warm bronze skin, long black hair in thin braids with beads and feathers, shaman class, chanting idle pose. Wears a sand-colored hide tunic with turquoise bead trim, an eagle-feather mantle, white clay marks on the face and arms, a totem staff with a hawk skull and hanging feathers, small blue-white lightning arcing between the fingers. Color identity: sand tan, turquoise, storm-blue lightning.
+```
+
+Palette:
+```
+#1c1410 #5a4228 #8e6a40 #c8a468 #ece0c0 #1a7a7e #3ab8b4 #6ad0ff #e8f8ff #c88e5e #9c6a42 #6a4228 #1a1214
+```
+
+### Elf Shaman
+
+Prompt:
+```
+Pixel art fantasy RPG character of a wood elf, deep amber skin, long pointed ears, shaved sides with a long dark-red braid, shaman class, chanting idle pose. Wears layered rust-red and ochre cloth wraps with copper bangles, a mask of carved wood pushed up on the head, a gnarled staff topped with a glowing spirit-orb and a pale spirit fox of fire at the feet. Color identity: rust red, ochre, copper, spirit-orange glow.
+```
+
+Palette:
+```
+#1a0e0c #4a1c14 #7e2e1c #b0522a #d8923a #f0cc70 #b8703a #7a4a28 #ff7a2a #ffd890 #c8864e #a0623a #6c3e24
+```
+
+### Dwarf Shaman
+
+Prompt:
+```
+Pixel art fantasy RPG character of a dwarf, short and stocky, gray-brown skin, long silver beard braided with stone and iron beads, shaman class, chanting idle pose. Wears slate-gray stone-plated shoulder armor over a moss-green hide robe, glowing yellow-green rune scars on the arms, a staff topped with a floating boulder crackling with earth energy. Color identity: slate gray, moss green, glowing rune yellow-green.
+```
+
+Palette:
+```
+#101210 #2c3030 #4c5456 #7a8688 #aab6b6 #34502a #5e8a3c #b8e04a #eaff9a #b49480 #8c6c5a #605040 #d8d8d0
+```
+
+### Orc Shaman
+
+Prompt:
+```
+Pixel art fantasy RPG character of an orc, mossy green skin with red and white war paint spirals, large lower tusks, wild dark hair with bones and teeth, shaman class, chanting idle pose. Wears a tattered wolf pelt over a dark blue-gray hide skirt, bone and talisman necklaces, a tall skull-topped totem staff with a swirling blue-white storm cloud and small lightning bolts. Color identity: dark blue-gray, pelt gray, storm-blue lightning.
+```
+
+Palette:
+```
+#0e1014 #242a36 #3e485c #5e6a82 #8a8e96 #4a9aea #9ad4ff #f0fbff #d8d0b8 #6e8e46 #4e6a30 #344a22 #b82a2a
+```
+
+## Monk
+
+### Human Monk
+
+Prompt:
+```
+Pixel art fantasy RPG character of a human man, light tan skin, shaved head, short dark stubble, monk class, balanced martial-arts ready stance. Wears a cream sleeveless gi with a deep maroon sash and bracers, bare muscular arms wrapped in white cloth, simple sandals, a soft golden ki glow around the clenched fists. No weapon, no armor. Color identity: cream, maroon, golden ki.
+```
+
+Palette:
+```
+#241410 #5a1a22 #8e2a34 #d8ccb0 #f4ecd8 #fffaf0 #c8981e #ffd84a #fff4a0 #e6bc92 #c4906a #946444 #6a4430
+```
+
+### Elf Monk
+
+Prompt:
+```
+Pixel art fantasy RPG character of an elf, fair skin, long pointed ears, long white hair tied in a high tail, closed serene eyes, monk class, balanced martial-arts ready stance. Wears flowing pale jade green robes with white wraps and a thin silver sash, barefoot, gentle jade-green ki swirling around the open palms. No weapon, no armor. Color identity: pale jade, white, jade-green ki.
+```
+
+Palette:
+```
+#14201c #3a5a4e #6a9a86 #a4ccba #e8f6ee #ffffff #3ae0a0 #a0ffd8 #c8c8c0 #f8e4d4 #e0bea8 #b0907c #8a8a84
+```
+
+### Dwarf Monk
+
+Prompt:
+```
+Pixel art fantasy RPG character of a dwarf, short and stocky, ruddy brown skin, bald with a long braided brown mustache and beard, monk class, balanced martial-arts ready stance. Wears a rust-brown short robe tied with a thick black belt, iron knuckle bands and shin guards, wide bare shoulders, ember-orange ki flickering around the fists. No weapon, no heavy armor. Color identity: rust brown, black, iron gray, ember-orange ki.
+```
+
+Palette:
+```
+#120c0a #2a1c16 #4e2e1e #8a4a26 #b8683a #5c5e64 #9a9ca4 #ff7a2a #ffc060 #e0a07c #bc7a58 #8a5238 #3a2a22
+```
+
+### Orc Monk
+
+Prompt:
+```
+Pixel art fantasy RPG character of an orc, muscular, gray-green skin with pale scars, small lower tusks, shaved head with a single long black topknot, monk class, balanced martial-arts ready stance. Wears a slate-gray sleeveless tunic and wide pants with a bone-white sash, cloth-wrapped fists and forearms, prayer beads around the neck, cold sky-blue ki glowing around the fists. No weapon, no armor. Color identity: slate gray, bone white, sky-blue ki.
+```
+
+Palette:
+```
+#0e1014 #2a2e36 #4a505c #7a808c #d8d4c0 #f0ece0 #4aa0ea #a0dcff #eaf8ff #8e9e84 #6c7c64 #4a5844 #1a1618
+```
