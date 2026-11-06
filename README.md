@@ -170,6 +170,7 @@ API (needs the login cookie from `/auth/login`, except `/world`):
 - `GET /parties/:id/replays`, `GET /replays/:id` stored fight logs (last 100 plus 20 pinned boss/defeat/epic fights)
 - `POST /parties/:id/orders {siteId}`, `DELETE /parties/:id/orders/:orderId`, `POST /parties/:id/orders/:orderId/move {dir}` send the party to a city or dungeon and order the queue
 - Management (every call answers with the fresh party): `POST /parties/:id/equip`, `/unequip`, `/items/:itemId/favorite`, `DELETE /items/:itemId`, `POST /members/:memberId/allocate`, `/auto-alloc`, `/reset-points`, `PUT /members/:memberId/ai`, `POST /members/:memberId/ai/reset`
+- Quests: `GET /parties/:id/quests` (all quests with status, objectives, progress and rewards), `POST /parties/:id/quests/:questId/accept`, `DELETE /parties/:id/quests/:questId`
 - City (only while the party is in one): `GET /parties/:id/city`, `POST /parties/:id/city/sell`, `/city/buy`, `/city/teleport`, `POST /parties/:id/town/leave`
 - `GET /content/skills` skill definitions (public)
 
@@ -199,6 +200,7 @@ What you get:
   - **AI:** edit each member's combat rules (skill, target order, target and self conditions), reorder them, save, or reset to the class default. Rules are checked on the server.
   - **Party:** every member's stats and gear side by side.
   - **Bag:** the shared 40-slot bag, favorite stars, equip for any member, discard.
+  - **Quests:** active quests with progress bars, available quests (with rewards), quests that are not open yet and why, and the completed list. Taking a quest adds it to the order queue; the party then travels to the right place, hunts the target monster in a region where it lives, or clears the dungeon, and is paid when done (gold, xp, sometimes an item). Kills count for every active quest that wants them. Boss dungeons only open to a party that has taken their quest.
   - **Orders:** the order queue with reordering, and add a destination from a list.
   - **City:** only while the party stands in a city. A party you send to a city waits there for an hour (or until you give new orders) so you have time to sell, buy from the shop, teleport to cities you have visited (for gold) or send it on its way.
 - **Replay lab:** a developer tool that runs any seed of the sample fight, or loads a log made with `simulate --json`, without needing the API.

@@ -6,8 +6,9 @@
   import CityTab from './CityTab.svelte';
   import OrdersTab from './OrdersTab.svelte';
   import OverviewTab from './OverviewTab.svelte';
+  import QuestsTab from './QuestsTab.svelte';
 
-  type Tab = 'character' | 'ai' | 'party' | 'bag' | 'orders' | 'city';
+  type Tab = 'character' | 'ai' | 'party' | 'bag' | 'quests' | 'orders' | 'city';
   let { start = 'character', onclose }: { start?: Tab; onclose: () => void } = $props();
 
   const party = $derived(session.party!);
@@ -22,6 +23,7 @@
     { id: 'ai', label: 'AI' },
     { id: 'party', label: 'Party' },
     { id: 'bag', label: 'Bag' },
+    { id: 'quests', label: 'Quests' },
     { id: 'orders', label: 'Orders' },
     ...(party.city ? [{ id: 'city' as Tab, label: 'City' }] : []),
   ]);
@@ -61,6 +63,8 @@
       />
     {:else if tab === 'bag'}
       <BagTab />
+    {:else if tab === 'quests'}
+      <QuestsTab />
     {:else if tab === 'orders'}
       <OrdersTab />
     {:else if tab === 'city'}

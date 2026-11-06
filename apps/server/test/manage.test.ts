@@ -219,7 +219,7 @@ describe('orders', () => {
   it('reorders orders', async () => {
     const cookie = await signUp();
     const id = await newParty(cookie);
-    for (const siteId of ['goblin_warren', 'goblin_keep']) {
+    for (const siteId of ['goblin_warren', 'oakhaven']) {
       await call(cookie, 'POST', `/parties/${id}/orders`, { siteId });
     }
     const orders = (await stateOf(id)).orders;
@@ -227,7 +227,7 @@ describe('orders', () => {
       dir: -1,
     });
     expect(res.json().party.orders.map((o: { siteId: string }) => o.siteId)).toEqual([
-      'goblin_keep',
+      'oakhaven',
       'goblin_warren',
     ]);
     expect(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { acceptQuest } from '../src/actions.ts';
 import { advance, createParty, defaultConfig } from '../src/sim.ts';
 import { STARTER_WORLD as W } from '../src/starter-world.ts';
 import { memberDerived } from '../src/progression.ts';
@@ -190,9 +191,15 @@ describe('orders and dungeons', () => {
     expect(r.party.orders).toHaveLength(0);
   });
 
+  /** Boss dungeons only open to a party that has taken the boss quest. */
+  function withBossQuest(p: PartyState) {
+    p.quests.completed = ['clear_the_warren'];
+    expect(acceptQuest(p, W, 'goblin_king', 'quest-order', 0)).toEqual({ ok: true });
+  }
+
   it('clearing a boss dungeon unlocks its region and pins the boss replay', () => {
     const p = strong();
-    p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_keep' });
+    withBossQuest(p);
     const r = advance(p, 3 * DAY, W, cfg);
     expect(
       r.events.some((e) => e.kind === 'zone_unlocked' && e.payload.zoneId === 'ashen_hills'),
@@ -203,7 +210,7 @@ describe('orders and dungeons', () => {
 
   it('after a boss region opens the party can travel there', () => {
     const p = strong();
-    p.orders.push({ id: 'o1', kind: 'goto', siteId: 'goblin_keep' });
+    withBossQuest(p);
     p.orders.push({ id: 'o2', kind: 'goto', siteId: 'stonebridge' });
     const r = advance(p, 4 * DAY, W, cfg);
     expect(r.party.lastCity).toBe('stonebridge');
@@ -227,11 +234,11 @@ describe('orders and dungeons', () => {
 });
 
 describe('defeat', () => {
-  /** A level 1 party thrown at the boss dungeon loses sooner or later. */
+  /** A level 1 party thrown at a dungeon built for level 3 loses sooner or later. */
   function doomed(mode: 'standard' | 'hardcore', seed: number) {
     const p = party(seed, mode);
     p.gold = 1000;
-    p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_keep' });
+    p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_warren' });
     return advance(p, 2 * DAY, W, cfg);
   }
 
@@ -261,7 +268,7 @@ describe('defeat', () => {
         value: 1,
         favorite: true,
       });
-      p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_keep' });
+      p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_warren' });
       const r = advance(p, DAY, W, { ...cfg, defeatItemLossPct: 100 });
       const d = r.events.find((e) => e.kind === 'defeat');
       if (!d) continue;

@@ -15,6 +15,9 @@ import {
   unequipSchema,
 } from '@game/shared';
 import {
+  abandonQuest,
+  acceptQuest,
+  addGotoOrder,
   allocatePoints,
   buyItem,
   createParty,
@@ -33,7 +36,6 @@ import {
   teleportOptions,
   unequipItem,
   usableCity,
-  wakeFromTown,
   type ActionResult,
   type PartyState,
   type SimConfig,
@@ -44,7 +46,7 @@ import { z } from 'zod';
 import { authenticate } from '../auth/guard.ts';
 import type { Pool } from '../db/pool.ts';
 import { decompressEvents } from '../game/replays.ts';
-import { publicWorld, skillCatalog, summarize } from '../game/summary.ts';
+import { orderInfo, publicWorld, questInfo, skillCatalog, summarize } from '../game/summary.ts';
 import { HttpError } from '../http-error.ts';
 
 interface Deps {
@@ -54,7 +56,6 @@ interface Deps {
 }
 
 const idParam = z.object({ id: z.uuid() });
-const MAX_ORDERS = 10;
 
 /** Rule problems map to 4xx: missing things are 404, malformed input 400, the rest conflicts. */
 function statusFor(code: string): number {
@@ -284,19 +285,10 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.post('/parties/:id/orders', { preHandler: auth }, async (req, reply) => {
     const { siteId } = addOrderSchema.parse(req.body);
-    if (!world.sites[siteId]) throw new HttpError(404, 'unknown_site', 'No such place');
-    const state = await mutateParty(req, (s) => {
-      if (s.status !== 'active') throw new HttpError(409, 'party_dead', 'The party has fallen');
-      if (s.orders.length >= MAX_ORDERS)
-        throw new HttpError(409, 'too_many_orders', 'Order queue is full');
-      if (s.orders.some((o) => o.siteId === siteId)) {
-        throw new HttpError(409, 'duplicate_order', 'Already ordered');
-      }
-      s.orders.push({ id: randomUUID(), kind: 'goto', siteId });
-      // A party waiting in town should set off at once instead of finishing its stay first.
-      wakeFromTown(s, Date.now());
-    });
-    return reply.code(201).send({ orders: state.orders });
+    const state = await mutateParty(req, (s) =>
+      addGotoOrder(s, world, siteId, randomUUID(), Date.now()),
+    );
+    return reply.code(201).send({ orders: orderInfo(state, world) });
   });
 
   app.delete('/parties/:id/orders/:orderId', { preHandler: auth }, async (req) => {
@@ -306,7 +298,26 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
       s.orders = s.orders.filter((o) => o.id !== orderId);
       if (s.orders.length === before) throw new HttpError(404, 'not_found', 'Order not found');
     });
-    return { orders: state.orders };
+    return { orders: orderInfo(state, world) };
+  });
+
+  // ---- quests ----
+
+  const questParam = z.object({ id: z.uuid(), questId: z.string().min(1).max(60) });
+
+  app.get('/parties/:id/quests', { preHandler: auth }, async (req) => {
+    const { state } = await ownedParty(req);
+    return { quests: Object.values(world.quests).map((q) => questInfo(state, world, q)) };
+  });
+
+  app.post('/parties/:id/quests/:questId/accept', { preHandler: auth }, async (req) => {
+    const { questId } = questParam.parse(req.params);
+    return act(req, (s) => acceptQuest(s, world, questId, randomUUID(), Date.now()));
+  });
+
+  app.delete('/parties/:id/quests/:questId', { preHandler: auth }, async (req) => {
+    const { questId } = questParam.parse(req.params);
+    return act(req, (s) => abandonQuest(s, questId));
   });
 
   app.post('/parties/:id/orders/:orderId/move', { preHandler: auth }, async (req) => {

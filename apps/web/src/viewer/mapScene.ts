@@ -235,7 +235,10 @@ export class MapScene {
     const used = new Set<string>();
     const m = this.marks;
     m.clear();
-    const ordered = new Map((this.party?.orders ?? []).map((o, i) => [o.siteId, i + 1]));
+    const ordered = new Map<string, number>();
+    (this.party?.orders ?? []).forEach((o, i) => {
+      if (o.targetSiteId && !ordered.has(o.targetSiteId)) ordered.set(o.targetSiteId, i + 1);
+    });
 
     for (const s of info.sites) {
       const c = hexCenter(s.col, s.row);

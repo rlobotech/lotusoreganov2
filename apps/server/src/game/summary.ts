@@ -1,13 +1,81 @@
-import type { PartySummary, SkillInfo, WorldInfo } from '@game/shared';
+import type { OrderInfo, PartySummary, QuestInfo, SkillInfo, WorldInfo } from '@game/shared';
 import {
+  activeQuest,
   memberBreakdown,
   memberDerived,
+  MONSTERS,
+  objectiveTarget,
+  questAvailability,
+  questTargetSite,
+  shopItem,
   SKILLS,
   usableCity,
   xpToNext,
   type PartyState,
+  type QuestDef,
   type WorldDef,
 } from '@game/world';
+
+function objectiveLabel(def: QuestDef['objectives'][number], world: WorldDef): string {
+  if (def.type === 'kill') {
+    const name = MONSTERS[def.template]?.name ?? def.template;
+    return `Defeat ${def.count} ${name}${def.count === 1 ? '' : 's'}`;
+  }
+  const site = world.sites[def.siteId]?.name ?? def.siteId;
+  return def.type === 'visit' ? `Travel to ${site}` : `Clear ${site}`;
+}
+
+/** One quest as the player sees it: status, objectives with progress, and the reward. */
+export function questInfo(state: PartyState, world: WorldDef, def: QuestDef): QuestInfo {
+  const a = questAvailability(state, world, def);
+  const prog = activeQuest(state, def.id);
+  const item = def.reward.item
+    ? shopItem(def.reward.item.base, def.reward.item.itemLevel, def.reward.item.rarity)
+    : null;
+  const opens = Object.values(world.sites).find((s) => s.requiresQuest === def.id);
+  return {
+    id: def.id,
+    name: def.name,
+    description: def.description,
+    minLevel: def.minLevel,
+    repeatable: !!def.repeatable,
+    status: a.status,
+    ...(a.reason ? { reason: a.reason } : {}),
+    objectives: def.objectives.map((o, i) => {
+      const target = objectiveTarget(o);
+      const progress = Math.min(target, prog?.progress[i] ?? 0);
+      return { label: objectiveLabel(o, world), progress, target, done: progress >= target };
+    }),
+    reward: {
+      gold: def.reward.gold,
+      xp: def.reward.xp,
+      ...(item ? { item: { name: item.name, rarity: item.rarity } } : {}),
+    },
+    ...(opens ? { opens: opens.name } : {}),
+  };
+}
+
+export function orderInfo(state: PartyState, world: WorldDef): OrderInfo[] {
+  return state.orders.map((o) => {
+    if (o.kind === 'quest') {
+      const q = o.questId ? world.quests[o.questId] : undefined;
+      return {
+        id: o.id,
+        kind: 'quest' as const,
+        questId: o.questId,
+        label: `Quest: ${q?.name ?? o.questId}`,
+        targetSiteId: o.questId ? questTargetSite(world, state, o.questId) : null,
+      };
+    }
+    return {
+      id: o.id,
+      kind: 'goto' as const,
+      siteId: o.siteId,
+      label: `Go to ${world.sites[o.siteId ?? '']?.name ?? o.siteId}`,
+      targetSiteId: o.siteId ?? null,
+    };
+  });
+}
 
 /** What the client sees of a party. Deliberately leaves out a running fight's result. */
 export function summarize(state: PartyState, world: WorldDef): PartySummary {
@@ -62,7 +130,14 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
       };
     }),
     bag: state.bag,
-    orders: state.orders,
+    orders: orderInfo(state, world),
+    quests: {
+      active: state.quests.active.flatMap((q) => {
+        const def = world.quests[q.id];
+        return def ? [questInfo(state, world, def)] : [];
+      }),
+      completedCount: state.quests.completed.length,
+    },
     cleared: state.cleared,
     dungeon: state.dungeon
       ? {
@@ -125,6 +200,14 @@ export function publicWorld(world: WorldDef): WorldInfo {
               recommendedLevel: s.dungeon.level,
               stages: s.dungeon.stages.length,
               restPolicy: s.dungeon.restPolicy,
+            },
+          }
+        : {}),
+      ...(s.requiresQuest
+        ? {
+            requiresQuest: {
+              id: s.requiresQuest,
+              name: world.quests[s.requiresQuest]?.name ?? s.requiresQuest,
             },
           }
         : {}),

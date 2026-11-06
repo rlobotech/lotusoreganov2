@@ -10,8 +10,18 @@ import {
   zoneAt,
   type PathStep,
 } from './hex.ts';
-import { addToBag, rollDrop } from './loot.ts';
+import { addToBag, rollDrop, shopItem } from './loot.ts';
 import { MONSTERS, monsterUnit } from './monsters.ts';
+import {
+  activeQuest,
+  currentObjectiveIndex,
+  isQuestComplete,
+  recordClear,
+  recordKills,
+  recordVisit,
+  standingAt,
+  zonesWithMonster,
+} from './quests.ts';
 import {
   addXp,
   CLASSES,
@@ -64,6 +74,7 @@ export function defaultConfig(tickMs = 60_000): SimConfig {
 export function normalizeParty(p: PartyState, world: WorldDef): PartyState {
   p.visited ??= [world.startCity];
   if (!p.visited.includes(p.lastCity)) p.visited.push(p.lastCity);
+  p.quests ??= { active: [], completed: [] };
   for (const m of p.members) normalizeMember(m);
   return p;
 }
@@ -104,6 +115,7 @@ export function createParty(o: CreatePartyOptions): PartyState {
     dungeon: null,
     cleared: [],
     visited: [city.id],
+    quests: { active: [], completed: [] },
     forcedRest: false,
     settings: { restBelowPct: 55 },
     stats: { fights: 0, wins: 0, defeats: 0, draws: 0 },
@@ -222,6 +234,7 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
     }
     levelsGained = addXp(p, r.xp);
     grantLevelPoints(ctx, levelsGained);
+    recordKills(p, ctx.world, r.kills ?? {});
     payload.xp = r.xp;
     payload.gold = r.gold;
     payload.loot = r.loot.map((i) => ({ name: i.name, rarity: i.rarity, itemLevel: i.itemLevel }));
@@ -255,6 +268,53 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
   if (fallen.length) p.forcedRest = true;
 
   if (r.outcome === 'victory' && p.dungeon) advanceDungeon(ctx);
+  if (r.outcome === 'victory') settleQuests(ctx);
+}
+
+/** Pays out every active quest whose objectives are all done. */
+function settleQuests(ctx: Ctx) {
+  const p = ctx.party;
+  for (const prog of [...p.quests.active]) {
+    const def = ctx.world.quests[prog.id];
+    if (!def) {
+      p.quests.active = p.quests.active.filter((q) => q !== prog);
+      continue;
+    }
+    if (!isQuestComplete(def, prog)) continue;
+    p.quests.active = p.quests.active.filter((q) => q.id !== def.id);
+    if (!p.quests.completed.includes(def.id)) p.quests.completed.push(def.id);
+    p.orders = p.orders.filter((o) => !(o.kind === 'quest' && o.questId === def.id));
+    p.gold += def.reward.gold;
+    const gained = addXp(p, def.reward.xp);
+    grantLevelPoints(ctx, gained);
+    let itemName: string | undefined;
+    if (def.reward.item) {
+      const s = shopItem(def.reward.item.base, def.reward.item.itemLevel, def.reward.item.rarity);
+      itemName = s.name;
+      addToBag(
+        p.bag,
+        {
+          id: `q_${def.id}_${p.stats.fights}_${ctx.at}`,
+          name: s.name,
+          rarity: s.rarity,
+          itemLevel: s.itemLevel,
+          value: s.value,
+          favorite: true,
+          slot: s.slot,
+          bonuses: { ...s.bonuses },
+        },
+        ctx.cfg.bagSize,
+      );
+    }
+    emit(ctx, 'quest_completed', {
+      questId: def.id,
+      name: def.name,
+      gold: def.reward.gold,
+      xp: def.reward.xp,
+      ...(itemName ? { item: itemName } : {}),
+    });
+    if (gained > 0) emit(ctx, 'level_up', { level: p.level, gained });
+  }
 }
 
 function advanceDungeon(ctx: Ctx) {
@@ -276,8 +336,9 @@ function advanceDungeon(ctx: Ctx) {
   const levelsGained = addXp(p, def.rewardXp);
   grantLevelPoints(ctx, levelsGained);
   p.cleared.push(site.id);
+  recordClear(p, ctx.world, site.id);
   p.dungeon = null;
-  p.orders = p.orders.filter((o) => o.siteId !== site.id);
+  p.orders = p.orders.filter((o) => !(o.kind === 'goto' && o.siteId === site.id));
   emit(ctx, 'dungeon_cleared', {
     siteId: site.id,
     name: site.name,
@@ -352,10 +413,12 @@ function completeActivity(ctx: Ctx): boolean {
       const site = siteAt(ctx.world, p.pos);
       if (site) {
         emit(ctx, 'arrive', { siteId: site.id, name: site.name, kind: site.kind });
+        recordVisit(p, ctx.world, site.id);
+        settleQuests(ctx);
         if (site.kind === 'city') {
           p.lastCity = site.id;
           if (!p.visited.includes(site.id)) p.visited.push(site.id);
-          p.orders = p.orders.filter((o) => o.siteId !== site.id);
+          p.orders = p.orders.filter((o) => !(o.kind === 'goto' && o.siteId === site.id));
           // Arrived on purpose: wait in town so the player can shop and manage before moving on.
           if (a.toSite === site.id) {
             p.activity = { kind: 'town', startedAt: ctx.at, ticks: ctx.cfg.townStayTicks };
@@ -417,17 +480,20 @@ function startFight(ctx: Ctx, f: FightSpec) {
   const size = p.members.length;
   const adj = size >= 5 ? 1 : size <= 2 ? -1 : 0;
   const enemies: UnitDef[] = [];
-  const levels: number[] = [];
+  const templates: string[] = [];
   for (const spawn of f.encounter.monsters) {
     const t = MONSTERS[spawn.template];
     if (!t) throw new Error(`Unknown monster ${spawn.template}`);
     const count = clamp(ctx.rng.int(spawn.min, spawn.max) + (spawn.max > 1 ? adj : 0), 1, 6);
     for (let i = 0; i < count; i++) {
       enemies.push(monsterUnit(t, `e${enemies.length}`, f.level));
-      levels.push(f.level);
+      templates.push(spawn.template);
     }
   }
   enemies.length = Math.min(enemies.length, 6);
+  templates.length = enemies.length;
+  const kills: Record<string, number> = {};
+  for (const t of templates) kills[t] = (kills[t] ?? 0) + 1;
 
   const arena = ARENAS[f.encounter.arena];
   if (!arena) throw new Error(`Unknown arena ${f.encounter.arena}`);
@@ -464,6 +530,7 @@ function startFight(ctx: Ctx, f: FightSpec) {
       xp,
       gold,
       loot,
+      kills,
       events: result.events,
     },
   };
@@ -486,10 +553,16 @@ function startDungeonFight(ctx: Ctx) {
   });
 }
 
-function startWildFight(ctx: Ctx) {
+/** `template` biases the encounter towards one that contains that monster (for kill quests). */
+function startWildFight(ctx: Ctx, template?: string) {
   const p = ctx.party;
   const zone = ctx.world.zones[zoneAt(ctx.world, p.pos)]!;
-  const encounter = pickWeighted(ctx.rng, zone.encounters);
+  let pool = zone.encounters;
+  if (template) {
+    const wanted = pool.filter((e) => e.monsters.some((m) => m.template === template));
+    if (wanted.length > 0) pool = wanted;
+  }
+  const encounter = pickWeighted(ctx.rng, pool);
   const level = clamp(p.level + ctx.rng.int(-1, 1), zone.minLevel, zone.maxLevel);
   // Hunting far below your level pays less, nudging players onward.
   const xpMult = Math.max(0.1, 1 - 0.15 * Math.max(0, p.level - zone.maxLevel));
@@ -510,14 +583,17 @@ export function findHuntingSpot(
   level: number,
   cleared: readonly string[],
   ticksPerHex: number,
+  opts: { zones?: string[]; maxDistance?: number } = {},
 ): { hex: Hex; path: PathStep[] } | null {
   let best: { hex: Hex; path: PathStep[]; score: number } | null = null;
+  const maxDistance = opts.maxDistance ?? 5;
   for (let row = 0; row < world.height; row++) {
     for (let col = 0; col < world.width; col++) {
       const hex = { col, row };
-      if (hexDistance(from, hex) > 5 || sameHex(from, hex)) continue;
+      if (hexDistance(from, hex) > maxDistance || sameHex(from, hex)) continue;
       if (!isPassable(world, hex, cleared) || siteAt(world, hex)) continue;
       const zone = world.zones[zoneAt(world, hex)]!;
+      if (opts.zones && !opts.zones.includes(zone.id)) continue;
       const path = findPath(world, from, hex, cleared, ticksPerHex);
       if (!path) continue;
       const ticks = path.reduce((s, st) => s + st.ticks, 0);
@@ -540,21 +616,41 @@ function startHunting(ctx: Ctx) {
   startWildFight(ctx);
 }
 
-/** 'started' = an activity is running, 'retry' = the order is gone, decide again. */
-function handleOrder(ctx: Ctx): 'started' | 'retry' | 'none' {
+type OrderResult = 'started' | 'retry' | 'none';
+type Drop = (reason?: string) => 'retry';
+
+/** Travels to a zone where the monster lives and hunts it there. */
+function huntFor(ctx: Ctx, template: string, drop: Drop): OrderResult {
   const p = ctx.party;
-  const order = p.orders[0];
-  if (!order) return 'none';
-  const drop = (reason?: string) => {
-    p.orders.shift();
-    if (reason) emit(ctx, 'order_failed', { siteId: order.siteId, reason });
-    return 'retry' as const;
-  };
-  const site = ctx.world.sites[order.siteId];
+  const zones = zonesWithMonster(ctx.world, template, p.cleared).map((z) => z.id);
+  if (zones.length === 0) return drop('unreachable');
+  const inZone = !siteAt(ctx.world, p.pos) && zones.includes(zoneAt(ctx.world, p.pos));
+  if (inZone) {
+    startWildFight(ctx, template);
+    return 'started';
+  }
+  const spot = findHuntingSpot(ctx.world, p.pos, p.level, p.cleared, ctx.cfg.travelTicksPerHex, {
+    zones,
+    maxDistance: 40,
+  });
+  if (!spot) return drop('unreachable');
+  startTravel(ctx, spot.path, null);
+  return 'started';
+}
+
+/**
+ * Walks to a place and, for a dungeon that is not cleared yet, goes in. `finishGoto` is true for a
+ * plain "go to" order, which is done once the party is standing in a city or a cleared dungeon.
+ */
+function goToSite(ctx: Ctx, siteId: string, drop: Drop, finishGoto: boolean): OrderResult {
+  const p = ctx.party;
+  const site = ctx.world.sites[siteId];
   if (!site) return drop('unknown_site');
+  if (site.requiresQuest && !activeQuest(p, site.requiresQuest)) return drop('quest_required');
 
   if (p.pos.col === site.col && p.pos.row === site.row) {
-    if (site.kind === 'city' || p.cleared.includes(site.id)) return drop();
+    if (site.kind === 'city' || p.cleared.includes(site.id))
+      return finishGoto ? drop() : drop('done');
     p.dungeon = { siteId: site.id, stage: 0, restsUsed: 0 };
     emit(ctx, 'enter_dungeon', {
       siteId: site.id,
@@ -575,6 +671,46 @@ function handleOrder(ctx: Ctx): 'started' | 'retry' | 'none' {
   if (!path || path.length === 0) return drop('unreachable');
   startTravel(ctx, path, site.id);
   return 'started';
+}
+
+/** 'started' = an activity is running, 'retry' = the order is gone, decide again. */
+function handleOrder(ctx: Ctx): OrderResult {
+  const p = ctx.party;
+  const order = p.orders[0];
+  if (!order) return 'none';
+  const drop: Drop = (reason) => {
+    p.orders.shift();
+    if (reason && reason !== 'done') {
+      emit(ctx, 'order_failed', { siteId: order.siteId, questId: order.questId, reason });
+    }
+    return 'retry';
+  };
+
+  if (order.kind === 'goto') return goToSite(ctx, order.siteId ?? '', drop, true);
+
+  // A quest order works on the first unfinished objective.
+  const def = order.questId ? ctx.world.quests[order.questId] : undefined;
+  const prog = def ? activeQuest(p, def.id) : undefined;
+  if (!def || !prog) return drop('unknown_quest');
+  const i = currentObjectiveIndex(def, prog);
+  if (i === -1) {
+    settleQuests(ctx);
+    return 'retry';
+  }
+  const obj = def.objectives[i]!;
+  if (obj.type === 'kill') return huntFor(ctx, obj.template, drop);
+  if (obj.type === 'visit' && standingAt(ctx.world, p, obj.siteId)) {
+    recordVisit(p, ctx.world, obj.siteId);
+    settleQuests(ctx);
+    return 'retry';
+  }
+  if (obj.type === 'clear' && p.cleared.includes(obj.siteId)) {
+    // Already cleared before the quest was taken: the objective is met.
+    recordClear(p, ctx.world, obj.siteId);
+    settleQuests(ctx);
+    return 'retry';
+  }
+  return goToSite(ctx, obj.siteId, drop, false);
 }
 
 function decide(ctx: Ctx) {

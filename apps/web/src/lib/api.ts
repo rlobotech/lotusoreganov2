@@ -7,6 +7,7 @@ import type {
   OrderInfo,
   PartySummary,
   PublicUser,
+  QuestInfo,
   RegisterInput,
   ReplayListEntry,
   SkillInfo,
@@ -82,6 +83,13 @@ export const api = {
   replay: (id: number) => request<ReplayDetail>('GET', `/replays/${id}`),
 
   skills: () => request<{ skills: SkillInfo[] }>('GET', '/content/skills'),
+
+  quests: (partyId: string) =>
+    request<{ quests: QuestInfo[] }>('GET', `/parties/${partyId}/quests`),
+  acceptQuest: (partyId: string, questId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/quests/${questId}/accept`),
+  abandonQuest: (partyId: string, questId: string) =>
+    request<{ party: PartySummary }>('DELETE', `/parties/${partyId}/quests/${questId}`),
 
   // management: every call answers with the fresh party summary
   equip: (partyId: string, memberId: string, itemId: string) =>

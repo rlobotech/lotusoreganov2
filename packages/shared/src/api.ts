@@ -80,8 +80,35 @@ export interface CityInfo {
 
 export interface OrderInfo {
   id: string;
-  kind: 'goto';
-  siteId: string;
+  kind: 'goto' | 'quest';
+  siteId?: string;
+  questId?: string;
+  /** "Go to Oakhaven" or "Quest: Pest control". */
+  label: string;
+  /** The place the order currently leads to (for the map), if it is a place. */
+  targetSiteId: string | null;
+}
+
+export interface QuestObjectiveInfo {
+  label: string;
+  progress: number;
+  target: number;
+  done: boolean;
+}
+
+export interface QuestInfo {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  repeatable: boolean;
+  status: 'available' | 'active' | 'completed' | 'locked';
+  /** Why a locked quest cannot be taken yet. */
+  reason?: string;
+  objectives: QuestObjectiveInfo[];
+  reward: { gold: number; xp: number; item?: { name: string; rarity: ItemInfo['rarity'] } };
+  /** Set for quests that open a boss dungeon. */
+  opens?: string;
 }
 
 export interface PartySummary {
@@ -108,6 +135,8 @@ export interface PartySummary {
   } | null;
   /** What the party is doing now. `endsAt` is when it finishes (ms since epoch), null if never. */
   activity: { kind: string; label: string; endsAt: number | null };
+  /** Quests being worked on, with progress, and how many have been completed. */
+  quests: { active: QuestInfo[]; completedCount: number };
   /** Set while the party stands in a city it can use (shop, sell, teleport). */
   city: { id: string; name: string } | null;
   /** The party is waiting in town and can be sent on its way. */
@@ -136,6 +165,8 @@ export interface WorldInfo {
     col: number;
     row: number;
     dungeon?: { recommendedLevel: number; stages: number; restPolicy: string };
+    /** A boss dungeon opens only to a party that has taken this quest. */
+    requiresQuest?: { id: string; name: string };
   }>;
 }
 

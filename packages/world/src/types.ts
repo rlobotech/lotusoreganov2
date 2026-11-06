@@ -61,6 +61,8 @@ export interface SiteDef {
   dungeon?: DungeonDef;
   /** What a city's shop sells. */
   shop?: ShopItem[];
+  /** A boss dungeon only opens to a party that has taken this quest. */
+  requiresQuest?: string;
 }
 
 export interface WorldDef {
@@ -73,6 +75,7 @@ export interface WorldDef {
   zones: Record<string, ZoneDef>;
   sites: Record<string, SiteDef>;
   startCity: string;
+  quests: Record<string, QuestDef>;
 }
 
 // ---------- party ----------
@@ -140,8 +143,47 @@ export interface ShopItem {
 
 export interface Order {
   id: string;
-  kind: 'goto';
-  siteId: string;
+  /** 'goto' sends the party to a place; 'quest' works on a quest's current objective. */
+  kind: 'goto' | 'quest';
+  siteId?: string;
+  questId?: string;
+}
+
+// ---------- quests ----------
+
+export type Objective =
+  /** Defeat `count` monsters of this kind (wild or dungeon), counted from acceptance. */
+  | { type: 'kill'; template: string; count: number }
+  /** Arrive at a place. */
+  | { type: 'visit'; siteId: string }
+  /** Clear a dungeon. */
+  | { type: 'clear'; siteId: string };
+
+export interface QuestReward {
+  gold: number;
+  xp: number;
+  /** A guaranteed item, made from an item base like shop stock is. */
+  item?: { base: string; itemLevel: number; rarity: Rarity };
+}
+
+export interface QuestDef {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  /** Quests that must be completed first. */
+  requires?: string[];
+  /** Objectives are worked through in order. */
+  objectives: Objective[];
+  reward: QuestReward;
+  /** Can be taken again after completing it. */
+  repeatable?: boolean;
+}
+
+export interface QuestProgress {
+  id: string;
+  /** One number per objective: kills so far, or 1 once a visit/clear is done. */
+  progress: number[];
 }
 
 export interface FightResult {
@@ -151,6 +193,8 @@ export interface FightResult {
   xp: number;
   gold: number;
   loot: Item[];
+  /** Monsters defeated by kind, for quest progress. Missing in fights saved before quests. */
+  kills?: Record<string, number>;
   events: CombatEvent[];
 }
 
@@ -199,6 +243,7 @@ export interface PartyState {
   cleared: string[];
   /** Cities the party has been to; only these can be teleported to. */
   visited: string[];
+  quests: { active: QuestProgress[]; completed: string[] };
   forcedRest: boolean;
   settings: { restBelowPct: number };
   stats: { fights: number; wins: number; defeats: number; draws: number };

@@ -13,7 +13,7 @@
   const world = $derived(session.world!);
 
   let selected = $state<string | null>(null);
-  let menu = $state<'character' | 'city' | null>(null);
+  let menu = $state<'character' | 'city' | 'quests' | null>(null);
   const unspent = $derived(party.members.reduce((s, m) => s + m.points, 0));
   let now = $state(Date.now());
   let hasNew = $state(false);
@@ -27,7 +27,9 @@
     const zone = world.zones.find((z) => z.id === world.zoneOf[site.row * world.width + site.col]);
     return !!zone?.unlockedBy && !party.cleared.includes(zone.unlockedBy);
   });
-  const ordered = $derived(site ? party.orders.some((o) => o.siteId === site.id) : false);
+  const ordered = $derived(site ? party.orders.some((o) => o.targetSiteId === site.id) : false);
+  const gate = $derived(site?.requiresQuest ?? null);
+  const questActive = $derived(gate ? party.quests.active.some((q) => q.id === gate.id) : false);
 
   async function poll() {
     try {
@@ -77,7 +79,6 @@
 
   const pct = (a: number, b: number) => `${Math.max(0, Math.min(100, (a / b) * 100))}%`;
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  const siteName = (id: string) => world.sites.find((s) => s.id === id)?.name ?? id;
   const rank = { epic: 3, rare: 2, uncommon: 1, common: 0 } as const;
   const bagTop = $derived(
     [...party.bag]
@@ -165,6 +166,11 @@
           {/if}
           {#if siteLocked}
             <div class="muted small">This region is closed until its guardian falls.</div>
+          {:else if gate && !questActive && !party.cleared.includes(site.id)}
+            <div class="small">Entry requires the quest <strong>{gate.name}</strong>.</div>
+            <button class="primary" onclick={() => (menu = 'quests')}>Open quests</button>
+          {:else if gate && questActive && !party.cleared.includes(site.id)}
+            <div class="muted small">The quest "{gate.name}" is active. The party is on it.</div>
           {:else if ordered}
             <div class="muted small">Already in the order list.</div>
           {:else if party.status === 'active'}
@@ -181,7 +187,7 @@
         <div class="label">Orders</div>
         {#each party.orders as o, i}
           <div class="row">
-            <span>{i + 1}. {siteName(o.siteId)}</span>
+            <span>{i + 1}. {o.label}</span>
             <button
               class="small-btn"
               onclick={() => act(() => api.removeOrder(party.id, o.id))}
@@ -193,6 +199,29 @@
         {:else}
           <div class="muted small">
             None. The party hunts on its own. Tap a place on the map to send it somewhere.
+          </div>
+        {/each}
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="label">Quests</span>
+          <button class="small-btn" onclick={() => (menu = 'quests')}>Open</button>
+        </div>
+        {#each party.quests.active as q}
+          <div class="quest">
+            <strong>{q.name}</strong>
+            {#each q.objectives as o}
+              <div class="row small" class:muted={o.done}>
+                <span>{o.done ? '✓ ' : ''}{o.label}</span>
+                <span class="muted">{o.progress}/{o.target}</span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="muted small">
+            No active quests. Quests give gold, experience and items, and open the way to new
+            regions.
           </div>
         {/each}
       </div>
@@ -348,6 +377,12 @@
   }
   .member.down {
     opacity: 0.5;
+  }
+  .quest {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 6px;
   }
   .small-btn {
     min-height: 32px;

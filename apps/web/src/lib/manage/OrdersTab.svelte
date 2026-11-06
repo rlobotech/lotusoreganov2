@@ -13,9 +13,13 @@
     return { party: (await api.myParty()).party! };
   };
   const site = (id: string) => world.sites.find((s) => s.id === id);
+  // Boss dungeons are entered through their quest, so they are not offered as a plain destination.
   const addable = $derived(
     world.sites.filter(
-      (s) => !party.orders.some((o) => o.siteId === s.id) && s.id !== party.lastCity,
+      (s) =>
+        !party.orders.some((o) => o.siteId === s.id) &&
+        s.id !== party.lastCity &&
+        (!s.requiresQuest || party.cleared.includes(s.id)),
     ),
   );
   let choice = $state('');
@@ -23,16 +27,16 @@
 
 <h3>Orders</h3>
 <p class="muted small">
-  The party works through its orders from the top, and hunts on its own when there are none. You can
-  also tap a place on the world map.
+  The party works through its orders from the top, and hunts on its own when there are none. Quests
+  you take in the Quests tab appear here too. You can also tap a place on the world map.
 </p>
 {#if error}<p class="bad">{error}</p>{/if}
 
 {#each party.orders as o, i}
-  {@const s = site(o.siteId)}
+  {@const s = o.targetSiteId ? site(o.targetSiteId) : undefined}
   <div class="card">
     <div class="row">
-      <span><strong>{i + 1}.</strong> Go to {s?.name ?? o.siteId}</span>
+      <span><strong>{i + 1}.</strong> {o.label}</span>
       <span class="actions">
         <button
           class="icon-btn"
@@ -82,7 +86,7 @@
       Send there
     </button>
   </div>
-  <div class="muted small">Quests arrive in a later update.</div>
+  <div class="muted small">For a quest, use the Quests tab.</div>
 </div>
 
 <style>

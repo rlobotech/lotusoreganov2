@@ -1,5 +1,5 @@
 import { shopItem } from './loot.ts';
-import type { EncounterDef, SiteDef, Terrain, WorldDef, ZoneDef } from './types.ts';
+import type { EncounterDef, QuestDef, SiteDef, Terrain, WorldDef, ZoneDef } from './types.ts';
 
 // r = road, . = plains, f = forest, h = hills, s = swamp, m = mountain, ~ = water
 const MAP = [
@@ -166,6 +166,7 @@ const sites: Record<string, SiteDef> = {
     kind: 'boss_dungeon',
     col: 7,
     row: 3,
+    requiresQuest: 'goblin_king',
     dungeon: {
       level: 5,
       restPolicy: 'limited',
@@ -219,6 +220,106 @@ const sites: Record<string, SiteDef> = {
   },
 };
 
+const quests: Record<string, QuestDef> = {
+  pest_control: {
+    id: 'pest_control',
+    name: 'Pest control',
+    description: 'Goblins are raiding the farms around Oakhaven. Thin their numbers.',
+    minLevel: 1,
+    objectives: [{ type: 'kill', template: 'goblin', count: 8 }],
+    reward: { gold: 60, xp: 160 },
+  },
+  wolves_at_the_door: {
+    id: 'wolves_at_the_door',
+    name: 'Wolves at the door',
+    description: 'A wolf pack has been stalking travellers on the Greenwood roads.',
+    minLevel: 1,
+    objectives: [{ type: 'kill', template: 'wolf', count: 6 }],
+    reward: { gold: 70, xp: 200, item: { base: 'Leather Cap', itemLevel: 3, rarity: 'uncommon' } },
+  },
+  scout_the_warren: {
+    id: 'scout_the_warren',
+    name: 'Scout the warren',
+    description: 'Find the Goblin Warren and see what is in there.',
+    minLevel: 2,
+    objectives: [{ type: 'visit', siteId: 'goblin_warren' }],
+    reward: { gold: 30, xp: 120 },
+  },
+  clear_the_warren: {
+    id: 'clear_the_warren',
+    name: 'Clear the Goblin Warren',
+    description: 'Fight through the warren and break the chieftain.',
+    minLevel: 3,
+    requires: ['scout_the_warren'],
+    objectives: [{ type: 'clear', siteId: 'goblin_warren' }],
+    reward: { gold: 120, xp: 300, item: { base: 'Iron Dagger', itemLevel: 4, rarity: 'uncommon' } },
+  },
+  archers_toll: {
+    id: 'archers_toll',
+    name: "Archers' toll",
+    description: 'Goblin archers pick off anyone on the east road. Silence them.',
+    minLevel: 3,
+    objectives: [{ type: 'kill', template: 'goblin_archer', count: 6 }],
+    reward: { gold: 90, xp: 260 },
+  },
+  goblin_king: {
+    id: 'goblin_king',
+    name: 'The Goblin King',
+    description:
+      'The Goblin King rules from his keep. End his reign and the road to the Ashen Hills opens.',
+    minLevel: 5,
+    requires: ['clear_the_warren'],
+    objectives: [{ type: 'clear', siteId: 'goblin_keep' }],
+    reward: { gold: 300, xp: 900, item: { base: 'Bone Charm', itemLevel: 6, rarity: 'rare' } },
+  },
+  welcome_to_stonebridge: {
+    id: 'welcome_to_stonebridge',
+    name: 'Welcome to Stonebridge',
+    description: 'With the keep fallen, travel to Stonebridge and meet the people of the hills.',
+    minLevel: 6,
+    requires: ['goblin_king'],
+    objectives: [{ type: 'visit', siteId: 'stonebridge' }],
+    reward: { gold: 80, xp: 300 },
+  },
+  orc_menace: {
+    id: 'orc_menace',
+    name: 'Orc menace',
+    description: 'Orc brutes are raiding caravans in the Ashen Hills.',
+    minLevel: 6,
+    requires: ['goblin_king'],
+    objectives: [{ type: 'kill', template: 'orc_brute', count: 8 }],
+    reward: { gold: 200, xp: 650 },
+  },
+  restless_dead: {
+    id: 'restless_dead',
+    name: 'Restless dead',
+    description: 'The dead are walking near the old crypt. Put them back to rest.',
+    minLevel: 7,
+    requires: ['goblin_king'],
+    objectives: [{ type: 'kill', template: 'skeleton', count: 10 }],
+    reward: { gold: 220, xp: 750 },
+  },
+  into_the_crypt: {
+    id: 'into_the_crypt',
+    name: 'Into the crypt',
+    description:
+      'Descend into the Old Crypt and destroy whatever commands the dead. There is no rest down there.',
+    minLevel: 8,
+    requires: ['restless_dead'],
+    objectives: [{ type: 'clear', siteId: 'old_crypt' }],
+    reward: { gold: 400, xp: 1500, item: { base: 'Spell Tome', itemLevel: 9, rarity: 'epic' } },
+  },
+  goblin_bounty: {
+    id: 'goblin_bounty',
+    name: 'Goblin bounty',
+    description: 'A standing bounty on goblins. Hand in as many as you like.',
+    minLevel: 1,
+    objectives: [{ type: 'kill', template: 'goblin', count: 10 }],
+    reward: { gold: 50, xp: 120 },
+    repeatable: true,
+  },
+};
+
 export const STARTER_WORLD: WorldDef = {
   id: 'starter',
   width: WIDTH,
@@ -234,4 +335,5 @@ export const STARTER_WORLD: WorldDef = {
   zones,
   sites,
   startCity: 'oakhaven',
+  quests,
 };

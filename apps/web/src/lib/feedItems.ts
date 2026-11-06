@@ -22,7 +22,7 @@ export type FeedItem =
 export const COLLAPSE_ABOVE = 12;
 
 const CHATTER = new Set(['travel', 'arrive', 'rest']);
-const GOOD = new Set(['level_up', 'dungeon_cleared', 'zone_unlocked']);
+const GOOD = new Set(['level_up', 'dungeon_cleared', 'zone_unlocked', 'quest_completed']);
 const BAD = new Set(['defeat', 'party_lost']);
 
 type Payload = Record<string, unknown>;

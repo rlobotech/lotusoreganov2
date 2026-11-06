@@ -46,12 +46,16 @@ export function formatFeedEvent(e: FeedEvent): string {
         : '';
       return `DEFEATED. Back at ${p.city}, lost ${p.goldLost} gold${lost}.`;
     }
+    case 'quest_completed': {
+      const item = p.item ? `, ${p.item}` : '';
+      return `Quest complete: ${p.name}! +${p.gold} gold, +${p.xp} xp${item}.`;
+    }
     case 'teleport':
       return `Teleported from ${p.from} to ${p.to} for ${p.cost} gold.`;
     case 'party_lost':
       return `${p.name} has fallen for good at level ${p.level}.`;
     case 'order_failed':
-      return `Could not follow the order to ${p.siteId} (${p.reason}).`;
+      return `Could not follow the order to ${p.siteId ?? p.questId} (${p.reason}).`;
     default:
       return `${e.kind} ${JSON.stringify(e.payload)}`;
   }

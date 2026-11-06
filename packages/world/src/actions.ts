@@ -2,6 +2,7 @@ import type { AIRule, Attributes } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
 import { addToBag } from './loot.ts';
 import { ATTRS, CLASSES, memberDerived, SKILLS, spentPoints } from './progression.ts';
+import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
   SLOTS,
   type FeedEvent,
@@ -214,6 +215,65 @@ export function moveOrder(p: PartyState, orderId: string, dir: -1 | 1): ActionRe
   const j = i + dir;
   if (j < 0 || j >= p.orders.length) return OK;
   [p.orders[i], p.orders[j]] = [p.orders[j]!, p.orders[i]!];
+  return OK;
+}
+
+export const MAX_ORDERS = 10;
+
+/** Adds a "go to" order after checking the place exists and may be visited. */
+export function addGotoOrder(
+  p: PartyState,
+  world: WorldDef,
+  siteId: string,
+  orderId: string,
+  now: number,
+): ActionResult {
+  const site = world.sites[siteId];
+  if (!site) return fail('no_site', 'No such place');
+  if (p.status !== 'active') return fail('party_dead', 'The party has fallen');
+  if (p.orders.length >= MAX_ORDERS) return fail('too_many_orders', 'Order queue is full');
+  if (p.orders.some((o) => o.kind === 'goto' && o.siteId === siteId)) {
+    return fail('duplicate_order', 'Already ordered');
+  }
+  if (site.requiresQuest && !activeQuest(p, site.requiresQuest) && !p.cleared.includes(site.id)) {
+    const q = world.quests[site.requiresQuest];
+    return fail('quest_required', `Take the quest "${q?.name ?? site.requiresQuest}" first`);
+  }
+  p.orders.push({ id: orderId, kind: 'goto', siteId });
+  wakeFromTown(p, now);
+  return OK;
+}
+
+// ---------- quests ----------
+
+export function acceptQuest(
+  p: PartyState,
+  world: WorldDef,
+  questId: string,
+  orderId: string,
+  now: number,
+): ActionResult {
+  const def = world.quests[questId];
+  if (!def) return fail('no_quest', 'No such quest');
+  if (p.status !== 'active') return fail('party_dead', 'The party has fallen');
+  const a = questAvailability(p, world, def);
+  if (a.status === 'active') return fail('already_active', 'That quest is already active');
+  if (a.status === 'completed') return fail('already_done', 'That quest is already completed');
+  if (a.status === 'locked') return fail('quest_locked', a.reason ?? 'Not available yet');
+  if (p.quests.active.length >= MAX_ACTIVE_QUESTS) {
+    return fail('too_many_quests', `At most ${MAX_ACTIVE_QUESTS} active quests`);
+  }
+  if (p.orders.length >= MAX_ORDERS) return fail('too_many_orders', 'Order queue is full');
+  p.quests.active.push(newProgress(def));
+  p.orders.push({ id: orderId, kind: 'quest', questId });
+  wakeFromTown(p, now);
+  return OK;
+}
+
+export function abandonQuest(p: PartyState, questId: string): ActionResult {
+  if (!activeQuest(p, questId)) return fail('no_quest', 'That quest is not active');
+  p.quests.active = p.quests.active.filter((q) => q.id !== questId);
+  p.orders = p.orders.filter((o) => !(o.kind === 'quest' && o.questId === questId));
   return OK;
 }
 

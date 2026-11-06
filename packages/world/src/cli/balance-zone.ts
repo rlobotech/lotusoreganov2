@@ -1,3 +1,5 @@
+import { acceptQuest } from '../actions.ts';
+import { questAvailability } from '../quests.ts';
 import { advance, createParty, defaultConfig } from '../sim.ts';
 import { STARTER_WORLD } from '../starter-world.ts';
 
@@ -32,15 +34,16 @@ for (let s = 1; s <= parties; s++) {
       { name: 'R', race: 'orc', cls: 'ranger' },
     ],
   });
-  // Players who check in: send the party to the dungeons when it is about ready.
+  // Players who check in: with nothing queued, take the easiest quest that is available.
   for (let m = 0; m <= hours * 6; m++) {
     const t = m * 600_000;
     if (party.orders.length === 0) {
-      if (party.level >= 4 && !party.cleared.includes('goblin_warren')) {
-        party.orders.push({ id: `w${m}`, kind: 'goto', siteId: 'goblin_warren' });
-      } else if (party.level >= 6 && !party.cleared.includes('goblin_keep')) {
-        party.orders.push({ id: `k${m}`, kind: 'goto', siteId: 'goblin_keep' });
-      }
+      const next = Object.values(STARTER_WORLD.quests)
+        .filter(
+          (q) => !q.repeatable && questAvailability(party, STARTER_WORLD, q).status === 'available',
+        )
+        .sort((a, b) => a.minLevel - b.minLevel)[0];
+      if (next) acceptQuest(party, STARTER_WORLD, next.id, `q${m}`, t);
     }
     const r = advance(party, t, STARTER_WORLD, cfg);
     party = r.party;
