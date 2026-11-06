@@ -1,5 +1,13 @@
-import type { PartySummary, WorldInfo } from '@game/shared';
-import { memberDerived, xpToNext, type PartyState, type WorldDef } from '@game/world';
+import type { PartySummary, SkillInfo, WorldInfo } from '@game/shared';
+import {
+  memberBreakdown,
+  memberDerived,
+  SKILLS,
+  usableCity,
+  xpToNext,
+  type PartyState,
+  type WorldDef,
+} from '@game/world';
 
 /** What the client sees of a party. Deliberately leaves out a running fight's result. */
 export function summarize(state: PartyState, world: WorldDef): PartySummary {
@@ -10,7 +18,9 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
     label = site ? `Travelling to ${site.name}` : 'Travelling to a hunting ground';
   } else if (a.kind === 'fight') label = `Fighting: ${a.title}`;
   else if (a.kind === 'rest') label = a.forced ? 'Recovering' : 'Resting';
+  else if (a.kind === 'town') label = 'Resting in town';
   else if (a.kind === 'dead') label = 'Fallen';
+  const city = usableCity(state, world);
 
   return {
     id: state.id,
@@ -35,6 +45,20 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
         maxHp: d.maxHp,
         mana: m.mana,
         maxMana: d.maxMana,
+        attributes: memberBreakdown(m, state.level),
+        derived: {
+          atk: d.atk,
+          magic: d.magic,
+          def: d.def,
+          res: d.res,
+          speed: d.speed,
+          move: d.move,
+        },
+        points: m.points,
+        autoAlloc: m.autoAlloc,
+        equipment: m.equipment,
+        skills: m.skills,
+        ai: m.ai,
       };
     }),
     bag: state.bag,
@@ -48,8 +72,29 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
         }
       : null,
     activity: { kind: a.kind, label, endsAt: state.nextAt },
+    city: city ? { id: city.id, name: city.name } : null,
+    inTown: a.kind === 'town',
     stats: state.stats,
   };
+}
+
+/** Skill definitions the AI editor and character sheet show. */
+export function skillCatalog(): SkillInfo[] {
+  return Object.values(SKILLS).map((s) => ({
+    id: s.id,
+    name: s.name,
+    kind: s.kind,
+    damageType: s.damageType,
+    power: s.power,
+    range: s.range,
+    manaCost: s.manaCost,
+    cooldown: s.cooldown,
+    side: s.side,
+    ...(s.radius ? { radius: s.radius } : {}),
+    ...(s.status
+      ? { status: { id: s.status.id, kind: s.status.kind, duration: s.status.duration } }
+      : {}),
+  }));
 }
 
 /** The map and sites, without anything the player should not know yet. */

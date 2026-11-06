@@ -16,10 +16,12 @@ import {
   addXp,
   CLASSES,
   createMember,
+  grantPoints,
   memberAttributes,
   memberDerived,
   monsterGold,
   monsterXp,
+  normalizeMember,
   SKILLS,
 } from './progression.ts';
 import type {
@@ -50,7 +52,20 @@ export function defaultConfig(tickMs = 60_000): SimConfig {
     restMinTicks: 10,
     restExtraTicks: 10,
     travelTicksPerHex: 10,
+    pointsPerLevel: 1,
+    townStayTicks: 60,
+    teleportBaseCost: 25,
+    teleportCostPerHex: 15,
+    teleportTicks: 5,
   };
+}
+
+/** Fills in fields older saved parties do not have. Idempotent. */
+export function normalizeParty(p: PartyState, world: WorldDef): PartyState {
+  p.visited ??= [world.startCity];
+  if (!p.visited.includes(p.lastCity)) p.visited.push(p.lastCity);
+  for (const m of p.members) normalizeMember(m);
+  return p;
 }
 
 export interface CreatePartyOptions {
@@ -88,6 +103,7 @@ export function createParty(o: CreatePartyOptions): PartyState {
     nextAt: o.now,
     dungeon: null,
     cleared: [],
+    visited: [city.id],
     forcedRest: false,
     settings: { restBelowPct: 55 },
     stats: { fights: 0, wins: 0, defeats: 0, draws: 0 },
@@ -141,8 +157,8 @@ function memberUnit(p: PartyState, m: Member): UnitDef {
     level: p.level,
     attributes: memberAttributes(m, p.level),
     move: cls.move,
-    skills: cls.skills,
-    ai: cls.ai,
+    skills: m.skills,
+    ai: m.ai,
     sprite: `${m.race}_${m.cls}`,
     hp: m.hp,
     mana: m.mana,
@@ -159,6 +175,12 @@ function pickWeighted(rng: Rng, list: EncounterDef[]): EncounterDef {
   return list[list.length - 1]!;
 }
 
+/** Every member earns attribute points per level gained (auto-spent unless the player opted out). */
+function grantLevelPoints(ctx: Ctx, levelsGained: number) {
+  if (levelsGained <= 0) return;
+  for (const m of ctx.party.members) grantPoints(m, levelsGained * ctx.cfg.pointsPerLevel);
+}
+
 // ---------- completing the current activity ----------
 
 function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
@@ -168,8 +190,10 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
   for (const s of r.survivors) {
     const m = p.members.find((x) => x.id === s.id);
     if (m) {
-      m.hp = s.hp;
-      m.mana = s.mana;
+      // Gear can change mid-fight, so never keep more than the member's current maximum.
+      const d = maxes(p, m);
+      m.hp = Math.min(s.hp, d.maxHp);
+      m.mana = Math.min(s.mana, d.maxMana);
       m.alive = s.alive;
     }
   }
@@ -197,6 +221,7 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
       if (out) discarded.push(out.name);
     }
     levelsGained = addXp(p, r.xp);
+    grantLevelPoints(ctx, levelsGained);
     payload.xp = r.xp;
     payload.gold = r.gold;
     payload.loot = r.loot.map((i) => ({ name: i.name, rarity: i.rarity, itemLevel: i.itemLevel }));
@@ -249,6 +274,7 @@ function advanceDungeon(ctx: Ctx) {
   }
   p.gold += def.rewardGold;
   const levelsGained = addXp(p, def.rewardXp);
+  grantLevelPoints(ctx, levelsGained);
   p.cleared.push(site.id);
   p.dungeon = null;
   p.orders = p.orders.filter((o) => o.siteId !== site.id);
@@ -328,7 +354,14 @@ function completeActivity(ctx: Ctx): boolean {
         emit(ctx, 'arrive', { siteId: site.id, name: site.name, kind: site.kind });
         if (site.kind === 'city') {
           p.lastCity = site.id;
+          if (!p.visited.includes(site.id)) p.visited.push(site.id);
           p.orders = p.orders.filter((o) => o.siteId !== site.id);
+          // Arrived on purpose: wait in town so the player can shop and manage before moving on.
+          if (a.toSite === site.id) {
+            p.activity = { kind: 'town', startedAt: ctx.at, ticks: ctx.cfg.townStayTicks };
+            schedule(ctx, ctx.cfg.townStayTicks);
+            return true;
+          }
         }
       }
       return false;
@@ -577,7 +610,7 @@ export function advance(
   world: WorldDef,
   cfg: SimConfig,
 ): AdvanceResult {
-  const party = structuredClone(input);
+  const party = normalizeParty(structuredClone(input), world);
   const events: FeedEvent[] = [];
   const replays: ReplayOut[] = [];
   let steps = 0;

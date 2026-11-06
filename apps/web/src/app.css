@@ -92,3 +92,96 @@ h3 {
   letter-spacing: 0.04em;
   margin: 0;
 }
+
+/* shared building blocks for the management menu */
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.bad {
+  color: #ff8a8a;
+}
+.good {
+  color: #8affb0;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card > .label,
+.label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.chips button {
+  white-space: nowrap;
+}
+.bar {
+  height: 6px;
+  background: #2a2430;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar.thin {
+  height: 3px;
+}
+.bar > .fill {
+  height: 100%;
+}
+.fill.hp {
+  background: var(--green);
+}
+.fill.mp {
+  background: #4a8af2;
+}
+.fill.xp {
+  background: var(--gold);
+}
+.common {
+  color: var(--text);
+}
+.uncommon {
+  color: #7ad07a;
+}
+.rare {
+  color: #6aa8ff;
+}
+.epic {
+  color: #c78aff;
+}
+.icon-btn {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 8px;
+}
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: 40px;
+  padding: 0 6px;
+}

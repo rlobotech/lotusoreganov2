@@ -59,6 +59,8 @@ export interface SiteDef {
   col: number;
   row: number;
   dungeon?: DungeonDef;
+  /** What a city's shop sells. */
+  shop?: ShopItem[];
 }
 
 export interface WorldDef {
@@ -79,6 +81,17 @@ export type Race = 'human' | 'elf' | 'dwarf' | 'orc';
 export type ClassId = 'warrior' | 'mage' | 'priest' | 'ranger';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
+export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'feet' | 'ring' | 'charm';
+export const SLOTS: readonly Slot[] = [
+  'weapon',
+  'offhand',
+  'head',
+  'body',
+  'feet',
+  'ring',
+  'charm',
+];
+
 export interface Member {
   id: string;
   name: string;
@@ -87,6 +100,18 @@ export interface Member {
   hp: number;
   mana: number;
   alive: boolean;
+  /** Worn items. Each item's `bonuses` add to the member's attributes. */
+  equipment: Partial<Record<Slot, Item>>;
+  /** Attribute points the player has spent (on top of class, race and level growth). */
+  alloc: Attributes;
+  /** Unspent attribute points. */
+  points: number;
+  /** Spend new points automatically in the class's usual pattern. */
+  autoAlloc: boolean;
+  /** Skills this member can use (class skills for now; more are learned later). */
+  skills: string[];
+  /** The member's combat AI, edited by the player. */
+  ai: AIRule[];
 }
 
 export interface Item {
@@ -96,6 +121,21 @@ export interface Item {
   itemLevel: number;
   value: number;
   favorite: boolean;
+  /** Where it is worn. Items without a slot cannot be equipped (older saves). */
+  slot?: Slot;
+  bonuses?: Partial<Attributes>;
+}
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  slot: Slot;
+  rarity: Rarity;
+  itemLevel: number;
+  bonuses: Partial<Attributes>;
+  /** What one unit of the item sells for, and the basis of the buy price. */
+  value: number;
+  price: number;
 }
 
 export interface Order {
@@ -133,7 +173,9 @@ export type Activity =
       startedAt: number;
       result: FightResult;
     }
-  | { kind: 'rest'; startedAt: number; ticks: number; forced: boolean };
+  | { kind: 'rest'; startedAt: number; ticks: number; forced: boolean }
+  /** Waiting in a city after an order, so the player can shop and manage. */
+  | { kind: 'town'; startedAt: number; ticks: number };
 
 export interface PartyState {
   id: string;
@@ -155,6 +197,8 @@ export interface PartyState {
   nextAt: number | null;
   dungeon: { siteId: string; stage: number; restsUsed: number } | null;
   cleared: string[];
+  /** Cities the party has been to; only these can be teleported to. */
+  visited: string[];
   forcedRest: boolean;
   settings: { restBelowPct: number };
   stats: { fights: number; wins: number; defeats: number; draws: number };
@@ -200,6 +244,13 @@ export interface SimConfig {
   restMinTicks: number;
   restExtraTicks: number;
   travelTicksPerHex: number;
+  /** Attribute points each member earns per level. */
+  pointsPerLevel: number;
+  /** How long the party waits in a city after an order before it goes back to hunting. */
+  townStayTicks: number;
+  teleportBaseCost: number;
+  teleportCostPerHex: number;
+  teleportTicks: number;
 }
 
 export interface MemberTemplate {
@@ -216,4 +267,6 @@ export interface ClassDef {
   move: number;
   skills: string[];
   ai: AIRule[];
+  /** The pattern attribute points follow when spent automatically (repeats). */
+  pointOrder: Array<keyof Attributes>;
 }

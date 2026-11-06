@@ -46,6 +46,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     move: 3,
     skills: ['attack', 'power_strike', 'war_cry'],
     ai: warriorAi,
+    pointOrder: ['str', 'vit', 'str', 'vit', 'dex'],
   },
   mage: {
     id: 'mage',
@@ -55,6 +56,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     move: 3,
     skills: ['staff_bolt', 'fireball'],
     ai: [{ skill: 'fireball', order: 'highest_hp' }, { skill: 'staff_bolt' }],
+    pointOrder: ['int', 'int', 'wis', 'vit'],
   },
   priest: {
     id: 'priest',
@@ -68,6 +70,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       { skill: 'heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 75 } },
       { skill: 'staff_bolt' },
     ],
+    pointOrder: ['wis', 'wis', 'int', 'vit'],
   },
   ranger: {
     id: 'ranger',
@@ -80,35 +83,94 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       { skill: 'poison_arrow', order: 'highest_hp', filter: { lacksStatus: 'poison' } },
       { skill: 'shoot' },
     ],
+    pointOrder: ['dex', 'dex', 'str', 'vit'],
   },
 };
 
 /** Skills available in the engine. Real skill content arrives with packages/content. */
 export const SKILLS = samples.skills;
 
-export function memberAttributes(m: Pick<Member, 'race' | 'cls'>, level: number): Attributes {
+export const ATTRS: ReadonlyArray<keyof Attributes> = ['str', 'dex', 'int', 'vit', 'wis'];
+export const zeroAttrs = (): Attributes => ({ str: 0, dex: 0, int: 0, vit: 0, wis: 0 });
+
+/** What a member's attributes are made of, for display and for the totals the engine uses. */
+export type MemberLike = Pick<Member, 'race' | 'cls'> &
+  Partial<Pick<Member, 'alloc' | 'equipment'>>;
+
+export function memberBreakdown(m: MemberLike, level: number) {
   const cls = CLASSES[m.cls];
   const mod = RACE_MODS[m.race];
-  const at = (k: keyof Attributes) =>
-    Math.max(1, Math.round(cls.base[k] + cls.growth[k] * (level - 1) + (mod[k] ?? 0)));
-  return { str: at('str'), dex: at('dex'), int: at('int'), vit: at('vit'), wis: at('wis') };
+  const base = zeroAttrs();
+  const alloc = zeroAttrs();
+  const gear = zeroAttrs();
+  const total = zeroAttrs();
+  const worn = Object.values(m.equipment ?? {});
+  for (const k of ATTRS) {
+    base[k] = Math.round(cls.base[k] + cls.growth[k] * (level - 1) + (mod[k] ?? 0));
+    alloc[k] = m.alloc?.[k] ?? 0;
+    gear[k] = worn.reduce((s, it) => s + (it?.bonuses?.[k] ?? 0), 0);
+    total[k] = Math.max(1, base[k] + alloc[k] + gear[k]);
+  }
+  return { base, alloc, gear, total };
 }
 
-export function memberDerived(m: Pick<Member, 'race' | 'cls'>, level: number): Derived {
+export function memberAttributes(m: MemberLike, level: number): Attributes {
+  return memberBreakdown(m, level).total;
+}
+
+export function memberDerived(m: MemberLike, level: number): Derived {
   return derive(memberAttributes(m, level), level, CLASSES[m.cls].move);
 }
 
 export function createMember(index: number, t: MemberTemplate, level = 1): Member {
-  const d = memberDerived(t, level);
-  return {
+  const cls = CLASSES[t.cls];
+  const m: Member = {
     id: `m${index + 1}`,
     name: t.name,
     race: t.race,
     cls: t.cls,
-    hp: d.maxHp,
-    mana: d.maxMana,
+    hp: 0,
+    mana: 0,
     alive: true,
+    equipment: {},
+    alloc: zeroAttrs(),
+    points: 0,
+    autoAlloc: true,
+    skills: [...cls.skills],
+    ai: structuredClone(cls.ai),
   };
+  const d = memberDerived(m, level);
+  m.hp = d.maxHp;
+  m.mana = d.maxMana;
+  return m;
+}
+
+/** Fills in fields older saves do not have, so new features never break an existing party. */
+export function normalizeMember(m: Member): Member {
+  const cls = CLASSES[m.cls];
+  m.equipment ??= {};
+  m.alloc ??= zeroAttrs();
+  m.points ??= 0;
+  m.autoAlloc ??= true;
+  m.skills ??= [...cls.skills];
+  m.ai ??= structuredClone(cls.ai);
+  return m;
+}
+
+export function spentPoints(m: Pick<Member, 'alloc'>): number {
+  return ATTRS.reduce((s, k) => s + m.alloc[k], 0);
+}
+
+/** Gives a member `n` new points and, if they auto-spend, puts them in the class pattern. */
+export function grantPoints(m: Member, n: number): void {
+  m.points += n;
+  if (!m.autoAlloc) return;
+  const order = CLASSES[m.cls].pointOrder;
+  while (m.points > 0) {
+    const k = order[spentPoints(m) % order.length]!;
+    m.alloc[k] += 1;
+    m.points -= 1;
+  }
 }
 
 /** Adds XP and returns how many levels were gained. Mutates `p`. */

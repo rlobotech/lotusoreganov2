@@ -1,5 +1,9 @@
 /** Response shapes of the game API, shared so the server and the web app cannot drift apart. */
 
+export type SlotName = 'weapon' | 'offhand' | 'head' | 'body' | 'feet' | 'ring' | 'charm';
+export type AttrName = 'str' | 'dex' | 'int' | 'vit' | 'wis';
+export type AttrMap = Record<AttrName, number>;
+
 export interface ItemInfo {
   id: string;
   name: string;
@@ -7,6 +11,20 @@ export interface ItemInfo {
   itemLevel: number;
   value: number;
   favorite: boolean;
+  slot?: SlotName;
+  bonuses?: Partial<AttrMap>;
+}
+
+export interface AiRuleInfo {
+  skill: string;
+  order?: 'nearest' | 'lowest_hp' | 'highest_hp' | 'lowest_hp_pct';
+  filter?: {
+    hpBelowPct?: number;
+    hpAbovePct?: number;
+    lacksStatus?: string;
+    hasStatus?: string;
+  };
+  when?: { selfHpBelowPct?: number; selfManaAbovePct?: number; selfManaBelowPct?: number };
 }
 
 export interface MemberInfo {
@@ -19,6 +37,45 @@ export interface MemberInfo {
   maxHp: number;
   mana: number;
   maxMana: number;
+  /** Where the attributes come from: class/race/level, points spent, and worn gear. */
+  attributes: { base: AttrMap; alloc: AttrMap; gear: AttrMap; total: AttrMap };
+  derived: { atk: number; magic: number; def: number; res: number; speed: number; move: number };
+  points: number;
+  autoAlloc: boolean;
+  equipment: Partial<Record<SlotName, ItemInfo>>;
+  skills: string[];
+  ai: AiRuleInfo[];
+}
+
+export interface SkillInfo {
+  id: string;
+  name: string;
+  kind: 'damage' | 'heal' | 'status';
+  damageType: 'physical' | 'magical';
+  power: number;
+  range: number;
+  manaCost: number;
+  cooldown: number;
+  side: 'enemy' | 'ally' | 'self';
+  radius?: number;
+  status?: { id: string; kind: string; duration: number };
+}
+
+export interface ShopEntry {
+  id: string;
+  name: string;
+  slot: SlotName;
+  rarity: ItemInfo['rarity'];
+  itemLevel: number;
+  bonuses: Partial<AttrMap>;
+  value: number;
+  price: number;
+}
+
+export interface CityInfo {
+  city: { id: string; name: string };
+  stock: ShopEntry[];
+  teleports: Array<{ siteId: string; name: string; cost: number }>;
 }
 
 export interface OrderInfo {
@@ -51,6 +108,10 @@ export interface PartySummary {
   } | null;
   /** What the party is doing now. `endsAt` is when it finishes (ms since epoch), null if never. */
   activity: { kind: string; label: string; endsAt: number | null };
+  /** Set while the party stands in a city it can use (shop, sell, teleport). */
+  city: { id: string; name: string } | null;
+  /** The party is waiting in town and can be sent on its way. */
+  inTown: boolean;
   stats: { fights: number; wins: number; defeats: number; draws: number };
 }
 

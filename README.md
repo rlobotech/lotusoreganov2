@@ -168,7 +168,10 @@ API (needs the login cookie from `/auth/login`, except `/world`):
 - `GET /parties/me`, `GET /parties/:id` status, members, bag, orders
 - `GET /parties/:id/feed` events since you last watched (`?after=` to choose), `POST /parties/:id/feed/seen {upTo}`
 - `GET /parties/:id/replays`, `GET /replays/:id` stored fight logs (last 100 plus 20 pinned boss/defeat/epic fights)
-- `POST /parties/:id/orders {siteId}` and `DELETE /parties/:id/orders/:orderId` send the party to a city or dungeon
+- `POST /parties/:id/orders {siteId}`, `DELETE /parties/:id/orders/:orderId`, `POST /parties/:id/orders/:orderId/move {dir}` send the party to a city or dungeon and order the queue
+- Management (every call answers with the fresh party): `POST /parties/:id/equip`, `/unequip`, `/items/:itemId/favorite`, `DELETE /items/:itemId`, `POST /members/:memberId/allocate`, `/auto-alloc`, `/reset-points`, `PUT /members/:memberId/ai`, `POST /members/:memberId/ai/reset`
+- City (only while the party is in one): `GET /parties/:id/city`, `POST /parties/:id/city/sell`, `/city/buy`, `/city/teleport`, `POST /parties/:id/town/leave`
+- `GET /content/skills` skill definitions (public)
 
 ## Playing it (web app)
 The web app talks to the API through the same origin: the Vite dev server forwards `/api/*` to the API on port 3000, so the login cookie just works. In production a reverse proxy (Caddy) does the same mapping.
@@ -191,6 +194,13 @@ Open http://127.0.0.1:5173. Create an invite code first (see above), then **Crea
 What you get:
 - **Return slideshow:** whenever you come back, the fights and events since your last visit play one at a time (skip this / skip all). Long absences roll routine victories into summaries and keep the notable fights (bosses, defeats, rare loot, anyone falling). What you watched or skipped is remembered on the server, so it works across devices.
 - **Party screen:** the hex world map (pan and zoom, tap a place to send the party there), what the party is doing and when it finishes, members' health, the bag, orders and a list of stored replays to rewatch.
+- **Manage party menu** (button on the party screen):
+  - **Character:** attributes with where each point comes from (class, race, level, points you spent, gear), spend unspent points or let them auto-spend, equip and remove gear, see the member's skills.
+  - **AI:** edit each member's combat rules (skill, target order, target and self conditions), reorder them, save, or reset to the class default. Rules are checked on the server.
+  - **Party:** every member's stats and gear side by side.
+  - **Bag:** the shared 40-slot bag, favorite stars, equip for any member, discard.
+  - **Orders:** the order queue with reordering, and add a destination from a list.
+  - **City:** only while the party stands in a city. A party you send to a city waits there for an hour (or until you give new orders) so you have time to sell, buy from the shop, teleport to cities you have visited (for gold) or send it on its way.
 - **Replay lab:** a developer tool that runs any seed of the sample fight, or loads a log made with `simulate --json`, without needing the API.
 
 Replay controls: play/pause, 1x/2x/4x, previous/next turn, scrub bar, End. Camera: drag to pan, mouse wheel or pinch or the +/- buttons to zoom (whole-number steps), Fit to see the whole arena. Tap a unit to see its HP and statuses.

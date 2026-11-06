@@ -2,6 +2,7 @@
   import type { ReplayListEntry } from '@game/shared';
   import { onMount } from 'svelte';
   import { api, ApiError } from './api.ts';
+  import ManageMenu from './manage/ManageMenu.svelte';
   import ReplayLoader from './ReplayLoader.svelte';
   import { refreshParty, session } from './session.svelte.ts';
   import WorldMap from './WorldMap.svelte';
@@ -12,6 +13,8 @@
   const world = $derived(session.world!);
 
   let selected = $state<string | null>(null);
+  let menu = $state<'character' | 'city' | null>(null);
+  const unspent = $derived(party.members.reduce((s, m) => s + m.points, 0));
   let now = $state(Date.now());
   let hasNew = $state(false);
   let replays = $state<ReplayListEntry[] | null>(null);
@@ -111,8 +114,18 @@
         <div class="muted small">{party.xp} / {party.xpToNext} xp</div>
       </div>
 
+      <button class="primary" onclick={() => (menu = 'character')}>
+        Manage party
+        {#if unspent > 0}<span class="dot">{unspent} points</span>{/if}
+      </button>
+      {#if party.city}
+        <button onclick={() => (menu = 'city')}>
+          {party.inTown ? 'Waiting in' : 'In'}
+          {party.city.name}: shop, sell, teleport
+        </button>
+      {/if}
       {#if hasNew}
-        <button class="primary" onclick={onwatch}>Watch what happened</button>
+        <button onclick={onwatch}>Watch what happened</button>
       {/if}
 
       <div class="card">
@@ -232,6 +245,10 @@
       </div>
     </aside>
   </div>
+{/if}
+
+{#if menu}
+  <ManageMenu start={menu} onclose={() => (menu = null)} />
 {/if}
 
 <style>
@@ -379,6 +396,14 @@
   }
   .replay :global(.replay) {
     flex: 1;
+  }
+  .dot {
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--gold);
+    color: #1a1408;
+    font-size: 12px;
   }
   @media (max-width: 800px) {
     .home {

@@ -101,7 +101,7 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
 };
 
 /** Global difficulty knob for monsters, tuned with `pnpm --filter @game/world balance`. */
-export const MONSTER_POWER = 1.4;
+export const MONSTER_POWER = 1.55;
 
 export function monsterAttributes(t: MonsterTemplate, level: number): Attributes {
   const at = (k: keyof Attributes) =>

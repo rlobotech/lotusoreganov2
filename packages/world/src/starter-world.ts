@@ -1,3 +1,4 @@
+import { shopItem } from './loot.ts';
 import type { EncounterDef, SiteDef, Terrain, WorldDef, ZoneDef } from './types.ts';
 
 // r = road, . = plains, f = forest, h = hills, s = swamp, m = mountain, ~ = water
@@ -119,7 +120,27 @@ const zones: Record<string, ZoneDef> = {
 };
 
 const sites: Record<string, SiteDef> = {
-  oakhaven: { id: 'oakhaven', name: 'Oakhaven', kind: 'city', col: 4, row: 5 },
+  oakhaven: {
+    id: 'oakhaven',
+    name: 'Oakhaven',
+    kind: 'city',
+    col: 4,
+    row: 5,
+    shop: [
+      shopItem('Rusty Sword', 2, 'common'),
+      shopItem('Iron Dagger', 2, 'common'),
+      shopItem('Short Bow', 2, 'common'),
+      shopItem('Gnarled Staff', 2, 'common'),
+      shopItem('Wooden Shield', 2, 'common'),
+      shopItem('Leather Cap', 2, 'common'),
+      shopItem('Padded Vest', 3, 'uncommon'),
+      shopItem('Cloth Robe', 3, 'uncommon'),
+      shopItem('Worn Boots', 3, 'uncommon'),
+      shopItem('Spell Tome', 3, 'uncommon'),
+      shopItem('Copper Ring', 4, 'uncommon'),
+      shopItem('Bone Charm', 4, 'uncommon'),
+    ],
+  },
   goblin_warren: {
     id: 'goblin_warren',
     name: 'Goblin Warren',
@@ -159,7 +180,25 @@ const sites: Record<string, SiteDef> = {
       ],
     },
   },
-  stonebridge: { id: 'stonebridge', name: 'Stonebridge', kind: 'city', col: 9, row: 4 },
+  stonebridge: {
+    id: 'stonebridge',
+    name: 'Stonebridge',
+    kind: 'city',
+    col: 9,
+    row: 4,
+    shop: [
+      shopItem('Rusty Sword', 7, 'uncommon'),
+      shopItem('Short Bow', 7, 'uncommon'),
+      shopItem('Gnarled Staff', 7, 'uncommon'),
+      shopItem('Wooden Shield', 7, 'uncommon'),
+      shopItem('Leather Cap', 7, 'uncommon'),
+      shopItem('Padded Vest', 8, 'uncommon'),
+      shopItem('Cloth Robe', 8, 'uncommon'),
+      shopItem('Worn Boots', 8, 'uncommon'),
+      shopItem('Copper Ring', 9, 'rare'),
+      shopItem('Bone Charm', 9, 'rare'),
+    ],
+  },
   old_crypt: {
     id: 'old_crypt',
     name: 'Old Crypt',

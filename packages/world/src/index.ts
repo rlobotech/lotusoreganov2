@@ -3,6 +3,7 @@ export * from './hex.ts';
 export * from './progression.ts';
 export * from './monsters.ts';
 export * from './loot.ts';
+export * from './actions.ts';
 export { ARENAS } from './arenas.ts';
 export { STARTER_WORLD } from './starter-world.ts';
 export { formatClock, formatFeedEvent } from './format.ts';
@@ -12,5 +13,6 @@ export {
   defaultConfig,
   findHuntingSpot,
   hpFraction,
+  normalizeParty,
   type CreatePartyOptions,
 } from './sim.ts';

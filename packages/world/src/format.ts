@@ -46,6 +46,8 @@ export function formatFeedEvent(e: FeedEvent): string {
         : '';
       return `DEFEATED. Back at ${p.city}, lost ${p.goldLost} gold${lost}.`;
     }
+    case 'teleport':
+      return `Teleported from ${p.from} to ${p.to} for ${p.cost} gold.`;
     case 'party_lost':
       return `${p.name} has fallen for good at level ${p.level}.`;
     case 'order_failed':

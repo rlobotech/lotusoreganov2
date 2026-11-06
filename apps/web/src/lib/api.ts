@@ -1,12 +1,17 @@
 import type {
+  AiRuleInfo,
+  AttrMap,
+  CityInfo,
   FeedPage,
   LoginInput,
+  OrderInfo,
   PartySummary,
   PublicUser,
   RegisterInput,
   ReplayListEntry,
+  SkillInfo,
+  SlotName,
   WorldInfo,
-  OrderInfo,
 } from '@game/shared';
 import type { CombatEvent } from '@game/engine';
 
@@ -75,6 +80,51 @@ export const api = {
   replays: (partyId: string) =>
     request<{ replays: ReplayListEntry[] }>('GET', `/parties/${partyId}/replays`),
   replay: (id: number) => request<ReplayDetail>('GET', `/replays/${id}`),
+
+  skills: () => request<{ skills: SkillInfo[] }>('GET', '/content/skills'),
+
+  // management: every call answers with the fresh party summary
+  equip: (partyId: string, memberId: string, itemId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/equip`, { memberId, itemId }),
+  unequip: (partyId: string, memberId: string, slot: SlotName) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/unequip`, { memberId, slot }),
+  favorite: (partyId: string, itemId: string, value: boolean) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/items/${itemId}/favorite`, {
+      value,
+    }),
+  discard: (partyId: string, itemId: string) =>
+    request<{ party: PartySummary }>('DELETE', `/parties/${partyId}/items/${itemId}`),
+  allocate: (partyId: string, memberId: string, alloc: Partial<AttrMap>) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/members/${memberId}/allocate`, {
+      alloc,
+    }),
+  autoAlloc: (partyId: string, memberId: string, auto: boolean) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/members/${memberId}/auto-alloc`, {
+      auto,
+    }),
+  resetPoints: (partyId: string, memberId: string) =>
+    request<{ party: PartySummary }>(
+      'POST',
+      `/parties/${partyId}/members/${memberId}/reset-points`,
+    ),
+  setAi: (partyId: string, memberId: string, rules: AiRuleInfo[]) =>
+    request<{ party: PartySummary }>('PUT', `/parties/${partyId}/members/${memberId}/ai`, {
+      rules,
+    }),
+  resetAi: (partyId: string, memberId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/members/${memberId}/ai/reset`),
+  moveOrder: (partyId: string, orderId: string, dir: -1 | 1) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/orders/${orderId}/move`, { dir }),
+
+  city: (partyId: string) => request<CityInfo>('GET', `/parties/${partyId}/city`),
+  sell: (partyId: string, itemIds: string[]) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/sell`, { itemIds }),
+  buy: (partyId: string, stockId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/buy`, { stockId }),
+  teleport: (partyId: string, siteId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/teleport`, { siteId }),
+  leaveTown: (partyId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/town/leave`),
 
   addOrder: (partyId: string, siteId: string) =>
     request<{ orders: OrderInfo[] }>('POST', `/parties/${partyId}/orders`, { siteId }),

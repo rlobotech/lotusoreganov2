@@ -22,3 +22,26 @@ export type CreatePartyInput = z.infer<typeof createPartySchema>;
 export const addOrderSchema = z.object({ siteId: z.string().min(1).max(64) });
 
 export const seenSchema = z.object({ upTo: z.number().int().min(0) });
+
+export const SLOT_NAMES = ['weapon', 'offhand', 'head', 'body', 'feet', 'ring', 'charm'] as const;
+const idStr = z.string().min(1).max(80);
+
+export const equipSchema = z.object({ memberId: idStr, itemId: idStr });
+export const unequipSchema = z.object({ memberId: idStr, slot: z.enum(SLOT_NAMES) });
+export const favoriteSchema = z.object({ value: z.boolean() });
+export const allocSchema = z.object({
+  alloc: z.object({
+    str: z.number().int().min(0).max(100).optional(),
+    dex: z.number().int().min(0).max(100).optional(),
+    int: z.number().int().min(0).max(100).optional(),
+    vit: z.number().int().min(0).max(100).optional(),
+    wis: z.number().int().min(0).max(100).optional(),
+  }),
+});
+export const autoAllocSchema = z.object({ auto: z.boolean() });
+/** The rules themselves are checked by the game rules (world package), which know the skills. */
+export const aiSchema = z.object({ rules: z.array(z.record(z.string(), z.unknown())).max(32) });
+export const sellSchema = z.object({ itemIds: z.array(idStr).min(1).max(40) });
+export const buySchema = z.object({ stockId: idStr });
+export const teleportSchema = z.object({ siteId: idStr });
+export const moveOrderSchema = z.object({ dir: z.union([z.literal(-1), z.literal(1)]) });
