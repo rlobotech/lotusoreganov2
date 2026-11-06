@@ -103,7 +103,7 @@ Key principle: **engine is pure and deterministic** (seeded RNG, no Date/Math.ra
 - **Modes:** `free` (default after the user touches the camera), `auto-fit` (whole arena, used at start), `follow` (camera glides to the acting unit, optional toggle). Any manual drag/zoom switches to `free`; a "recenter" button returns to auto-fit.
 - **Pure client concern:** camera state is not part of the log or the engine. Tapping a unit shows its HP/status panel; zoom and pan state can be remembered in local storage per device.
 - **Same camera** is reused for the world hex map (pan/zoom/grab) so there is one input layer in PixiJS.
-- Playback controls sit beside it: play/pause, 1x/2x/4x speed, skip to end, scrub by round.
+- Playback controls sit beside it: play/pause, 1x/2x/4x speed, previous/next round (jump through turns), scrub by round/turn, skip to end. Pausing keeps the camera free so the player can zoom and pan on a frozen frame. The player can **rewatch any stored replay at any time** from the Replays list (see "Return flow").
 
 ### Accounts and access (decided)
 - **Sign-in:** email + password and Google login, both linkable to one account (match by verified email, explicit "link" step for safety). Passwords hashed with argon2id; session via httpOnly, secure, SameSite cookie (server-side sessions in Postgres, revocable). Email verification and password reset need a transactional email provider (e.g. Resend/Postmark/SES).
@@ -116,12 +116,31 @@ Key principle: **engine is pure and deterministic** (seeded RNG, no Date/Math.ra
 - **Security basics:** rate limiting on login and signup, lockout/backoff, audit log for logins, CSRF protection, all game actions authorised server-side by party membership.
 
 ### Database (core tables)
-users, characters, parties, party_members, items, bags (personal 10 / party 40), ai_rules (priority, condition, action, target), skills_unlocked, skill_usage_counters (for Skyrim-style unlocking), orders (+ votes later), party_state (position, activity, hp/mana, next_tick_at), combat_replays (party_id, slot, engine_version, blob), event_feed, seasons, leaderboard_snapshots.
+users, characters, parties, party_members, items, bags (personal 10 / party 40), ai_rules (priority, condition, action, target), skills_unlocked, skill_usage_counters (for Skyrim-style unlocking), orders (+ votes later), party_state (position, activity, hp/mana, next_tick_at), combat_replays (party_id, slot, engine_version, log_format_version, blob), event_feed (ordered ids, type, payload, optional replay ref), user_party_seen (user_id, party_id, last_seen_event_id), seasons, leaderboard_snapshots.
 
 ## 3. UI / UX
 - Mobile-first, portrait layout, big touch targets; desktop gets multi-panel layout.
 - Canvas rendered at low internal resolution (e.g. 320x180 or 270x480) and integer-scaled with `image-rendering: pixelated`, so pixel art stays crisp on any screen.
-- Screens: Party home (status + feed), Replays, Characters (equipment, attributes), AI editor (FFXII-style gambits, drag to reorder), Skills, Bag, Orders/Quests, World map (hex, pan/zoom), Leaderboard.
+- Screens: Return slideshow, World map (hex, pan/zoom) with the party, Management menu (below), Replays, Leaderboard.
+
+### Return flow (catch-up slideshow)
+- When a player comes back, the game shows everything that happened since their last visit as a **slideshow, one item at a time**, oldest first: fights (played as replays), arrivals, dungeon stage progress, loot and level-ups, rests, random events, defeats, quest completions.
+- **Skip controls:** "skip this one" (go to the next item) and "skip all" (jump straight to the world map). Fights can be paused and jumped through turn by turn like any replay. Skipped items still land in the feed, so nothing is lost.
+- Items that have no animation (travel, rest, loot) show as short cards with the key result, auto-advancing or tap to continue; consecutive boring items can be grouped into one card ("Travelled 4 hexes, rested twice").
+- **Seen tracking:** each user stores a `last_seen_event_id` (per party) on the server, advanced as items are shown or skipped, so the slideshow works across devices and survives reloads. Long absences collapse routine items and show a summary card plus the notable ones (bosses, defeats, rare drops, level-ups).
+- **Replays list:** a screen with the stored replays (last 100 + pinned) so any fight can be rewatched later; expired ones (see "Versioning") show a text summary instead.
+- After the slideshow the player lands on the **world map hex view** with the party marker, current activity, and the progress line.
+
+### Management menu
+Opened from the world map. Tabs:
+1. **Character:** attributes, equipment, skills (assign and manage), level-up points. One character at a time with a switcher.
+2. **AI:** the gambit editor (priority list of condition, target, action per character).
+3. **Party overview:** all characters side by side with their items, key stats, HP/mana.
+4. **Bag:** the shared party bag (40 slots) and the personal bag (10 slots), favorites, discard rules.
+5. **Orders:** quest log, order queue and priority (voting once multiplayer exists), add new quests or go-to-location orders.
+6. **City** (only available while the party is in a city): sell items, buy things, teleport to other cities, bank, and later the arena.
+
+On phones the menu is full-screen with a bottom tab bar; on desktop it is a side panel next to the map.
 - Dark-fantasy look: limited palette (~32 colours), heavy vignette, candle/torch lighting shader on the combat canvas, serif/blackletter UI font accents.
 - Combat presentation: 2.5D isometric-ish square grid, sprite swing movement ("South Park" slide), VFX as small sprite sheets and particles, speed controls (1x/2x/skip), tap an entry in the feed to watch.
 - Push notifications (web push) for defeat, quest done, bag full.
@@ -135,13 +154,13 @@ Monorepo (pnpm workspaces), TS config, lint/test, Docker Compose, Postgres + mig
 Seeded RNG, grid, turn order, attributes/derived stats, basic skills, AI gambit evaluator, EOT effects, event log format, CLI to simulate fights and print the log, unit tests + determinism tests, balance simulator (run 10k fights).
 
 **M2 - Replay viewer (2-3 wks)**
-PixiJS combat scene playing a log with placeholder sprites; slide movement, VFX hooks, speed controls; mobile layout.
+PixiJS combat scene playing a log with placeholder sprites; slide movement, VFX hooks, play/pause, speed, jump by turn, zoom/pan; mobile layout. Also the return slideshow shell (skip one / skip all) fed by a fake event list.
 
 **M3 - Tick loop + world (3 wks)**
 Hex map data + loader, party state machine, worker with scheduler, hunting loop in zones, XP/leveling, loot + bag overflow rules, rest/defeat -> city + gold loss, replay ring buffer.
 
 **M4 - Management UI (3-4 wks)**
-Character creation (race/class), equipment, attributes, AI editor, skill assignment, bag/favorites/sell, activity feed.
+World map screen and management menu tabs: character (attributes, equipment, skills), AI editor, party overview, bag/favorites, orders (basic), city tab (sell/buy/teleport later in M5), activity feed and replays list, character creation (race/class).
 
 **M5 - Orders and quests (2-3 wks)**
 Quest log, go-to-location orders, queue and priority, first dungeon + boss that unlocks a region, teleport between cities.
@@ -160,5 +179,19 @@ Content pass (first 2 regions, ~30 monsters, ~100 items), balance to the 45-day-
 - **Cheating/botting**: all logic server-side, rate limits, no client authority.
 - **Art throughput** (you are making all sprites): define a sprite spec early (sizes, palette, frame set) and ship placeholders so code is never blocked on art.
 
-## 6. Open questions
+## 6. Systems to detail later (backlog)
+These are intentionally not designed yet. Build the data model and content pipeline so they can grow without rewrites: everything below is **data-driven content** (JSON/YAML + zod schemas in `packages/content`), loaded by the engine, never hard-coded.
+- **Skills:** definitions, costs (mana, cooldown), targeting/range/line of sight, effects, skill trees per class, and the "use it to unlock it" rule (usage counters per skill family drive the chance to acquire related skills).
+- **Items:** slots, rarity, item level, affixes/modifiers, sets, consumables, quest items, sell/buy prices, shops per city.
+- **Monsters:** stats, skills, AI configurations, loot tables, families and regions, bosses with phases.
+- **Races and passives:** Human, Elf, Dwarf, Orc stat bonuses and passive traits (more races later).
+- **Classes:** the nine classes, their base attributes, growth, starting skills and gear.
+- **Attributes and derived stats:** the formulas (HP, mana, damage, hit/crit/dodge, speed, move), plus the XP curve for level 1-100 tuned to the 45-day target.
+- **Quests:** structure (objectives, rewards, prerequisites, repeatable), quest types (kill, collect, explore, dungeon, boss), how they unlock regions.
+- **AI conditions, targets and actions:** the full catalog for the gambit editor.
+- **World:** zone level ranges, city list, region unlocks, random event table.
+- **PvP, arena, leaderboard, seasons.**
+- Rule of thumb: add each system as a content schema + engine hook + a few example entries, then grow the content over time.
+
+## 7. Open questions
 See the chat; answers will be folded into this file.
