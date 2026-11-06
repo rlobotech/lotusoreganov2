@@ -1,73 +1,117 @@
-This is a game project.
-I will add here all the info that is on top of my head to create this game.
+# Lotus Oregano
 
-This game is going to be a idle party rpg game for web.
-All combat will be processed in the backend server.
-Players will be able to manage their characters in the UI, equip items, define skills, select missions, etc etc.
+An idle party RPG for the web. A party of 2 to 6 adventurers explores a hex world, hunts monsters, clears dungeons and does quests on its own, around the clock. Players check in once or a few times a day to watch what happened, adjust their characters and give the party new orders.
 
-The game can be played solo or multiplayer.
-The game runs as a party of 2-6 characters.
-In single player you define the size of your group 2-6.
-In multiplayer each player creates its own character and add to the group.
+All combat is calculated on the backend server. The client only plays it back as a replay.
 
-It will require an user account to play the game.
+## Overview
 
-How the game works.
-It is a idle game.
-So the party will go through the world exploring, hunting and doing quests.
-The party will automatically do hunting while no orders are giving or no quests are in the queue.
-There will be a world that the party will be exploring. The world is divided in small hexagons. Each has something or is empty.
-Parts of the world is unlocked by bosses dungeons that the party will have to defeat to unlock. 
-The multiplayer group (or the player in solo) may give orders to the party to do. Order can be do quests or go to specific locations on the world map.
-The world map will be rich with dungeons, cities, forests and things to visit.
-When an order is given, the party will finish what they are doing and move to the order. The order can be basically do a quest, go to a specific place.
-A player can give multiple order or assign multiple quests. Once one order is accepted the party will try to finish it before proceeding to the next one.
-Player can vote to cancel a order if needed. Order will have votes. Each vote will move it to the priority. Example two players want the quest 1 to have priority 1 and one player want the quest 2 has priority 1. The party will do quest 1, once it is finished it will go to next quest/order.
-Multiple player can give different orders in the same party. When this happens the party will go to the order with most votes.
-The quests available are the same for the whole party.
-The party always work together.
-When the party is defeated it goes back to the nearest city and lose gold coins and maybe items in the bag.
-The combat is done in turns, each player and monster will follow an its ai configuration done by the player or for the enemies a defined one.
-Each character in combat act at least once a turn. When the turn ends some EOT effects happens.
-The combat works in a square grid system, it is 2.5D. Different 'arenas' but all with their size limit but different formats.
-The art is pixel and all monsters characters uses just a few sprites without animation, like idle, in combat, death, and some others.
-The movement makes the character move from one square to the other, its animation is like south park where the sprite moves from one side to the other while moving in scene, it does not have an animation it is just the sprite swinging.
-The combat will use vfx to dispaly the attacks. like sword attack (a sword movement on the enemy), fire ball goes from the caster to the enemy and explode.
-The whole combat will be calculated on the backend side. It will be write in a combat log. It will be used for the UI to display the replay so we can watch a movie. Players don't decide anything in the combat. What they can do is outside the combat like setting the ai config, thier equipment.
-The whole combat log will be saved on the database so players can watch the replay.
-The idea is that players may only need to join the game once a day or a few times a day, so they can watch all the combat replays, adjust they AI, equip new items, put some points and select new quests or give new order to go to specific locations.
-The combat is in turn, so we see each action, monster and players moving around and using skills until one is defeted. After the party, if players are in the wild they can rest to regain some health. if they are inside a dungeon not always it will be possible to rest. there will be consecutives fights. The rest could be a configuration that the party set.
-The backend server will do calculation every x minutes (x could be 1 or 5 or something else, I am still deciding). These calculations will display where the party is in the world, or if they are fighting or if there is a event.
-The world map is divided by zones. each zone has a level range like 1-3, 4-5. The world map will have different cities in different regions. Player will access different regions after defeating bosses dugeons by doing the bosses quests. Players will be able to teleport from one city to the other by paying gold. When a group is defetead they go back to the last city that the visited. If one member of the group survive, the group survive which mean they will rest to recovery before proceeding.
-Max lvl is 100. The game is defined to be played in seasons of 3 months. players who play a lot and optimize a lot should be able to achieve lvl 100 in 45 days.
-There will be pvp events that rarely happens. Which will take two groups of the same level and make them fight. The looser wont go back to the city but will stop to rest. There will also be an arena in the city which the group can order to party to go and fight.
-This is an async game, sometimes all members of the group will be logged in updating their character and select their priority in the orders. Sometimes one player will be there alone giving orders. Sometimes no one will be playing. The game will always be active
-The idea is that the group can assign different orders like different quests and locations to go so it will take hours of the day, lets say 10 hours to complete everything so when they go back to the game their party will become more strong, they will equip new items found, will manage new AI and set new orders.
+- Idle, asynchronous and always running: the world keeps going whether or not anyone is logged in.
+- Solo or multiplayer. The party always acts together.
+- Players manage their characters in the UI: equipment, attributes, skills, combat AI, orders and quests.
+- Dark, D&D-flavoured pixel art, playable on desktop and on a phone browser.
+- A user account is required to play.
 
-Races
-Human, Elf, Dward and Orc (we will expand for more later)
+### Parties
 
-Classes
-Warrior, Barbarian, Paladin, Mage, Necromancer, Priest, Ranger, Rogue and Druid (we will expand for more later)
+- A party has 2 to 6 characters.
+- Solo: you choose the size of your group (2 to 6).
+- Multiplayer: each player creates their own character and adds it to the group.
+- The party shares its level, experience and bag.
+- Each player also has a personal bag of 10 slots that other players cannot access (in solo you can use it freely).
 
-Player character will have attributes, equipements, skills and combat AI.
+## How the game works
 
-The party will have a shared level, experience and bag.
-Each player will have their own personal 10 bag slots, which other players in the group cant access (unless you are playing solo).
-The party group will have a 40 bag slots. Items can be sold on the city. When the bag is full, new items will ocupy the space of the items with lowest item level or rarity. Items can be favorited by any player so they wont be automatically discarded. 
+### The idle loop
 
-Character will have attributes that are modified by equipments and by leveling up.
+The party goes through the world exploring, hunting and doing quests. When it has no orders and no quests queued, it hunts automatically.
 
-Combat AI will work like final fantasy 12. Player may select what skills are priority to which conditions.
-- Example, priority 1 cast heal on nearby player with 50% or less health. priority 1 cast less heal on a player with 80% less health. priority 3 use skill x to buff player with greater max health. priority 4 use mele attack on close enemy. priority 5...
-- There will be many actions, many condition, many targets that players will be able to choose.
+The server advances every party in small time steps. These show where the party is in the world, whether it is travelling, fighting or resting, and whether an event happens.
 
-players will have skills and they can define any on their priority. Skills consume mana and may have cooldown.
-- skills are adquired based on the current skills that the players are using, like skyrim. like a mage that specializes in fire skill will adquire more fire skills. the more you use the more chance you have to adquire that skill tree skills.
+Players are expected to log in once a day or a few times a day. They watch the replays of everything that happened, adjust their AI, equip new items, spend attribute points, pick new quests or send the party somewhere. The idea is that a set of orders keeps the party busy for hours (around 10), and when the players come back the party is stronger and they set new orders.
 
-The world will be huge, with many different monster, many different encounter, skills, events.
+### The world
 
-There will be a leaderboard. And there will be two modes of player standard and hardcore. hardcore the game is over if the whole party is defetead.
+- The world map is divided into small hexagons. Each one is either empty or holds something to visit.
+- It is rich with cities, dungeons, forests and other places.
+- The map is divided into zones. Each zone has a level range (for example 1-3, 4-5).
+- Cities are spread across the regions. Players can teleport from one city to another by paying gold.
+- Regions are unlocked by defeating boss dungeons, which the party does by taking the boss quests.
+- The world will be huge, with many monsters, encounters, skills and events.
+
+### Orders and quests
+
+- The player (or, in multiplayer, the group) gives orders to the party. An order is either a quest or a trip to a specific place on the map.
+- When an order is given, the party finishes what it is doing and then goes to the order.
+- Players can queue several orders or quests. The party finishes one before moving on to the next.
+- The quests available are the same for the whole party.
+- Multiplayer: orders are voted on. Each vote moves an order up in priority. For example, if two players want quest 1 first and one wants quest 2 first, the party does quest 1, and when it is finished it moves on to the next order. When players give different orders, the party goes to the one with the most votes. A player can also vote to cancel an order.
+
+### Resting, defeat and survival
+
+- After a fight in the wild, the party can rest to regain health.
+- Inside a dungeon, resting is not always possible. Fights come one after another.
+- Resting can be a configuration that the party sets.
+- If the whole party is defeated, it goes back to the last city it visited and loses gold, and maybe items from the bag.
+- If at least one member survives, the party survives: it rests to recover before carrying on.
+
+### Pacing and seasons
+
+- The maximum level is 100.
+- The game is played in seasons of 3 months.
+- Players who play a lot and optimize should be able to reach level 100 in about 45 days.
+
+### PvP
+
+- Rare PvP events take two groups of the same level and make them fight. The loser does not go back to the city; it stops to rest.
+- There will also be an arena in the cities, which the group can order the party to go and fight in.
+
+### Modes and leaderboard
+
+There is a leaderboard and there are two game modes: standard and hardcore. In hardcore, the game is over for the party if the whole party is defeated.
+
+## Combat
+
+- Combat is turn based and fully calculated on the server. Players decide nothing during a fight. What they control is outside of combat: AI, equipment, attributes, skills, orders.
+- Each character and monster follows its own AI configuration. Players configure their characters; monsters have a fixed one.
+- Every character acts at least once per turn. When the turn ends, end-of-turn effects happen.
+- Combat takes place on a square grid, drawn in 2.5D. There are different arenas, all with a size limit but with different shapes.
+- The whole fight is written to a combat log. The UI uses it to display a replay, like watching a movie, and the log is saved in the database so players can watch it again.
+- In a replay you see every action: monsters and characters moving around and using skills until one side is defeated.
+
+### Combat AI
+
+Combat AI works like Final Fantasy XII: the player chooses which skill has priority under which conditions. Example: priority 1, cast heal on a nearby ally with 50% health or less; priority 2, cast a lesser heal on an ally with 80% health or less; priority 3, use skill X to buff the ally with the highest maximum health; priority 4, melee attack on a close enemy; and so on. There will be many actions, conditions and targets to choose from.
+
+### Skills
+
+- Players have skills and can put any of them in their AI priority list.
+- Skills consume mana and may have a cooldown.
+- Skills are acquired based on the skills a character already uses, like in Skyrim: a mage who specializes in fire gets more fire skills. The more you use a skill family, the greater the chance to acquire skills from that tree.
+
+## Presentation
+
+- Pixel art. Characters and monsters use just a few sprites with no animation: idle, in combat, death, and a few others.
+- Movement is a "South Park" style slide: the sprite swings from one square to the next instead of animating.
+- Attacks use visual effects: a sword slash on the enemy, a fireball that flies from the caster to the enemy and explodes.
+
+## Characters and items
+
+### Races and classes
+
+- Races: Human, Elf, Dwarf and Orc (more later).
+- Classes: Warrior, Barbarian, Paladin, Mage, Necromancer, Priest, Ranger, Rogue and Druid (more later).
+
+### Attributes and equipment
+
+A character has attributes, equipment, skills and a combat AI. Attributes are modified by equipment and by levelling up.
+
+### Bags
+
+- The party has a shared bag of 40 slots. Items can be sold in cities.
+- When the bag is full, new items take the place of the item with the lowest item level or rarity.
+- Any player can mark an item as a favorite so it is never discarded automatically.
+- Each player also has a personal bag of 10 slots (see Parties).
 
 ---
 
