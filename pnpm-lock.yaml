@@ -196,9 +196,15 @@ importers:
       '@fastify/rate-limit':
         specifier: ^11.2.2
         version: 11.2.2
+      '@game/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@game/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@game/world':
+        specifier: workspace:*
+        version: link:../../packages/world
       '@node-rs/argon2':
         specifier: ^2.2.2
         version: 2.2.2
@@ -264,6 +270,19 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6))
+
+  packages/world:
+    dependencies:
+      '@game/engine':
+        specifier: workspace:*
+        version: link:../engine
     devDependencies:
       typescript:
         specifier: ^6.0.3

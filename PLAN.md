@@ -160,6 +160,8 @@ Seeded RNG, grid, turn order, attributes/derived stats, basic skills, AI gambit 
 **M2 - Replay viewer (2-3 wks)**
 PixiJS combat scene playing a log with placeholder sprites; slide movement, VFX hooks, play/pause, speed, jump by turn, zoom/pan; mobile layout. Also the return slideshow shell (skip one / skip all) fed by a fake event list.
 
+**M3 - first version done.** `packages/world` (hex map with terrain costs and closed regions, starter world, party state machine: travel / hunt / rest / dungeons with rest policies / defeat and hardcore death, XP curve, loot and bag overflow, deterministic and bounded offline catch-up, balance and party CLIs) and the server side (migration, scheduler worker with `FOR UPDATE SKIP LOCKED`, replay storage with gzip and the 100 + 20 pinned ring, feed with per-user seen tracking, parties/orders/replays API). 38 world tests and 34 server tests. Known gaps: characters still live inside the party JSON (own tables in M4), only `goto` orders (quests in M5), no equipment, only 4 classes, 2 regions of content, one solo party per account (multiplayer groups later), XP curve and monster power are placeholders (see balance tool).
+
 **M3 - Tick loop + world (3 wks)**
 Hex map data + loader, party state machine, worker with scheduler, hunting loop in zones, XP/leveling, loot + bag overflow rules, rest/defeat -> city + gold loss, replay ring buffer.
 

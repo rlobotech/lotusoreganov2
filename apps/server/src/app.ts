@@ -1,11 +1,14 @@
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import { STARTER_WORLD, type SimConfig, type WorldDef } from '@game/world';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
-import { AuthError } from './auth/service.ts';
 import type { Config } from './config.ts';
 import type { Pool } from './db/pool.ts';
+import { simConfigFor } from './game/config.ts';
+import { HttpError } from './http-error.ts';
 import { authRoutes } from './routes/auth.ts';
+import { gameRoutes } from './routes/game.ts';
 
 export interface AppOptions {
   config: Config;
@@ -13,10 +16,14 @@ export interface AppOptions {
   /** Disable in tests that hammer the auth endpoints. */
   rateLimit?: boolean;
   logger?: boolean;
+  world?: WorldDef;
+  sim?: SimConfig;
 }
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const { config, pool } = opts;
+  const world = opts.world ?? STARTER_WORLD;
+  const sim = opts.sim ?? simConfigFor(config);
   const app = Fastify({
     logger: opts.logger ?? config.nodeEnv !== 'test',
     // Behind Caddy in production so req.ip is the real client.
@@ -39,7 +46,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   app.setErrorHandler((err, _req, reply) => {
-    if (err instanceof AuthError) {
+    if (err instanceof HttpError) {
       return reply.code(err.status).send({ error: err.code, message: err.message });
     }
     if (err instanceof ZodError) {
@@ -59,5 +66,6 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   await app.register(authRoutes, { config, pool });
+  await app.register(gameRoutes, { pool, world, cfg: sim });
   return app;
 }

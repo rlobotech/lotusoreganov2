@@ -103,6 +103,9 @@ export interface UnitDef {
   /** Evaluated top to bottom; the first rule that can be carried out this turn wins. */
   ai: AIRule[];
   sprite?: string;
+  /** Starting hp / mana when the unit enters the fight hurt. Default: full. */
+  hp?: number;
+  mana?: number;
 }
 
 export interface ArenaDef {

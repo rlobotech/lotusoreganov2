@@ -136,6 +136,28 @@ describe('invariants over many seeds', () => {
   });
 });
 
+describe('starting hp and mana', () => {
+  it('units can enter a fight hurt and the log starts from that hp', () => {
+    const input = samples.input(2);
+    input.units[0] = { ...input.units[0]!, hp: 17, mana: 3 };
+    const r = runCombat(input);
+    const start = r.events[0]!;
+    if (start.t !== 'start') throw new Error('no start');
+    const first = start.units[0]!;
+    expect(first.hp).toBe(17);
+    expect(first.mana).toBe(3);
+  });
+
+  it('clamps absurd values into the valid range', () => {
+    const input = samples.input(2);
+    input.units[0] = { ...input.units[0]!, hp: 99999, mana: -5 };
+    const start = runCombat(input).events[0]!;
+    if (start.t !== 'start') throw new Error('no start');
+    expect(start.units[0]!.hp).toBe(start.units[0]!.maxHp);
+    expect(start.units[0]!.mana).toBe(0);
+  });
+});
+
 describe('edge cases', () => {
   it('ends in a draw at the round cap when the sides cannot reach each other', () => {
     const sealed = openArena(5, 3, [

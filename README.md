@@ -147,6 +147,29 @@ Balance simulator: run N fights and print win rate, average rounds and survivors
 pnpm --filter @game/engine balance --fights 2000
 ```
 
+## World simulation (idle loop)
+`packages/world` is the pure game simulation: hex map, starter world (2 regions, 2 cities, 3 dungeons), party state machine (travel, hunt, rest, dungeons, defeat), XP and loot. The server's scheduler calls it for every party whose activity has finished.
+
+Play a party through time and print its feed (a 12 hour absence by default; `--order` sends it to a place, `--hardcore` makes a defeat permanent):
+```bash
+pnpm --filter @game/world simulate --hours 12 --order goblin_warren
+```
+
+Balance report: many parties over 48 hours, win and defeat rate by party level, level reached after 6/12/24/48h:
+```bash
+pnpm --filter @game/world balance --parties 40 --hours 48
+```
+
+Watch it run for real: set `TIME_SCALE=60` in `.env` (dev only, one tick per second instead of per minute), start the database and the API (`pnpm --filter @game/server dev`), then use the API below. The server refuses `TIME_SCALE` other than 1 in production.
+
+API (needs the login cookie from `/auth/login`, except `/world`):
+- `GET /world` map, zones and sites
+- `POST /parties` create your party `{name, mode, members:[{name, race, cls}]}` (races human/elf/dwarf/orc, classes warrior/mage/priest/ranger, 2-6 members)
+- `GET /parties/me`, `GET /parties/:id` status, members, bag, orders
+- `GET /parties/:id/feed` events since you last watched (`?after=` to choose), `POST /parties/:id/feed/seen {upTo}`
+- `GET /parties/:id/replays`, `GET /replays/:id` stored fight logs (last 100 plus 20 pinned boss/defeat/epic fights)
+- `POST /parties/:id/orders {siteId}` and `DELETE /parties/:id/orders/:orderId` send the party to a city or dungeon
+
 ## Replay viewer (web app)
 Start the web app (Vite dev server, http://127.0.0.1:5173). It runs the combat engine in the browser, so it works without the API or database:
 ```bash
@@ -168,6 +191,7 @@ pnpm --filter @game/web build
 apps/server/      Fastify API, migrations (src/db/migrations), tests
 packages/shared/  zod schemas and types shared by server and client
 packages/engine/  deterministic combat engine (pure TypeScript, no I/O), CLI simulator
+packages/world/   world map, party simulation, progression and loot (pure, deterministic)
 apps/web/         Svelte + PixiJS client: replay viewer, return slideshow
 docs/art/         AI prompts for character and tile sprites
 assets/raw/       original generated sprites (characters, monsters, tiles, vfx, ui)

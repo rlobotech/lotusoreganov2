@@ -1,5 +1,6 @@
 import type { LoginInput, PublicUser, RegisterInput } from '@game/shared';
 import type { Pool } from '../db/pool.ts';
+import { HttpError } from '../http-error.ts';
 import {
   getDummyHash,
   hashPassword,
@@ -8,15 +9,7 @@ import {
   verifyPassword,
 } from './crypto.ts';
 
-export class AuthError extends Error {
-  readonly status: number;
-  readonly code: string;
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
+export class AuthError extends HttpError {}
 
 interface UserRow {
   id: string;

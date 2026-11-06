@@ -37,8 +37,9 @@ function spawnUnits(input: CombatInput): UnitState[] {
       team: def.team,
       x: spot.x,
       y: spot.y,
-      hp: base.maxHp,
-      mana: base.maxMana,
+      // Fights can start from partial health/mana (the party carries damage between fights).
+      hp: Math.min(base.maxHp, Math.max(1, Math.round(def.hp ?? base.maxHp))),
+      mana: Math.min(base.maxMana, Math.max(0, Math.round(def.mana ?? base.maxMana))),
       alive: true,
       base,
       cooldowns: {},
