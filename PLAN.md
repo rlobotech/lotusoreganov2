@@ -150,7 +150,9 @@ On phones the menu is full-screen with a bottom tab bar; on desktop it is a side
 **M0 - Foundation (1-2 wks)**
 Monorepo (pnpm workspaces), TS config, lint/test, Docker Compose, Postgres + migrations, CI, account auth (email + password, argon2, sessions).
 
-**M1 - Combat engine (3-4 wks)** *(most important, no UI needed)*
+**M0 - done.** Monorepo, Postgres, migrations, invite-only email/password auth, tests, CI workflow.
+
+**M1 - Combat engine (3-4 wks)** *(most important, no UI needed)* **First version done** (`packages/engine`): seeded RNG, grid + BFS pathing + line of sight, derived stats, data-driven skills and statuses (dot/hot/mod/stun), AI rule planner (priority, filters, self conditions, move-then-act), round loop with EOT effects, versioned event log, CLI simulator and balance tool, 30 tests (determinism, invariants over 150 fights, AI priority, LOS, draw cap). Still to do: XP/loot results, more skill effects, content package, log compaction, tuning formulas.
 Seeded RNG, grid, turn order, attributes/derived stats, basic skills, AI gambit evaluator, EOT effects, event log format, CLI to simulate fights and print the log, unit tests + determinism tests, balance simulator (run 10k fights).
 
 **M2 - Replay viewer (2-3 wks)**

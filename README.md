@@ -69,6 +69,98 @@ The world will be huge, with many different monster, many different encounter, s
 
 There will be a leaderboard. And there will be two modes of player standard and hardcore. hardcore the game is over if the whole party is defetead.
 
+---
+
+# Development
+
+See [PLAN.md](PLAN.md) for the architecture and milestones, and `docs/art/` for the sprite and tile prompts.
+
+## Requirements
+- Node.js 24+ (the server runs TypeScript directly, no build step)
+- pnpm (`npm install -g pnpm`)
+- Docker Desktop (for Postgres)
+
+## First-time setup
+```bash
+pnpm install
+```
+
+```bash
+cp .env.example .env
+```
+
+## Everyday commands
+Start / stop the database (Postgres 17, plus a separate `game_test` database for tests):
+```bash
+pnpm db:up
+```
+
+```bash
+pnpm db:down
+```
+
+Run the API (applies pending migrations on start, listens on port 3000):
+```bash
+pnpm --filter @game/server dev
+```
+
+Apply migrations only:
+```bash
+pnpm --filter @game/server migrate
+```
+
+Create a beta invite code (arguments: uses, days valid, optional custom code):
+```bash
+pnpm --filter @game/server invite:create 5 30
+```
+
+Checks (the same ones CI runs; tests need the database up):
+```bash
+pnpm typecheck
+```
+
+```bash
+pnpm lint
+```
+
+```bash
+pnpm test
+```
+
+```bash
+pnpm format
+```
+
+## Combat engine
+Run one sample fight and print the readable log (change the seed to get a different fight):
+```bash
+pnpm --filter @game/engine simulate --seed 1
+```
+
+Print the raw JSON event log instead (this is what gets stored as a replay):
+```bash
+pnpm --filter @game/engine simulate --seed 1 --json
+```
+
+Balance simulator: run N fights and print win rate, average rounds and survivors:
+```bash
+pnpm --filter @game/engine balance --fights 2000
+```
+
+## Project layout
+```
+apps/server/      Fastify API, migrations (src/db/migrations), tests
+packages/shared/  zod schemas and types shared by server and client
+packages/engine/  deterministic combat engine (pure TypeScript, no I/O), CLI simulator
+docs/art/         AI prompts for character and tile sprites
+assets/raw/       original generated sprites (characters, monsters, tiles, vfx, ui)
+infra/            database init scripts
+```
+
+## Notes
+- `TIME_SCALE` in `.env` speeds up game time for development only (60 = one tick per second). The server refuses to start with it in production.
+- Health check: `GET http://localhost:3000/health`.
+
 
 
 
