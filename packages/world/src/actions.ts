@@ -1,9 +1,10 @@
 import type { AIRule, Attributes } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
-import { addToBag } from './loot.ts';
+import { addToBag, bagCapacity } from './loot.ts';
 import { ATTRS, CLASSES, memberDerived, SKILLS, spentPoints } from './progression.ts';
 import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
+  PERSONAL_BAG_SIZE,
   SLOTS,
   type FeedEvent,
   type Item,
@@ -36,21 +37,105 @@ function clampVitals(p: PartyState, m: Member) {
   m.mana = Math.min(m.mana, d.maxMana);
 }
 
-// ---------- gear ----------
+// ---------- gear and bags ----------
 
-export function equipItem(p: PartyState, memberId: string, itemId: string): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
-  const idx = p.bag.findIndex((i) => i.id === itemId);
-  if (idx === -1) return fail('no_item', 'That item is not in the bag');
-  const item = p.bag[idx]!;
-  if (!item.slot) return fail('not_equippable', 'That item cannot be worn');
-  const old = m.equipment[item.slot];
-  m.equipment[item.slot] = item;
-  p.bag.splice(idx, 1);
-  if (old) p.bag.push(old);
-  clampVitals(p, m);
+/** Where an item is: the shared bag, a member's personal bag, or a member's worn slot. */
+export type ItemPlace =
+  | { kind: 'bag' }
+  | { kind: 'personal'; memberId: string }
+  | { kind: 'equip'; memberId: string; slot: Slot };
+
+/** Where an item can be put. An `equip` target without a slot uses the item's own slot. */
+export type ItemTarget =
+  | { kind: 'bag' }
+  | { kind: 'personal'; memberId: string }
+  | { kind: 'equip'; memberId: string; slot?: Slot };
+
+function locate(p: PartyState, itemId: string): { item: Item; place: ItemPlace } | null {
+  const shared = p.bag.find((i) => i.id === itemId);
+  if (shared) return { item: shared, place: { kind: 'bag' } };
+  for (const m of p.members) {
+    const mine = m.bag.find((i) => i.id === itemId);
+    if (mine) return { item: mine, place: { kind: 'personal', memberId: m.id } };
+    for (const slot of SLOTS) {
+      const worn = m.equipment[slot];
+      if (worn?.id === itemId)
+        return { item: worn, place: { kind: 'equip', memberId: m.id, slot } };
+    }
+  }
+  return null;
+}
+
+function container(p: PartyState, place: ItemPlace): Item[] | null {
+  if (place.kind === 'bag') return p.bag;
+  if (place.kind === 'personal') return findMember(p, place.memberId)?.bag ?? null;
+  return null;
+}
+
+function removeFrom(p: PartyState, from: ItemPlace, item: Item) {
+  if (from.kind === 'equip') {
+    delete findMember(p, from.memberId)!.equipment[from.slot];
+    return;
+  }
+  const list = container(p, from)!;
+  list.splice(list.indexOf(item), 1);
+}
+
+/**
+ * Moves an item between the shared bag, personal bags and worn slots. Wearing an item over another
+ * one swaps them: the old item goes where the new one came from (and into the other member's slot
+ * when two members trade gear). Rejected moves change nothing.
+ */
+export function moveItem(
+  p: PartyState,
+  itemId: string,
+  to: ItemTarget,
+  cfg: Pick<SimConfig, 'bagSize'>,
+): ActionResult {
+  const found = locate(p, itemId);
+  if (!found) return fail('no_item', 'No such item');
+  const { item, place: from } = found;
+
+  const owner = to.kind === 'bag' ? null : findMember(p, to.memberId);
+  if (to.kind !== 'bag' && !owner) return fail('no_member', 'No such party member');
+
+  if (to.kind === 'equip') {
+    if (!item.slot) return fail('not_equippable', 'That item cannot be worn');
+    const slot = to.slot ?? item.slot;
+    if (slot !== item.slot) return fail('wrong_slot', 'That item does not go in that slot');
+    if (from.kind === 'equip' && from.memberId === to.memberId) return OK;
+    const old = owner!.equipment[slot];
+    removeFrom(p, from, item);
+    owner!.equipment[slot] = item;
+    if (old) {
+      if (from.kind === 'equip') findMember(p, from.memberId)!.equipment[from.slot] = old;
+      else container(p, from)!.push(old);
+    }
+    clampVitals(p, owner!);
+    if (from.kind === 'equip') clampVitals(p, findMember(p, from.memberId)!);
+    return OK;
+  }
+
+  const dest = container(p, to)!;
+  if (from.kind !== 'equip' && dest === container(p, from)) return OK;
+  const cap = to.kind === 'bag' ? bagCapacity(p, cfg) : PERSONAL_BAG_SIZE;
+  if (dest.length >= cap) {
+    return to.kind === 'bag'
+      ? fail('bag_full', 'The bag is full')
+      : fail('personal_full', 'That personal bag is full');
+  }
+  removeFrom(p, from, item);
+  dest.push(item);
+  if (from.kind === 'equip') clampVitals(p, findMember(p, from.memberId)!);
   return OK;
+}
+
+/** Wears an item from any bag on a member (swapping with what is worn). */
+export function equipItem(p: PartyState, memberId: string, itemId: string): ActionResult {
+  const found = locate(p, itemId);
+  if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
+  if (!findMember(p, memberId)) return fail('no_member', 'No such party member');
+  return moveItem(p, itemId, { kind: 'equip', memberId }, { bagSize: 0 });
 }
 
 export function unequipItem(
@@ -64,25 +149,37 @@ export function unequipItem(
   if (!SLOTS.includes(slot)) return fail('bad_slot', 'Unknown slot');
   const item = m.equipment[slot];
   if (!item) return fail('empty_slot', 'Nothing is worn there');
-  if (p.bag.length >= cfg.bagSize) return fail('bag_full', 'The bag is full');
-  delete m.equipment[slot];
-  p.bag.push(item);
-  clampVitals(p, m);
-  return OK;
+  return moveItem(p, item.id, { kind: 'bag' }, cfg);
 }
 
 export function setFavorite(p: PartyState, itemId: string, favorite: boolean): ActionResult {
-  const item = p.bag.find((i) => i.id === itemId);
-  if (!item) return fail('no_item', 'That item is not in the bag');
-  item.favorite = favorite;
+  const found = locate(p, itemId);
+  if (!found) return fail('no_item', 'That item is not in a bag');
+  found.item.favorite = favorite;
   return OK;
 }
 
 export function discardItem(p: PartyState, itemId: string): ActionResult {
-  const idx = p.bag.findIndex((i) => i.id === itemId);
-  if (idx === -1) return fail('no_item', 'That item is not in the bag');
-  if (p.bag[idx]!.favorite) return fail('favorite', 'Remove the favorite mark first');
-  p.bag.splice(idx, 1);
+  const found = locate(p, itemId);
+  if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
+  if (found.item.favorite) return fail('favorite', 'Remove the favorite mark first');
+  removeFrom(p, found.place, found.item);
+  return OK;
+}
+
+/** Sorts the shared bag: favorites first, then rarity, item level, slot and name. */
+export function sortBag(p: PartyState): ActionResult {
+  const rank = { epic: 3, rare: 2, uncommon: 1, common: 0 } as const;
+  const slotOrder = (i: Item) => (i.slot ? SLOTS.indexOf(i.slot) : SLOTS.length);
+  p.bag.sort(
+    (a, b) =>
+      Number(b.favorite) - Number(a.favorite) ||
+      rank[b.rarity] - rank[a.rarity] ||
+      b.itemLevel - a.itemLevel ||
+      slotOrder(a) - slotOrder(b) ||
+      a.name.localeCompare(b.name) ||
+      a.id.localeCompare(b.id),
+  );
   return OK;
 }
 
@@ -306,11 +403,13 @@ export function sellItems(p: PartyState, world: WorldDef, itemIds: string[]): Ac
   if (!usableCity(p, world)) return fail('not_in_city', 'The party is not in a city');
   const ids = new Set(itemIds);
   if (ids.size === 0) return fail('no_item', 'Nothing selected');
-  const chosen = p.bag.filter((i) => ids.has(i.id));
-  if (chosen.length !== ids.size) return fail('no_item', 'Some items are not in the bag');
+  const lists = [p.bag, ...p.members.map((m) => m.bag)];
+  const chosen = lists.flatMap((l) => l.filter((i) => ids.has(i.id)));
+  if (chosen.length !== ids.size) return fail('no_item', 'Some items are not in a bag');
   if (chosen.some((i) => i.favorite)) return fail('favorite', 'Favorites cannot be sold');
   p.gold += chosen.reduce((s, i) => s + sellPrice(i), 0);
   p.bag = p.bag.filter((i) => !ids.has(i.id));
+  for (const m of p.members) m.bag = m.bag.filter((i) => !ids.has(i.id));
   return OK;
 }
 
@@ -325,7 +424,7 @@ export function buyItem(
   const stock = city.shop?.find((s) => s.id === stockId);
   if (!stock) return fail('no_stock', 'The shop does not sell that');
   if (p.gold < stock.price) return fail('no_gold', 'Not enough gold');
-  if (p.bag.length >= cfg.bagSize) return fail('bag_full', 'The bag is full');
+  if (p.bag.length >= bagCapacity(p, cfg)) return fail('bag_full', 'The bag is full');
   p.counter += 1;
   p.gold -= stock.price;
   const item: Item = {
@@ -338,7 +437,7 @@ export function buyItem(
     slot: stock.slot,
     bonuses: { ...stock.bonuses },
   };
-  addToBag(p.bag, item, cfg.bagSize);
+  addToBag(p.bag, item, bagCapacity(p, cfg));
   return OK;
 }
 

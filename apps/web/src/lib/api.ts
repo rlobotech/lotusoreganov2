@@ -96,6 +96,16 @@ export const api = {
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/equip`, { memberId, itemId }),
   unequip: (partyId: string, memberId: string, slot: SlotName) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/unequip`, { memberId, slot }),
+  moveItem: (
+    partyId: string,
+    itemId: string,
+    to:
+      | { kind: 'bag' }
+      | { kind: 'personal'; memberId: string }
+      | { kind: 'equip'; memberId: string; slot?: SlotName },
+  ) => request<{ party: PartySummary }>('POST', `/parties/${partyId}/move`, { itemId, to }),
+  sortBag: (partyId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/sort-bag`),
   favorite: (partyId: string, itemId: string, value: boolean) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/items/${itemId}/favorite`, {
       value,

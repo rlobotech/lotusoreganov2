@@ -256,6 +256,26 @@ describe('defeat', () => {
     expect(seen).toBeGreaterThan(0);
   });
 
+  it('personal bag items are never lost on defeat', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const p = party(seed);
+      p.members[0]!.bag.push({
+        id: 'mine',
+        name: 'Mine',
+        rarity: 'common',
+        itemLevel: 1,
+        value: 1,
+        favorite: false,
+      });
+      p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_warren' });
+      const r = advance(p, DAY, W, { ...cfg, defeatItemLossPct: 100 });
+      if (!r.events.some((e) => e.kind === 'defeat')) continue;
+      expect(r.party.members[0]!.bag.map((i) => i.id)).toEqual(['mine']);
+      return;
+    }
+    throw new Error('no defeat found in 40 seeds');
+  });
+
   it('standard defeat takes 15% of carried gold, favorites are never lost', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const p = party(seed);

@@ -28,6 +28,14 @@ const idStr = z.string().min(1).max(80);
 
 export const equipSchema = z.object({ memberId: idStr, itemId: idStr });
 export const unequipSchema = z.object({ memberId: idStr, slot: z.enum(SLOT_NAMES) });
+export const moveItemSchema = z.object({
+  itemId: idStr,
+  to: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('bag') }),
+    z.object({ kind: z.literal('personal'), memberId: idStr }),
+    z.object({ kind: z.literal('equip'), memberId: idStr, slot: z.enum(SLOT_NAMES).optional() }),
+  ]),
+});
 export const favoriteSchema = z.object({ value: z.boolean() });
 export const allocSchema = z.object({
   alloc: z.object({

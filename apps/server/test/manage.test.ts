@@ -151,6 +151,58 @@ describe('gear and bag', () => {
     ).toBe(400);
   });
 
+  it('moves items between bags and worn slots, and sorts the shared bag', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    await patch(id, (s) => {
+      s.bag.push(
+        sword as never,
+        { ...sword, id: 'sw2', rarity: 'epic' } as never,
+        { ...sword, id: 'sw3', slot: undefined } as never,
+      );
+    });
+    const base = `/parties/${id}`;
+    const move = (itemId: string, to: unknown) =>
+      call(cookie, 'POST', `${base}/move`, { itemId, to });
+
+    const first = (await call(cookie, 'GET', '/parties/me')).json().party;
+    expect(first.bagSize).toBe(40);
+    expect(first.personalBagSize).toBe(5);
+    expect(first.members[0].bag).toEqual([]);
+
+    const toPersonal = await move('sw1', { kind: 'personal', memberId: 'm2' });
+    expect(toPersonal.statusCode).toBe(200);
+    expect(toPersonal.json().party.members[1].bag.map((i: { id: string }) => i.id)).toEqual([
+      'sw1',
+    ]);
+    expect(toPersonal.json().party.bag).toHaveLength(2);
+
+    const worn = await move('sw1', { kind: 'equip', memberId: 'm1' });
+    expect(worn.json().party.members[0].equipment.weapon.id).toBe('sw1');
+    expect(worn.json().party.members[1].bag).toEqual([]);
+
+    expect((await move('sw3', { kind: 'equip', memberId: 'm1' })).statusCode).toBe(409);
+    expect((await move('nope', { kind: 'bag' })).statusCode).toBe(404);
+    expect((await move('sw2', { kind: 'personal', memberId: 'zz' })).statusCode).toBe(404);
+    expect((await move('sw2', { kind: 'spaceship' })).statusCode).toBe(400);
+
+    const sorted = await call(cookie, 'POST', `${base}/sort-bag`);
+    expect(sorted.json().party.bag.map((i: { id: string }) => i.id)).toEqual(['sw2', 'sw3']);
+  });
+
+  it("another player cannot move a party's items", async () => {
+    const owner = await signUp();
+    const intruder = await signUp();
+    const id = await newParty(owner);
+    await patch(id, (s) => void s.bag.push(sword as never));
+    const res = await call(intruder, 'POST', `/parties/${id}/move`, {
+      itemId: 'sw1',
+      to: { kind: 'personal', memberId: 'm1' },
+    });
+    expect(res.statusCode).toBe(404);
+    expect((await stateOf(id)).bag).toHaveLength(1);
+  });
+
   it("another player's actions are refused", async () => {
     const owner = await signUp();
     const intruder = await signUp();

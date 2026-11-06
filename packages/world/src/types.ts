@@ -95,6 +95,11 @@ export const SLOTS: readonly Slot[] = [
   'charm',
 ];
 
+/** Slots in each member's personal bag. */
+export const PERSONAL_BAG_SIZE = 5;
+/** Shared bag capacity of a new party. */
+export const DEFAULT_BAG_SIZE = 40;
+
 export interface Member {
   id: string;
   name: string;
@@ -105,6 +110,11 @@ export interface Member {
   alive: boolean;
   /** Worn items. Each item's `bonuses` add to the member's attributes. */
   equipment: Partial<Record<Slot, Item>>;
+  /**
+   * Personal bag (up to PERSONAL_BAG_SIZE). Only its owner moves items in or out, loot never lands
+   * here by itself, and its items are safe from defeat losses and bag overflow.
+   */
+  bag: Item[];
   /** Attribute points the player has spent (on top of class, race and level growth). */
   alloc: Attributes;
   /** Unspent attribute points. */
@@ -235,6 +245,8 @@ export interface PartyState {
   lastCity: string;
   members: Member[];
   bag: Item[];
+  /** Shared bag capacity. Missing on older saves: SimConfig.bagSize applies. Raised by bag items. */
+  bagSize?: number;
   orders: Order[];
   activity: Activity;
   /** When the current activity completes (ms), or null when the party is dead. */

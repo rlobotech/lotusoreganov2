@@ -43,6 +43,8 @@ export interface MemberInfo {
   points: number;
   autoAlloc: boolean;
   equipment: Partial<Record<SlotName, ItemInfo>>;
+  /** Personal bag: only its owner moves items in or out, and it is safe from defeat losses. */
+  bag: ItemInfo[];
   skills: string[];
   ai: AiRuleInfo[];
 }
@@ -124,6 +126,9 @@ export interface PartySummary {
   lastCity: string;
   members: MemberInfo[];
   bag: ItemInfo[];
+  /** Shared bag capacity and personal bag capacity (per member). */
+  bagSize: number;
+  personalBagSize: number;
   orders: OrderInfo[];
   cleared: string[];
   dungeon: {

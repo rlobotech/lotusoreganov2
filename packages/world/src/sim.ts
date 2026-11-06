@@ -10,7 +10,7 @@ import {
   zoneAt,
   type PathStep,
 } from './hex.ts';
-import { addToBag, rollDrop, shopItem } from './loot.ts';
+import { addToBag, bagCapacity, rollDrop, shopItem } from './loot.ts';
 import { MONSTERS, monsterUnit } from './monsters.ts';
 import {
   activeQuest,
@@ -34,6 +34,7 @@ import {
   normalizeMember,
   SKILLS,
 } from './progression.ts';
+import { DEFAULT_BAG_SIZE } from './types.ts';
 import type {
   Activity,
   AdvanceResult,
@@ -58,7 +59,7 @@ export function defaultConfig(tickMs = 60_000): SimConfig {
     defeatGoldLossPct: 15,
     defeatItemLossPct: 7,
     reviveHpPct: 25,
-    bagSize: 40,
+    bagSize: DEFAULT_BAG_SIZE,
     restMinTicks: 10,
     restExtraTicks: 10,
     travelTicksPerHex: 10,
@@ -229,7 +230,7 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
     const discarded: string[] = [];
     for (const item of r.loot) {
       if (item.rarity === 'epic') pinned = true;
-      const { discarded: out } = addToBag(p.bag, item, ctx.cfg.bagSize);
+      const { discarded: out } = addToBag(p.bag, item, bagCapacity(p, ctx.cfg));
       if (out) discarded.push(out.name);
     }
     levelsGained = addXp(p, r.xp);
@@ -303,7 +304,7 @@ function settleQuests(ctx: Ctx) {
           slot: s.slot,
           bonuses: { ...s.bonuses },
         },
-        ctx.cfg.bagSize,
+        bagCapacity(p, ctx.cfg),
       );
     }
     emit(ctx, 'quest_completed', {

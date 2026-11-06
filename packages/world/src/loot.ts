@@ -102,6 +102,11 @@ export const itemScore = (i: Item): number => RARITY_RANK[i.rarity] * 1000 + i.i
  * Puts an item in the bag. When the bag is full the lowest-scoring unfavorited item is dropped
  * (or the new item, if it is the worst). Returns what was thrown away, if anything.
  */
+/** The party's shared bag capacity: its own size when it has one, else the config default. */
+export function bagCapacity(p: { bagSize?: number }, cfg: { bagSize: number }): number {
+  return p.bagSize ?? cfg.bagSize;
+}
+
 export function addToBag(bag: Item[], item: Item, capacity: number): { discarded: Item | null } {
   if (bag.length < capacity) {
     bag.push(item);

@@ -18,7 +18,7 @@ All combat is calculated on the backend server. The client only plays it back as
 - Solo: you choose the size of your group (2 to 6).
 - Multiplayer: each player creates their own character and adds it to the group.
 - The party shares its level, experience and bag.
-- Each player also has a personal bag of 10 slots that other players cannot access (in solo you can use it freely).
+- Each player also has a personal bag of 5 slots that other players cannot access (in solo you can use it freely).
 
 ## How the game works
 
@@ -111,7 +111,7 @@ A character has attributes, equipment, skills and a combat AI. Attributes are mo
 - The party has a shared bag of 40 slots. Items can be sold in cities.
 - When the bag is full, new items take the place of the item with the lowest item level or rarity.
 - Any player can mark an item as a favorite so it is never discarded automatically.
-- Each player also has a personal bag of 10 slots (see Parties).
+- Each player also has a personal bag of 5 slots (see Parties).
 
 ---
 

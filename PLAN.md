@@ -136,7 +136,7 @@ Opened from the world map. Tabs:
 1. **Character:** attributes, equipment, skills (assign and manage), level-up points. One character at a time with a switcher.
 2. **AI:** the gambit editor (priority list of condition, target, action per character).
 3. **Party overview:** all characters side by side with their items, key stats, HP/mana.
-4. **Bag:** the shared party bag (40 slots) and the personal bag (10 slots), favorites, discard rules.
+4. **Bag:** the shared party bag (40 slots) and the personal bag (5 slots), favorites, discard rules.
 5. **Orders:** quest log, order queue and priority (voting once multiplayer exists), add new quests or go-to-location orders.
 6. **City** (only available while the party is in a city): sell items, buy things, teleport to other cities, bank, and later the arena.
 
@@ -144,6 +144,32 @@ On phones the menu is full-screen with a bottom tab bar; on desktop it is a side
 - Dark-fantasy look: limited palette (~32 colours), heavy vignette, candle/torch lighting shader on the combat canvas, serif/blackletter UI font accents.
 - Combat presentation: 2.5D isometric-ish square grid, sprite swing movement ("South Park" slide), VFX as small sprite sheets and particles, speed controls (1x/2x/skip), tap an entry in the feed to watch.
 - Push notifications (web push) for defeat, quest done, bag full.
+
+## 3b. Inventory revamp (planned, decided with the user)
+
+Goal: replace the list-style Character/Bag/Party tabs with a Baldur's Gate style inventory screen.
+
+### Decisions
+- **Top tabs:** Inventory, Attributes, Spellbook, Quests/Orders, AI, plus City while in a city. Inventory shows gear only; attribute points and the stat breakdown live in the Attributes tab (a table of every character's stats side by side, plus point spending). Spellbook lists each character's skills.
+- **Team strip on top:** portrait, name, level and HP/mana bar for every member. It scrolls sideways if crowded. Tapping a portrait selects the character.
+- **Character panels:** the sprite in the middle, equipment slots around it (weapon, offhand, head, body, feet, ring, charm: 7 for now; the layout is data driven so more slots can be added later). Desktop shows as many panels side by side as fit; phone shows one at a time and swipes.
+- **Personal bag:** 5 slots under each character, owner only, and its items are never lost on defeat. (Replaces the old 10.) Solo players can use it freely.
+- **Shared bag:** 40 slots below the panels. Size is `party.bagSize`.
+- **Icons:** 32x32 item sprites at `apps/web/public/sprites/items/<base name slug>.png`, scaled with crisp pixels (whole steps) to fit. Until they exist, generated placeholders: rarity-colored tile with a slot glyph. The character figure is a placeholder silhouette colored from the class and race palettes in `docs/art/characters_art.md`; a real 32x32 sprite replaces it automatically.
+- **Item details:** hover on desktop, tap on phone, shows a card with name, rarity, level, slot, bonuses, value, favorite state, and a **comparison with the item currently worn** (green better, red worse).
+- **Moving items:** drag and drop between the shared bag, personal bags, equipment slots and the character panel (dropping on the character picks the slot). Right click or double click equips or moves. On phone: tap the item, then use Equip / Move to personal bag / Favorite / Discard on the card. Pointer events so one code path serves mouse and touch.
+- **Sort button** for the shared bag (favorites, rarity, level, slot). Favorites and discard rules are unchanged.
+
+### Steps
+1. **(done) World (`packages/world`):** `Member.bag` (personal, max `personalBagSize` = 5), actions to move items shared <-> personal <-> equipment <-> other members' equipment, personal items excluded from defeat item loss and from overflow replacement, `normalizeParty` backfills `bag: []`. Make `bagSize` a party field set when created (base 40) so the bag item below can raise it. Tests.
+2. **(done) Server (`apps/server`):** endpoints for move/equip between containers (reuse the `mutateParty` lock), owner check for personal bags (user to member mapping, solo owns all), summary and shared types updated. Tests.
+3. **(done) Web foundation:** `ItemIcon` (sprite or placeholder), `ItemCard` (details and comparison), pointer-based drag and drop helper with tap fallback, `Slot` and `BagGrid` components.
+4. **Inventory screen:** team strip, character panels with slots and silhouette, personal bag, shared bag, sort, phone swipe layout.
+5. **Attributes and Spellbook tabs:** move point spending and the stat breakdown out of the old Character tab; add the team comparison table; spellbook list. Retire the old Character, Party and Bag tabs.
+6. **Verify:** tests, then check in the browser at phone and desktop sizes (drag with mouse, tap flow on phone).
+
+### Not in this revamp
+Group accessories and bag items (see backlog), real item sprites, extra slots (gloves, cloak, belt, amulet, second ring) which need new bases, loot tables and balance.
 
 ## 4. Milestones
 
@@ -204,6 +230,7 @@ These are intentionally not designed yet. Build the data model and content pipel
 - **World:** zone level ranges, city list, region unlocks, random event table.
 - **PvP, arena, leaderboard, seasons.**
 - Rule of thumb: add each system as a content schema + engine hook + a few example entries, then grow the content over time.
+- **Group accessories (own session later):** items the whole party uses, each with tiers and different effects: a **horse** (faster movement across terrain), **bag** items (raise the shared bag size; found as rewards, drops or bought), a **tent** (faster resting and healing), a **pet**. Needs a party-level accessory slot set, a tier model, shop and loot entries, and sim hooks (travel time, rest time, bag size). The inventory revamp only exposes `party.bagSize` for this.
 
 ## 7. Open questions
 See the chat; answers will be folded into this file.

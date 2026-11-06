@@ -6,6 +6,7 @@ import {
   discardItem,
   equipItem,
   leaveTown,
+  moveItem,
   moveOrder,
   resetMemberAi,
   resetPoints,
@@ -13,6 +14,7 @@ import {
   setAutoAlloc,
   setFavorite,
   setMemberAi,
+  sortBag,
   teleport,
   teleportOptions,
   unequipItem,
@@ -24,7 +26,7 @@ import { BASES, rollDrop, shopItem } from '../src/loot.ts';
 import { CLASSES, memberAttributes, memberDerived } from '../src/progression.ts';
 import { advance, createParty, defaultConfig, normalizeParty } from '../src/sim.ts';
 import { STARTER_WORLD as W } from '../src/starter-world.ts';
-import type { Item, PartyState } from '../src/types.ts';
+import { PERSONAL_BAG_SIZE, type Item, type PartyState } from '../src/types.ts';
 
 const cfg = { ...defaultConfig(1000), maxSteps: 5000 };
 const DAY = 24 * 3600 * 1000;
@@ -417,5 +419,133 @@ describe('orders and old saves', () => {
       expect(m.skills).toEqual(CLASSES[m.cls].skills);
     }
     expect(() => advance(fixed, 3600_000, W, cfg)).not.toThrow();
+  });
+});
+
+describe('personal bags and moving items', () => {
+  const cfg40 = { bagSize: 40 };
+
+  it('new members start with an empty personal bag and old saves get one', () => {
+    const p = party();
+    expect(p.members.every((m) => Array.isArray(m.bag) && m.bag.length === 0)).toBe(true);
+    delete (p.members[0] as { bag?: Item[] }).bag;
+    normalizeParty(p, W);
+    expect(p.members[0]!.bag).toEqual([]);
+  });
+
+  it('moves items between the shared bag and a personal bag', () => {
+    const p = party();
+    p.bag.push(sword());
+    expect(moveItem(p, 's1', { kind: 'personal', memberId: 'm1' }, cfg40)).toEqual({ ok: true });
+    expect(p.bag).toHaveLength(0);
+    expect(p.members[0]!.bag.map((i) => i.id)).toEqual(['s1']);
+    expect(moveItem(p, 's1', { kind: 'bag' }, cfg40)).toEqual({ ok: true });
+    expect(p.bag.map((i) => i.id)).toEqual(['s1']);
+    expect(p.members[0]!.bag).toHaveLength(0);
+  });
+
+  it('moves an item from one personal bag to another', () => {
+    const p = party();
+    p.members[0]!.bag.push(sword());
+    moveItem(p, 's1', { kind: 'personal', memberId: 'm2' }, cfg40);
+    expect(p.members[0]!.bag).toHaveLength(0);
+    expect(p.members[1]!.bag.map((i) => i.id)).toEqual(['s1']);
+  });
+
+  it('a personal bag holds at most PERSONAL_BAG_SIZE items', () => {
+    const p = party();
+    for (let i = 0; i < PERSONAL_BAG_SIZE; i++) p.members[0]!.bag.push(sword(`x${i}`));
+    p.bag.push(sword('extra'));
+    expect(moveItem(p, 'extra', { kind: 'personal', memberId: 'm1' }, cfg40)).toMatchObject({
+      code: 'personal_full',
+    });
+    expect(p.bag).toHaveLength(1);
+  });
+
+  it('refuses to move into a full shared bag, and unknown items or members', () => {
+    const p = party();
+    p.members[0]!.bag.push(sword());
+    expect(moveItem(p, 's1', { kind: 'bag' }, { bagSize: 0 })).toMatchObject({ code: 'bag_full' });
+    expect(p.members[0]!.bag).toHaveLength(1);
+    expect(moveItem(p, 'nope', { kind: 'bag' }, cfg40)).toMatchObject({ code: 'no_item' });
+    expect(moveItem(p, 's1', { kind: 'personal', memberId: 'zz' }, cfg40)).toMatchObject({
+      code: 'no_member',
+    });
+  });
+
+  it('equips from a personal bag and swaps the old item back into it', () => {
+    const p = party();
+    const m = p.members[0]!;
+    m.equipment.weapon = sword('old');
+    m.bag.push(sword('new', { bonuses: { str: 9 } }));
+    expect(moveItem(p, 'new', { kind: 'equip', memberId: 'm1' }, cfg40)).toEqual({ ok: true });
+    expect(m.equipment.weapon!.id).toBe('new');
+    expect(m.bag.map((i) => i.id)).toEqual(['old']);
+    expect(p.bag).toHaveLength(0);
+  });
+
+  it('refuses the wrong slot and items that cannot be worn', () => {
+    const p = party();
+    p.bag.push(sword(), sword('junk', { slot: undefined }));
+    expect(moveItem(p, 's1', { kind: 'equip', memberId: 'm1', slot: 'head' }, cfg40)).toMatchObject(
+      { code: 'wrong_slot' },
+    );
+    expect(moveItem(p, 'junk', { kind: 'equip', memberId: 'm1' }, cfg40)).toMatchObject({
+      code: 'not_equippable',
+    });
+    expect(p.bag).toHaveLength(2);
+  });
+
+  it('wearing an item another member wears swaps the two', () => {
+    const p = party();
+    p.members[0]!.equipment.weapon = sword('a');
+    p.members[1]!.equipment.weapon = sword('b', { bonuses: { int: 5 } });
+    moveItem(p, 'a', { kind: 'equip', memberId: 'm2' }, cfg40);
+    expect(p.members[1]!.equipment.weapon!.id).toBe('a');
+    expect(p.members[0]!.equipment.weapon!.id).toBe('b');
+  });
+
+  it('unequips into a personal bag and clamps health to the new maximum', () => {
+    const p = party();
+    const m = p.members[0]!;
+    m.equipment.body = sword('plate', { slot: 'body', bonuses: { vit: 20 } });
+    m.hp = memberDerived(m, p.level).maxHp;
+    moveItem(p, 'plate', { kind: 'personal', memberId: 'm1' }, cfg40);
+    expect(m.equipment.body).toBeUndefined();
+    expect(m.bag.map((i) => i.id)).toEqual(['plate']);
+    expect(m.hp).toBeLessThanOrEqual(memberDerived(m, p.level).maxHp);
+  });
+
+  it('favorite, discard and sell work on personal items', () => {
+    const p = party();
+    p.members[1]!.bag.push(sword('a'), sword('b'));
+    expect(setFavorite(p, 'a', true)).toEqual({ ok: true });
+    expect(discardItem(p, 'a')).toMatchObject({ code: 'favorite' });
+    expect(discardItem(p, 'b')).toEqual({ ok: true });
+    expect(p.members[1]!.bag.map((i) => i.id)).toEqual(['a']);
+    p.members[1]!.equipment.weapon = sword('w');
+    expect(discardItem(p, 'w')).toMatchObject({ code: 'no_item' });
+  });
+
+  it('a party bag size overrides the default capacity', () => {
+    const p = party();
+    p.bagSize = 1;
+    p.bag.push(sword('a'));
+    p.members[0]!.bag.push(sword('b'));
+    expect(moveItem(p, 'b', { kind: 'bag' }, cfg40)).toMatchObject({ code: 'bag_full' });
+    p.bagSize = 2;
+    expect(moveItem(p, 'b', { kind: 'bag' }, cfg40)).toEqual({ ok: true });
+  });
+
+  it('sorts the shared bag: favorites, then rarity, then level', () => {
+    const p = party();
+    p.bag.push(
+      sword('c', { rarity: 'common' }),
+      sword('e', { rarity: 'epic', itemLevel: 2 }),
+      sword('f', { rarity: 'common', favorite: true }),
+      sword('r', { rarity: 'rare' }),
+    );
+    sortBag(p);
+    expect(p.bag.map((i) => i.id)).toEqual(['f', 'e', 'r', 'c']);
   });
 });

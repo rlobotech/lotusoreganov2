@@ -133,6 +133,7 @@ export function createMember(index: number, t: MemberTemplate, level = 1): Membe
     mana: 0,
     alive: true,
     equipment: {},
+    bag: [],
     alloc: zeroAttrs(),
     points: 0,
     autoAlloc: true,
@@ -149,6 +150,7 @@ export function createMember(index: number, t: MemberTemplate, level = 1): Membe
 export function normalizeMember(m: Member): Member {
   const cls = CLASSES[m.cls];
   m.equipment ??= {};
+  m.bag ??= [];
   m.alloc ??= zeroAttrs();
   m.points ??= 0;
   m.autoAlloc ??= true;

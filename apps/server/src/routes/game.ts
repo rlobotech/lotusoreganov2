@@ -8,6 +8,7 @@ import {
   createPartySchema,
   equipSchema,
   favoriteSchema,
+  moveItemSchema,
   moveOrderSchema,
   seenSchema,
   sellSchema,
@@ -23,6 +24,8 @@ import {
   createParty,
   discardItem,
   equipItem,
+  moveItem,
+  sortBag,
   leaveTown,
   moveOrder,
   normalizeParty,
@@ -336,6 +339,15 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/unequip', { preHandler: auth }, async (req) => {
     const { memberId, slot } = unequipSchema.parse(req.body);
     return act(req, (s) => unequipItem(s, memberId, slot, cfg));
+  });
+
+  app.post('/parties/:id/move', { preHandler: auth }, async (req) => {
+    const { itemId, to } = moveItemSchema.parse(req.body);
+    return act(req, (s) => moveItem(s, itemId, to, cfg));
+  });
+
+  app.post('/parties/:id/sort-bag', { preHandler: auth }, async (req) => {
+    return act(req, (s) => sortBag(s));
   });
 
   app.post('/parties/:id/items/:itemId/favorite', { preHandler: auth }, async (req) => {

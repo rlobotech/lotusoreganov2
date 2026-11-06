@@ -1,10 +1,12 @@
 import type { OrderInfo, PartySummary, QuestInfo, SkillInfo, WorldInfo } from '@game/shared';
 import {
   activeQuest,
+  DEFAULT_BAG_SIZE,
   memberBreakdown,
   memberDerived,
   MONSTERS,
   objectiveTarget,
+  PERSONAL_BAG_SIZE,
   questAvailability,
   questTargetSite,
   shopItem,
@@ -125,11 +127,14 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
         points: m.points,
         autoAlloc: m.autoAlloc,
         equipment: m.equipment,
+        bag: m.bag,
         skills: m.skills,
         ai: m.ai,
       };
     }),
     bag: state.bag,
+    bagSize: state.bagSize ?? DEFAULT_BAG_SIZE,
+    personalBagSize: PERSONAL_BAG_SIZE,
     orders: orderInfo(state, world),
     quests: {
       active: state.quests.active.flatMap((q) => {
