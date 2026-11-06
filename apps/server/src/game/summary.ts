@@ -1,7 +1,8 @@
+import type { PartySummary, WorldInfo } from '@game/shared';
 import { memberDerived, xpToNext, type PartyState, type WorldDef } from '@game/world';
 
 /** What the client sees of a party. Deliberately leaves out a running fight's result. */
-export function summarize(state: PartyState, world: WorldDef) {
+export function summarize(state: PartyState, world: WorldDef): PartySummary {
   const a = state.activity;
   let label = 'Idle';
   if (a.kind === 'travel') {
@@ -52,7 +53,7 @@ export function summarize(state: PartyState, world: WorldDef) {
 }
 
 /** The map and sites, without anything the player should not know yet. */
-export function publicWorld(world: WorldDef) {
+export function publicWorld(world: WorldDef): WorldInfo {
   return {
     id: world.id,
     width: world.width,

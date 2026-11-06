@@ -170,14 +170,30 @@ API (needs the login cookie from `/auth/login`, except `/world`):
 - `GET /parties/:id/replays`, `GET /replays/:id` stored fight logs (last 100 plus 20 pinned boss/defeat/epic fights)
 - `POST /parties/:id/orders {siteId}` and `DELETE /parties/:id/orders/:orderId` send the party to a city or dungeon
 
-## Replay viewer (web app)
-Start the web app (Vite dev server, http://127.0.0.1:5173). It runs the combat engine in the browser, so it works without the API or database:
+## Playing it (web app)
+The web app talks to the API through the same origin: the Vite dev server forwards `/api/*` to the API on port 3000, so the login cookie just works. In production a reverse proxy (Caddy) does the same mapping.
+
+To play locally, start the database, then the API, then the web app (three terminals, or background them):
+```bash
+pnpm db:up
+```
+
+```bash
+pnpm --filter @game/server dev
+```
+
 ```bash
 pnpm --filter @game/web dev
 ```
 
-Two screens: **Return slideshow** (fake "while you were away" feed with skip this / skip all, then a replays list) and **Replay lab** (run any seed, or load a log made with `simulate --json`).
-Controls: play/pause, 1x/2x/4x, previous/next turn, scrub bar, End. Camera: drag to pan, mouse wheel or pinch or the +/- buttons to zoom (whole-number steps), Fit to see the whole arena. Tap a unit to see its HP and statuses.
+Open http://127.0.0.1:5173. Create an invite code first (see above), then **Create account** with it, form your party (2 to 6 adventurers), and watch the hex map. Set `TIME_SCALE=60` in `.env` to see things happen in seconds instead of minutes.
+
+What you get:
+- **Return slideshow:** whenever you come back, the fights and events since your last visit play one at a time (skip this / skip all). Long absences roll routine victories into summaries and keep the notable fights (bosses, defeats, rare loot, anyone falling). What you watched or skipped is remembered on the server, so it works across devices.
+- **Party screen:** the hex world map (pan and zoom, tap a place to send the party there), what the party is doing and when it finishes, members' health, the bag, orders and a list of stored replays to rewatch.
+- **Replay lab:** a developer tool that runs any seed of the sample fight, or loads a log made with `simulate --json`, without needing the API.
+
+Replay controls: play/pause, 1x/2x/4x, previous/next turn, scrub bar, End. Camera: drag to pan, mouse wheel or pinch or the +/- buttons to zoom (whole-number steps), Fit to see the whole arena. Tap a unit to see its HP and statuses.
 
 Sprites: units are drawn as placeholders until a PNG with the sprite's name exists in `apps/web/public/sprites/` (for example `human_warrior.png`, `goblin.png`; the names come from each unit's `sprite` field). A 32x32 image facing south-east is expected, the west-facing version is the same image flipped.
 

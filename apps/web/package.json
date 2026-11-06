@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@game/engine": "workspace:*",
+    "@game/shared": "workspace:*",
+    "@game/world": "workspace:*",
     "pixi.js": "^8.22.0"
   },
   "devDependencies": {

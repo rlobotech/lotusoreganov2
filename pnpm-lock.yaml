@@ -233,6 +233,12 @@ importers:
       '@game/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@game/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@game/world':
+        specifier: workspace:*
+        version: link:../../packages/world
       pixi.js:
         specifier: ^8.22.0
         version: 8.22.0

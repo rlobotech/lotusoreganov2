@@ -8,7 +8,7 @@ import {
   TextureSource,
   type Texture,
 } from 'pixi.js';
-import { centerOn, clampPan, fitZoom, MAX_ZOOM, snapZoom, stepZoom, zoomAbout } from './camera.ts';
+import { CameraController } from './cameraController.ts';
 import { arenaBounds, gridToScreen, TILE_H, TILE_W, type Bounds, type Vec } from './iso.ts';
 import type { Playback } from './playback.ts';
 import { loadSprite } from './sprites.ts';
@@ -72,7 +72,7 @@ export class Scene {
   private labels = new Map<string, Text>();
   private pb: Playback | null = null;
   private bounds: Bounds = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
-  private cam = { x: 0, y: 0, zoom: 1, mode: 'fit' as 'fit' | 'free' };
+  private camera!: CameraController;
   private selected: string | null = null;
   private disposed = false;
   private cleanup: Array<() => void> = [];
@@ -117,14 +117,20 @@ export class Scene {
       this.pb?.tick(ticker.deltaMS);
       this.render();
     });
-    app.renderer.on('resize', () => this.onResize());
+    this.camera = new CameraController(app.canvas, {
+      size: () => this.app.screen,
+      bounds: () => this.bounds,
+      onTap: (p) => this.select(this.hitTest(p)),
+      onZoom: (z) => this.opts.onZoom?.(z),
+    });
+    this.cleanup.push(() => this.camera.dispose());
+    app.renderer.on('resize', () => this.camera.resized());
     // The stage can change size after creation (controls appear, phone rotates), so watch it.
     const observer = new ResizeObserver(() => {
       if (!this.disposed) this.app.resize();
     });
     observer.observe(this.host);
     this.cleanup.push(() => observer.disconnect());
-    this.bindPointers();
   }
 
   destroy() {
@@ -136,7 +142,7 @@ export class Scene {
   // ---------- public API ----------
 
   get zoom(): number {
-    return this.cam.zoom;
+    return this.camera.zoom;
   }
 
   async setPlayback(pb: Playback) {
@@ -150,20 +156,11 @@ export class Scene {
   }
 
   fit() {
-    this.cam.mode = 'fit';
-    const { width, height } = this.app.screen;
-    const z = fitZoom(width, height, this.bounds);
-    this.cam.zoom = z;
-    Object.assign(this.cam, centerOn(width, height, this.bounds, z));
-    this.opts.onZoom?.(z);
+    this.camera.fit();
   }
 
   zoomStep(dir: 1 | -1) {
-    const { width, height } = this.app.screen;
-    this.zoomTo(stepZoom(this.cam.zoom, dir, fitZoom(width, height, this.bounds)), {
-      x: width / 2,
-      y: height / 2,
-    });
+    this.camera.zoomStep(dir);
   }
 
   select(id: string | null) {
@@ -171,128 +168,11 @@ export class Scene {
     this.opts.onSelect?.(id);
   }
 
-  // ---------- camera ----------
-
-  private zoomTo(zoom: number, anchor: Vec) {
-    const next = zoomAbout(this.cam, this.cam.zoom, zoom, anchor);
-    this.cam.x = next.x;
-    this.cam.y = next.y;
-    this.cam.zoom = zoom;
-    this.cam.mode = 'free';
-    this.clamp();
-    this.opts.onZoom?.(zoom);
-  }
-
-  private clamp() {
-    const { width, height } = this.app.screen;
-    Object.assign(this.cam, clampPan(this.cam, width, height, this.bounds, this.cam.zoom));
-  }
-
-  private onResize() {
-    if (this.cam.mode === 'fit') this.fit();
-    else this.clamp();
-  }
-
-  private bindPointers() {
-    const canvas = this.app.canvas;
-    const pts = new Map<number, Vec>();
-    let down: { x: number; y: number; t: number } | null = null;
-    let moved = false;
-    let pinch: { dist: number; zoom: number } | null = null;
-    let lastWheel = 0;
-
-    const local = (e: PointerEvent | WheelEvent): Vec => {
-      const r = canvas.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-
-    const onDown = (e: PointerEvent) => {
-      canvas.setPointerCapture(e.pointerId);
-      const p = local(e);
-      pts.set(e.pointerId, p);
-      if (pts.size === 1) {
-        down = { ...p, t: performance.now() };
-        moved = false;
-      } else if (pts.size === 2) {
-        const [a, b] = [...pts.values()] as [Vec, Vec];
-        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.cam.zoom };
-        moved = true;
-      }
-    };
-
-    const onMove = (e: PointerEvent) => {
-      const prev = pts.get(e.pointerId);
-      if (!prev) return;
-      const p = local(e);
-      pts.set(e.pointerId, p);
-      if (pts.size === 1) {
-        if (down && !moved && Math.hypot(p.x - down.x, p.y - down.y) > 5) moved = true;
-        if (moved) {
-          this.cam.x += p.x - prev.x;
-          this.cam.y += p.y - prev.y;
-          this.cam.mode = 'free';
-          this.clamp();
-        }
-      } else if (pts.size === 2 && pinch) {
-        const [a, b] = [...pts.values()] as [Vec, Vec];
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const { width, height } = this.app.screen;
-        const min = Math.min(1, fitZoom(width, height, this.bounds));
-        const z = Math.max(min, Math.min(MAX_ZOOM, pinch.zoom * (dist / pinch.dist)));
-        this.zoomTo(z, mid);
-      }
-    };
-
-    const onUp = (e: PointerEvent) => {
-      const p = pts.get(e.pointerId);
-      pts.delete(e.pointerId);
-      if (pinch && pts.size < 2) {
-        // Snap back to a whole zoom step so pixels stay crisp.
-        const { width, height } = this.app.screen;
-        const snapped = snapZoom(this.cam.zoom, fitZoom(width, height, this.bounds));
-        this.zoomTo(snapped, p ?? { x: width / 2, y: height / 2 });
-        pinch = null;
-      }
-      if (pts.size === 0 && down && !moved && p && performance.now() - down.t < 500) {
-        this.select(this.hitTest(p));
-      }
-      if (pts.size === 0) down = null;
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const now = performance.now();
-      if (now - lastWheel < 90) return;
-      lastWheel = now;
-      const { width, height } = this.app.screen;
-      const next = stepZoom(
-        this.cam.zoom,
-        e.deltaY < 0 ? 1 : -1,
-        fitZoom(width, height, this.bounds),
-      );
-      this.zoomTo(next, local(e));
-    };
-
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-    this.cleanup.push(() => {
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onUp);
-      canvas.removeEventListener('wheel', onWheel);
-    });
-  }
-
   private hitTest(p: Vec): string | null {
     const st = this.pb?.state;
     if (!st) return null;
-    const wx = (p.x - this.cam.x) / this.cam.zoom;
-    const wy = (p.y - this.cam.y) / this.cam.zoom;
+    const wx = (p.x - this.camera.x) / this.camera.zoom;
+    const wy = (p.y - this.camera.y) / this.camera.zoom;
     let best: string | null = null;
     let bestD = 16;
     for (const id of st.order) {
@@ -428,7 +308,7 @@ export class Scene {
   }
 
   private toScreen(p: Vec): Vec {
-    return { x: p.x * this.cam.zoom + this.cam.x, y: p.y * this.cam.zoom + this.cam.y };
+    return { x: p.x * this.camera.zoom + this.camera.x, y: p.y * this.camera.zoom + this.camera.y };
   }
 
   // ---------- per-frame rendering ----------
@@ -436,8 +316,8 @@ export class Scene {
   private render() {
     const pb = this.pb;
     if (!pb) return;
-    this.world.scale.set(this.cam.zoom);
-    this.world.position.set(Math.round(this.cam.x), Math.round(this.cam.y));
+    this.world.scale.set(this.camera.zoom);
+    this.world.position.set(Math.round(this.camera.x), Math.round(this.camera.y));
 
     const st = pb.state;
     const ev = pb.event;

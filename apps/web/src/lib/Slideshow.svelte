@@ -1,54 +1,51 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import type { FeedItem } from './feed.ts';
-  import ReplayView from './ReplayView.svelte';
+  import type { FeedItem } from './feedItems.ts';
+  import ReplayLoader from './ReplayLoader.svelte';
 
-  let { items }: { items: FeedItem[] } = $props();
+  let {
+    items,
+    onseen,
+    onfinish,
+  }: {
+    items: FeedItem[];
+    /** Called with the id of the last feed entry the player has now watched or skipped. */
+    onseen?: (lastId: number) => void;
+    onfinish: () => void;
+  } = $props();
 
   let index = $state(0);
   let finished = $state(false);
-  let rewatching = $state<FeedItem | null>(null);
-  let timer: ReturnType<typeof setTimeout> | undefined;
   const CARD_MS = 4500;
 
   const current = $derived(index < items.length ? items[index]! : null);
-  const fights = $derived(items.filter((i) => i.kind === 'fight'));
+
+  function finishAll() {
+    const last = items[items.length - 1];
+    if (last) onseen?.(last.lastId);
+    onfinish();
+  }
 
   function next() {
+    const item = items[index];
+    if (item) onseen?.(item.lastId);
+    finished = false;
+    if (index + 1 >= items.length) return onfinish();
     index += 1;
-    finished = false;
-  }
-  function skipAll() {
-    index = items.length;
-  }
-  function restart() {
-    index = 0;
-    finished = false;
-    rewatching = null;
   }
 
+  // Cards advance on their own so a long absence does not need a tap per card.
   $effect(() => {
-    clearTimeout(timer);
-    if (current?.kind === 'card') {
-      timer = setTimeout(next, CARD_MS);
-    }
+    if (current?.kind !== 'card') return;
+    const timer = setTimeout(next, CARD_MS);
     return () => clearTimeout(timer);
   });
-  onDestroy(() => clearTimeout(timer));
+
+  $effect(() => {
+    if (items.length === 0) onfinish();
+  });
 </script>
 
-{#if rewatching && rewatching.kind === 'fight'}
-  <section class="screen">
-    <header>
-      <div>
-        <h2>{rewatching.title}</h2>
-        <div class="muted">{rewatching.subtitle}</div>
-      </div>
-      <button onclick={() => (rewatching = null)}>Back</button>
-    </header>
-    <div class="body"><ReplayView events={rewatching.events} /></div>
-  </section>
-{:else if current}
+{#if current}
   <section class="screen">
     <header>
       <div>
@@ -57,7 +54,7 @@
       </div>
       <div class="actions">
         <button onclick={next}>Skip this</button>
-        <button onclick={skipAll}>Skip all</button>
+        <button onclick={finishAll}>Skip all</button>
       </div>
     </header>
 
@@ -67,7 +64,11 @@
           <div class="fight-title">
             {current.title} <span class="muted">{current.subtitle}</span>
           </div>
-          <ReplayView events={current.events} onfinished={() => (finished = true)} />
+          <ReplayLoader
+            replayId={current.replayId}
+            events={current.events}
+            onfinished={() => (finished = true)}
+          />
         </div>
       {/key}
       <footer>
@@ -91,31 +92,6 @@
         <button class="primary" onclick={next}>Continue</button>
       </footer>
     {/if}
-  </section>
-{:else}
-  <section class="screen">
-    <header>
-      <div>
-        <h2>The party</h2>
-        <div class="muted">The world map arrives in a later milestone.</div>
-      </div>
-      <button onclick={restart}>Show slideshow again</button>
-    </header>
-    <div class="card info">
-      <h3>World map</h3>
-      <p>The hex world map and the management menu will appear here.</p>
-    </div>
-    <h3 class="replays-title">Replays</h3>
-    <div class="replays">
-      {#each fights as f}
-        {#if f.kind === 'fight'}
-          <button class="replay-item" onclick={() => (rewatching = f)}>
-            <strong>{f.title}</strong>
-            <span class="muted">{f.subtitle}</span>
-          </button>
-        {/if}
-      {/each}
-    </div>
   </section>
 {/if}
 
@@ -171,6 +147,9 @@
   .card.good {
     border-color: var(--gold);
   }
+  .card.bad {
+    border-color: var(--red);
+  }
   .card p {
     margin: 10px 0 0;
     line-height: 1.5;
@@ -195,20 +174,5 @@
     to {
       transform: scaleX(1);
     }
-  }
-  .replays-title {
-    margin-top: 8px;
-  }
-  .replays {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow: auto;
-  }
-  .replay-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    text-align: left;
   }
 </style>

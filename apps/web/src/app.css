@@ -68,6 +68,7 @@ button:disabled {
 }
 
 input[type='number'],
+input[type='password'],
 input[type='text'] {
   font: inherit;
   color: var(--text);
