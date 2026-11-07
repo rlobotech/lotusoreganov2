@@ -8,6 +8,10 @@ import type { Overlay, Terrain } from './types.ts';
  *   [biomes]     one character per hex, one line per row (legend in BIOME_CHARS)
  *   [overlay]    the same grid: . nothing, = road, : ford, # bridge, ^ pass
  *   [landmarks]  `id col row` lines: places from the picture (bosses, the first city)
+ *   [regions]    the same grid again: one character per hex naming its region, 0 for the sea
+ *   [zones]      `char id name...` lines: the regions, in the order they open up
+ *   [gates]      `id col row from to` lines: the one crossing (a pass, ford or bridge) that leads
+ *                from region `from` into region `to`; a boss stands there
  */
 
 export const BIOME_CHARS: Record<Terrain, string> = {
@@ -48,6 +52,23 @@ export interface Landmark {
   row: number;
 }
 
+/** A region of the continent. The order of the list is the order the regions open up. */
+export interface MapZone {
+  char: string;
+  id: string;
+  name: string;
+}
+
+/** The only way from one region into the next: a crossing hex a boss guards. */
+export interface Gate {
+  id: string;
+  col: number;
+  row: number;
+  /** Zone ids. */
+  from: string;
+  to: string;
+}
+
 export interface WorldMap {
   width: number;
   height: number;
@@ -55,6 +76,10 @@ export interface WorldMap {
   biomes: string[];
   overlay: string[];
   landmarks: Landmark[];
+  /** One string per row; every character is a zone's `char`, or '0' for the sea. */
+  regions: string[];
+  zones: MapZone[];
+  gates: Gate[];
 }
 
 export function parseWorldMap(text: string): WorldMap {
@@ -90,11 +115,29 @@ export function parseWorldMap(text: string): WorldMap {
     if (!id || col === undefined || row === undefined) throw new Error(`Bad landmark: ${line}`);
     return { id, col: Number(col), row: Number(row) };
   });
-  return { width, height: biomes.length, biomes, overlay, landmarks };
+  const regions = blocks.regions ?? biomes.map((r) => '0'.repeat(r.length));
+  if (regions.length !== biomes.length || regions.some((r) => r.length !== width)) {
+    throw new Error('The regions block must be the same size as the biomes');
+  }
+  const zones = (blocks.zones ?? []).map((line) => {
+    const [char, id, ...name] = line.split(/\s+/);
+    if (!char || char.length !== 1 || !id) throw new Error(`Bad zone: ${line}`);
+    return { char, id, name: name.join(' ') || id };
+  });
+  const known = new Set(['0', ...zones.map((z) => z.char)]);
+  for (const row of regions) {
+    for (const ch of row) if (!known.has(ch)) throw new Error(`Unknown region character "${ch}"`);
+  }
+  const gates = (blocks.gates ?? []).map((line) => {
+    const [id, col, row, from, to] = line.split(/\s+/);
+    if (!id || !to) throw new Error(`Bad gate: ${line}`);
+    return { id, col: Number(col), row: Number(row), from: from!, to };
+  });
+  return { width, height: biomes.length, biomes, overlay, landmarks, regions, zones, gates };
 }
 
 export function formatWorldMap(map: WorldMap): string {
-  return [
+  const lines = [
     '[biomes]',
     ...map.biomes,
     '',
@@ -104,7 +147,22 @@ export function formatWorldMap(map: WorldMap): string {
     '[landmarks]',
     ...map.landmarks.map((l) => `${l.id} ${l.col} ${l.row}`),
     '',
-  ].join('\n');
+  ];
+  // The region blocks are left out of a draft that has none (the traced map).
+  if (map.zones.length > 0) {
+    lines.push(
+      '[regions]',
+      ...map.regions,
+      '',
+      '[zones]',
+      ...map.zones.map((z) => `${z.char} ${z.id} ${z.name}`),
+      '',
+      '[gates]',
+      ...map.gates.map((g) => `${g.id} ${g.col} ${g.row} ${g.from} ${g.to}`),
+      '',
+    );
+  }
+  return lines.join('\n');
 }
 
 /** The biome and overlay arrays of a map, row-major, as the world definition wants them. */

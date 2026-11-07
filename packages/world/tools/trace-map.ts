@@ -6,13 +6,14 @@
  * It lays a pointy-top hex grid over the picture, classifies every pixel inside each hex into a
  * biome by its colour, and gives the hex the biome most of its pixels vote for. Rivers are found
  * from the bright blue pixels. A rules pass then cleans up noise, lost islands and the coast.
- * `--write` saves the result as src/world-map-data.ts (the fixed data the game reads); `--preview`
+ * `--write` saves the raw draft as src/world-map-trace.ts (tools/build-map.ts shapes it into the game's map); `--preview`
  * draws the traced map with the game's palette so it can be compared with the picture by eye.
  *
  * The saved map is then edited by hand (see world-map.ts); this tool is only the first draft.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { drawHexes, PALETTE } from './draw.ts';
 import { BIOME_CHARS, formatWorldMap, neighborsOf } from '../src/world-map.ts';
 
 // ---------- grid laid over the picture ----------
@@ -318,52 +319,8 @@ export function handFixes(rows: string[][]): string[][] {
 
 // ---------- preview ----------
 
-const PALETTE: Record<string, number> = {
-  '.': 0x8dbb45,
-  S: 0xd9c36b,
-  f: 0x278044,
-  F: 0x174d32,
-  h: 0x777b37,
-  s: 0x568d79,
-  d: 0xe6b653,
-  n: 0xb8d8f5,
-  i: 0xe6f2ff,
-  a: 0x6e6862,
-  l: 0xf15a24,
-  m: 0x777783,
-  r: 0x49b9f2,
-  '~': 0x07509b,
-};
-
 export function previewPng(rows: string[]): PNG {
-  const w = Math.ceil((COLS + 1) * HEX_W) + 4;
-  const h = Math.ceil(ROWS * ROW_STEP + 2 * S) + 4;
-  const png = new PNG({ width: w, height: h });
-  for (let i = 0; i < w * h; i++) png.data.writeUInt32BE(0x0d0b10ff, i * 4);
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const ch = rows[row]![col]!;
-      const rgb = PALETTE[ch] ?? 0xff00ff;
-      const cx = (col + 0.5 + 0.5 * (row & 1)) * HEX_W + 2;
-      const cy = S + row * ROW_STEP + 2;
-      for (let y = Math.floor(cy - S); y <= Math.ceil(cy + S); y++) {
-        for (let x = Math.floor(cx - HEX_W / 2); x <= Math.ceil(cx + HEX_W / 2); x++) {
-          // Inside a pointy-top hexagon (with a thin gap between hexes)?
-          const dx = Math.abs(x - cx);
-          const dy = Math.abs(y - cy);
-          if (dx > HEX_W / 2 - 0.6 || dy > S - 0.6 || dx * Math.sqrt(3) + dy > 2 * S - 1.2)
-            continue;
-          if (x < 0 || y < 0 || x >= w || y >= h) continue;
-          const i = (y * w + x) * 4;
-          png.data[i] = (rgb >> 16) & 255;
-          png.data[i + 1] = (rgb >> 8) & 255;
-          png.data[i + 2] = rgb & 255;
-          png.data[i + 3] = 255;
-        }
-      }
-    }
-  }
-  return png;
+  return drawHexes(COLS, ROWS, (c, r) => PALETTE[rows[r]![c]!] ?? 0xff00ff);
 }
 
 // ---------- command line ----------
@@ -388,13 +345,16 @@ if (
       biomes: rows,
       overlay: rows.map((r) => '.'.repeat(r.length)),
       landmarks: landmarks(),
+      regions: rows.map((r) => '0'.repeat(r.length)),
+      zones: [],
+      gates: [],
     };
-    const file = new URL('../src/world-map-data.ts', import.meta.url);
+    const file = new URL('../src/world-map-trace.ts', import.meta.url);
     writeFileSync(
       file,
-      `export const WORLD_MAP = \`${formatWorldMap(map)}\`;
+      `export const TRACED_MAP = \`${formatWorldMap(map)}\`;
 `,
     );
-    console.log('written src/world-map-data.ts');
+    console.log('written src/world-map-trace.ts');
   }
 }

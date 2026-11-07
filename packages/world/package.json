@@ -14,7 +14,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "map:trace": "node tools/trace-map.ts ../../docs/art/world_map_reference.png",
-    "map:print": "node tools/print-map.ts"
+    "map:print": "node tools/print-map.ts",
+    "map:build": "node tools/build-map.ts",
+    "map:check": "node tools/check-map.ts"
   },
   "dependencies": {
     "@game/engine": "workspace:*"

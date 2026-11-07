@@ -1,6 +1,6 @@
 # World map rebuild
 
-Status: in progress (phases 1 and 2 done, phase 3 next)
+Status: in progress (phases 1 to 3 done, phase 4 next)
 
 
 Goal: replace the 14x60 strip with an organic continent of about 40x40 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
@@ -60,6 +60,15 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - **Landmarks:** the picture's eight labelled places (the starting city and the seven bosses) are traced to hexes.
 - **The draft is not final.** Rivers come out as scattered patches (thin lines are hard to read from colour), there are no overlays yet (roads, fords, bridges, passes), and some landmarks sit on plains or ash rather than where the content wants them. Phase 3 fixes the map by hand until the validator passes; the data file is then edited directly, not re-traced.
 - Tests: `continent.test.ts` (size, characters, sea ring, one landmass, ice in the north, lava in the south, desert in the west, landmarks, text format).
+
+### Phase 3 notes (what exists now)
+- **Proposed unlock order (to confirm with the user in phase 4):** 1 Greenwood (start), 2 East Moors, 3 Southern Fen, 4 Northern Woods (north of the east), 5 Western Highlands (west of the start), 6 Frozen North, 7 Sand Wastes, 8 Southwest Coast, 9 Ashen Volcano. Which region leads into which (the gates): 1 into 2, 3 and 5; 2 into 4; 4 into 6; 5 into 7 and 8; 3 into 9. The order is the order of levels; a party may meet a gate before the region it leads from is finished, so the boss quests must be chained in this order (existing `requiresQuest`).
+- **Map pipeline:** `map:trace` writes the raw draft (`src/world-map-trace.ts`); `map:build` (`tools/build-map.ts`) shapes it into `src/world-map-data.ts` deterministically: open woods instead of dense forest, region seeds and a flood that is dear over rock (so borders follow mountains and rivers), a barrier on every border (river over low ground, mountains over high ground, dense forest in woods) with exactly one crossing, a pass over mountains or a bridge over a river, on every gate border, cut-off ground walled in, roads from the first city to every crossing. `map:check` prints the validator's report.
+- **Map file** gained `[regions]` (a character per hex), `[zones]` (ordered list) and `[gates]` (`id col row from to`).
+- **Validator** (`src/map-check.ts`, `checkMap`): sea ring; region and sea agree; each gate is a pass on mountains or a bridge/ford on a river, leads forward in the order, and has open ground on both sides; every region but the first has exactly one gate; no walkable hex touches another region except at a gate; with a region's gate shut it cannot be reached, and once opened every walkable hex of the opened regions is reachable (no sealed pockets); crossings stand on what they open; climate lints as warnings (ice north, lava south, desert west of the mountains).
+- **Result:** the continent passes with no errors. One warning: East Moors has only 25 walkable hexes (the picture's eastern slate lands are mostly rock). Walkable hexes per region: 72, 25, 140, 87, 67, 88, 57, 75, 41.
+- **Not yet:** interior rivers with fords (rivers exist only as region borders), the sites (cities, dungeons, boss dungeons) on the map, region content. The picture's landmarks were snapped onto open ground of the region they fall in (they are hints for phase 4, not sites).
+- Tests: `map-check.test.ts` (the continent passes; unlock order; gates; walls; and the checker catches a missing crossing, a hole in a wall, a sealed pocket, land on the edge, a gateless region, a backwards gate, a city on rock, a ford on mountains).
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).
