@@ -43,6 +43,7 @@
   $effect(() => {
     void near;
     void pet.equipped;
+    void party.level; // a level up renews the stock
     void party.pos.col;
     void party.pos.row;
     void party.bag.length;
@@ -159,7 +160,9 @@
     >
   </div>
   {#if near && city}
-    <div class="muted small">The shop's rotating stock changes in {left(city.rotatesAt)}.</div>
+    <div class="muted small">
+      The shop's rotating stock changes at the next level-up or in {left(city.rotatesAt)}.
+    </div>
   {/if}
   {#if !near}
     <div class="muted small">

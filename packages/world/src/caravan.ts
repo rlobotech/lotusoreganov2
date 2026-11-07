@@ -124,7 +124,7 @@ export function petQuote(
     3,
     Math.ceil((hexDistance(p.pos, city) * cfg.travelTicksPerHex) / petSpeed(tier)),
   );
-  return { cityId: city.id, stock: cityStock(city, now), ticks };
+  return { cityId: city.id, stock: cityStock(city, now, p.level), ticks };
 }
 
 /**

@@ -620,7 +620,7 @@ export function tradeItems(
   const ids = new Set(itemIds);
   if (ids.size !== itemIds.length) return fail('no_item', 'An item was chosen twice');
   if (ids.size === 0 && stockIds.length === 0) return fail('no_item', 'Nothing selected');
-  const stock = cityStock(city, now);
+  const stock = cityStock(city, now, p.level);
   const wanted: ShopItem[] = [];
   for (const id of stockIds) {
     const entry = stock.find((s) => s.id === id);

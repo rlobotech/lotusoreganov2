@@ -40,9 +40,9 @@ const item = (id: string, value = 100, over: Partial<Item> = {}): Item => ({
 
 describe('rotating stock', () => {
   it('is the same all day, changes from day to day, and keeps the fixed shop', () => {
-    const a = cityStock(oakhaven, NOW);
-    expect(cityStock(oakhaven, NOW + 3_600_000)).toEqual(a);
-    const tomorrow = cityStock(oakhaven, NOW + DAY_MS);
+    const a = cityStock(oakhaven, NOW, 1);
+    expect(cityStock(oakhaven, NOW + 3_600_000, 1)).toEqual(a);
+    const tomorrow = cityStock(oakhaven, NOW + DAY_MS, 1);
     expect(tomorrow.map((s) => s.id)).not.toEqual(a.map((s) => s.id));
     const fixed = oakhaven.shop!.map((s) => s.id);
     for (const id of fixed) {
@@ -110,7 +110,7 @@ describe('trading near a city', () => {
   it('sells and buys in one step: the sale pays for the purchase first, the rest is shared', () => {
     const p = party();
     p.bag.push(item('a', 300), item('b', 300));
-    const buy = cityStock(oakhaven, NOW).find((s) => !s.caravan && s.price < 600)!;
+    const buy = cityStock(oakhaven, NOW, 1).find((s) => !s.caravan && s.price < 600)!;
     const r = tradeItems(p, W, ['a', 'b'], [buy.id], cfg, undefined, NOW);
     expect(r).toEqual({ ok: true });
     expect(p.bag.map((i) => i.name)).toEqual([buy.name]);
@@ -120,7 +120,7 @@ describe('trading near a city', () => {
   it('is all or nothing: not enough gold, a full bag and unknown stock change nothing', () => {
     const p = party();
     p.bag.push(item('a', 10));
-    const dear = cityStock(oakhaven, NOW).find((s) => s.caravan)!;
+    const dear = cityStock(oakhaven, NOW, 1).find((s) => s.caravan)!;
     expect(tradeItems(p, W, ['a'], [dear.id], cfg, undefined, NOW)).toMatchObject({
       code: 'no_gold',
     });
@@ -142,9 +142,9 @@ describe('trading near a city', () => {
   it('yesterday stock is gone, and nothing can be bought without a day', () => {
     const p = party();
     p.members[0]!.gold = 99_999;
-    const yesterday = rotatingStock(oakhaven, dayOf(NOW) - 1)[0]!;
+    const yesterday = rotatingStock(oakhaven, dayOf(NOW) - 1, 1)[0]!;
     expect(buyItem(p, W, yesterday.id, cfg, undefined, NOW)).toMatchObject({ code: 'no_stock' });
-    const today = rotatingStock(oakhaven, dayOf(NOW))[0]!;
+    const today = rotatingStock(oakhaven, dayOf(NOW), 1)[0]!;
     expect(buyItem(p, W, today.id, cfg, undefined, NOW)).toEqual({ ok: true });
     expect(buyItem(p, W, today.id, cfg)).toMatchObject({ code: 'no_stock' });
   });
@@ -152,7 +152,7 @@ describe('trading near a city', () => {
   it('a bought accessory can be equipped and does its job', () => {
     const p = party();
     p.members[0]!.gold = 99_999;
-    const bag = rotatingStock(oakhaven, dayOf(NOW)).find((s) => s.caravan)!;
+    const bag = rotatingStock(oakhaven, dayOf(NOW), 1).find((s) => s.caravan)!;
     expect(buyItem(p, W, bag.id, cfg, undefined, NOW)).toEqual({ ok: true });
     const got = p.bag.find((i) => i.caravan)!;
     expect(got.caravan).toEqual(bag.caravan);
@@ -167,7 +167,7 @@ describe('trading near a city', () => {
     p.members[1]!.ownerId = 'u2';
     p.members[1]!.gold = 5000;
     p.bag.push(item('a', 100), item('b', 100));
-    const buy = cityStock(oakhaven, NOW).find((s) => s.price >= 400)!;
+    const buy = cityStock(oakhaven, NOW, 1).find((s) => s.price >= 400)!;
     expect(tradeItems(p, W, ['a'], [buy.id], cfg, 'u1', NOW)).toMatchObject({ code: 'no_gold' });
     expect(tradeItems(p, W, ['a', 'b'], [buy.id], cfg, 'u2', NOW)).toEqual({ ok: true });
     // The 200 gold sale is 100 each; u2's 100 and 'buy.price - 100' of u2 gold paid.
@@ -183,7 +183,7 @@ describe('the carrier pet and the rotating stock', () => {
     p.members[0]!.gold = 50_000;
     p.pos = { col: oakhaven.col + 6, row: oakhaven.row };
     p.activity = { kind: 'town', startedAt: 0, ticks: 100000 };
-    p.nextAt = 10 ** 12;
+    p.nextAt = 10 ** 15;
     const quote = petQuote(p, W, cfg, NOW)!;
     const acc = quote.stock.find((s) => s.caravan)!;
     expect(sendPet(p, W, cfg, [], [acc.id], NOW)).toEqual(expect.objectContaining({ ok: true }));
@@ -195,5 +195,46 @@ describe('the carrier pet and the rotating stock', () => {
     expect(petQuote(back, W, cfg, NOW + 2 * DAY_MS)!.stock.some((s) => s.id === acc.id)).toBe(
       false,
     );
+  });
+});
+
+describe('rotation by party level', () => {
+  it('the stock renews when the party gains a level, as well as every day', () => {
+    const ids = (level: number) => cityStock(oakhaven, NOW, level).map((s) => s.id);
+    expect(ids(5)).toEqual(ids(5));
+    expect(ids(6)).not.toEqual(ids(5));
+    // The fixed shop never changes.
+    for (const fixed of oakhaven.shop!) expect(ids(6)).toContain(fixed.id);
+    // A level up in the same day brings different goods than the day before did.
+    const sameDay = new Set(ids(5));
+    expect(ids(6).filter((id) => !sameDay.has(id)).length).toBeGreaterThan(3);
+  });
+
+  it('gear follows the party level inside a window around the city level', () => {
+    const gearLevels = (level: number) =>
+      rotatingStock(oakhaven, dayOf(NOW), level)
+        .filter((s) => !s.caravan)
+        .map((s) => s.itemLevel);
+    const city = oakhaven.stock!.level;
+    // A party at the city's own level is served around it.
+    for (const l of gearLevels(city)) expect(Math.abs(l - city)).toBeLessThanOrEqual(2);
+    // A far stronger party is still served from the city's own (capped) window.
+    for (const l of gearLevels(80)) expect(l).toBeLessThanOrEqual(city + 5 + 2);
+    // A weaker party gets weaker gear, but never below the window.
+    expect(Math.max(...gearLevels(1))).toBeLessThanOrEqual(city);
+    // The high regions follow the party up to their own window.
+    const spire = W.sites.the_spire_city!;
+    const high = rotatingStock(spire, dayOf(NOW), 95).filter((s) => !s.caravan);
+    expect(Math.min(...high.map((s) => s.itemLevel))).toBeGreaterThanOrEqual(90 - 2);
+  });
+
+  it('what is bought is priced and built for the party level at that time', () => {
+    const p = party();
+    p.level = 7;
+    p.members[0]!.gold = 99_999;
+    const today = rotatingStock(oakhaven, dayOf(NOW), 7)[0]!;
+    expect(buyItem(p, W, today.id, cfg, undefined, NOW)).toEqual({ ok: true });
+    p.level = 8; // levelled up: the old offer is gone
+    expect(buyItem(p, W, today.id, cfg, undefined, NOW)).toMatchObject({ code: 'no_stock' });
   });
 });

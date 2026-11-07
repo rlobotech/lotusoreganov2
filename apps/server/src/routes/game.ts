@@ -461,7 +461,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
     const now = Date.now();
     return {
       city: { id: city.id, name: city.name },
-      stock: cityStock(city, now),
+      stock: cityStock(city, now, state.level),
       // The shop changes at midnight UTC.
       rotatesAt: (dayOf(now) + 1) * DAY_MS,
       teleports: teleportOptions(state, world, cfg),
