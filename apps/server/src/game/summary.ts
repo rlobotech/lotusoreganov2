@@ -7,7 +7,21 @@ import {
   memberBreakdown,
   memberDerived,
   MAX_SCHOOL_LEVEL,
+  BAG_SLOTS,
+  bagCapacity,
+  caravanBagSlots,
+  MOUNT_SPEED,
+  PET_BAG,
+  PET_SALE_RATE,
+  PET_SPEED,
+  TENT_HEAL,
   memberGear,
+  mountSpeed,
+  petBag,
+  petSaleRate,
+  petSpeed,
+  petTier,
+  tentHealing,
   MONSTERS,
   objectiveTarget,
   partyGold,
@@ -88,6 +102,30 @@ export function orderInfo(state: PartyState, world: WorldDef): OrderInfo[] {
       targetSiteId: o.siteId ?? null,
     };
   });
+}
+
+function petInfo(state: PartyState, world: WorldDef): PartySummary['pet'] {
+  const tier = petTier(state);
+  const trip = state.pet?.trip;
+  return {
+    equipped: tier > 0,
+    tier,
+    capacity: tier ? petBag(tier) : 0,
+    saleRate: tier ? petSaleRate(tier) : 0,
+    speed: tier ? petSpeed(tier) : 0,
+    abilities: state.caravan?.pet?.caravan?.abilities ?? [],
+    trip: trip
+      ? {
+          phase: trip.phase,
+          city: world.sites[trip.cityId]?.name ?? trip.cityId,
+          items: trip.phase === 'out' ? trip.items.length : 0,
+          buying: trip.shopping.length,
+          arriveAt: trip.arriveAt,
+          endsAt: trip.returnAt,
+        }
+      : null,
+    waiting: state.pet?.waiting ?? [],
+  };
 }
 
 /** What the client sees of a party. Deliberately leaves out a running fight's result. */
@@ -178,8 +216,23 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
     }),
     bag: state.bag,
     pendingItems: state.pendingItems ?? [],
-    bagSize: state.bagSize ?? DEFAULT_BAG_SIZE,
+    bagSize: bagCapacity(state, { bagSize: DEFAULT_BAG_SIZE }),
     personalBagSize: PERSONAL_BAG_SIZE,
+    caravan: state.caravan ?? {},
+    caravanEffects: {
+      mountSpeed: mountSpeed(state),
+      bagSlots: caravanBagSlots(state),
+      tentHealing: tentHealing(state),
+    },
+    caravanTiers: {
+      mountSpeed: [...MOUNT_SPEED],
+      bagSlots: [...BAG_SLOTS],
+      tentHealing: [...TENT_HEAL],
+      petSaleRate: [...PET_SALE_RATE],
+      petBag: [...PET_BAG],
+      petSpeed: [...PET_SPEED],
+    },
+    pet: petInfo(state, world),
     orders: orderInfo(state, world),
     quests: {
       active: state.quests.active.flatMap((q) => {

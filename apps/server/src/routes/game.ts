@@ -6,8 +6,11 @@ import {
   autoAllocSchema,
   buySchema,
   createPartySchema,
+  caravanEquipSchema,
+  caravanUnequipSchema,
   equipSchema,
   learnSchema,
+  petSendSchema,
   favoriteSchema,
   moveItemSchema,
   moveOrderSchema,
@@ -31,7 +34,11 @@ import {
   leaveTown,
   moveOrder,
   normalizeParty,
+  equipCaravan,
   learnFromBook,
+  petQuote,
+  sendPet,
+  unequipCaravan,
   resetMemberAi,
   resetPoints,
   sellItems,
@@ -349,6 +356,35 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/equip', { preHandler: auth }, async (req) => {
     const { memberId, itemId } = equipSchema.parse(req.body);
     return act(req, (s) => equipItem(s, memberId, itemId, req.user!.id));
+  });
+
+  // ---- caravan ----
+
+  app.post('/parties/:id/caravan/equip', { preHandler: auth }, async (req) => {
+    const { itemId } = caravanEquipSchema.parse(req.body);
+    return act(req, (s) => equipCaravan(s, itemId, cfg));
+  });
+
+  app.post('/parties/:id/caravan/unequip', { preHandler: auth }, async (req) => {
+    const { kind } = caravanUnequipSchema.parse(req.body);
+    return act(req, (s) => unequipCaravan(s, kind, cfg));
+  });
+
+  app.get('/parties/:id/pet/shop', { preHandler: auth }, async (req) => {
+    const { state } = await ownedParty(req);
+    const quote = petQuote(state, world, cfg);
+    if (!quote) throw new HttpError(409, 'no_pet', 'The party has no carrier pet');
+    return {
+      city: { id: quote.cityId, name: world.sites[quote.cityId]?.name ?? quote.cityId },
+      stock: quote.stock,
+      ticks: quote.ticks,
+      tickMs: cfg.tickMs,
+    };
+  });
+
+  app.post('/parties/:id/pet/send', { preHandler: auth }, async (req) => {
+    const { itemIds, stockIds } = petSendSchema.parse(req.body);
+    return act(req, (s) => sendPet(s, world, cfg, itemIds, stockIds, Date.now(), req.user!.id));
   });
 
   app.post('/parties/:id/learn', { preHandler: auth }, async (req) => {

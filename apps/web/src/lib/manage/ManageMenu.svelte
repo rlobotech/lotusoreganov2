@@ -3,12 +3,13 @@
   import { session } from '../session.svelte.ts';
   import AiTab from './AiTab.svelte';
   import AttributesTab from './AttributesTab.svelte';
+  import CaravanTab from './CaravanTab.svelte';
   import CityTab from './CityTab.svelte';
   import InventoryTab from './InventoryTab.svelte';
   import QuestsOrdersTab from './QuestsOrdersTab.svelte';
   import SpellbookTab from './SpellbookTab.svelte';
 
-  type Tab = 'inventory' | 'attributes' | 'spellbook' | 'quests' | 'ai' | 'city';
+  type Tab = 'inventory' | 'attributes' | 'spellbook' | 'quests' | 'ai' | 'caravan' | 'city';
   let { start = 'inventory', onclose }: { start?: Tab; onclose: () => void } = $props();
 
   const party = $derived(session.party!);
@@ -26,6 +27,8 @@
     spellbook: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Zm0 13a3 3 0 0 1 3-3h11M10 8h5',
     quests: 'M8 3h10v15a3 3 0 0 1-3 3H6a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3h2Zm3 5h4m-4 4h4',
     ai: 'M12 3v3m0 12v3M3 12h3m12 0h3M7 7l2 2m6 6 2 2m0-10-2 2m-6 6-2 2M9 9h6v6H9z',
+    caravan:
+      'M3 17h18M5 17V9h9v8M14 12h4l3 3v2M7 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm10 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
     city: 'M4 21V10l4-3 4 3v11M12 21V6l4-3 4 3v15M2 21h20M7 14h2m6-5h2m-2 4h2',
   };
 
@@ -36,6 +39,7 @@
     { id: 'spellbook', label: 'Spellbook' },
     { id: 'quests', label: 'Quests' },
     { id: 'ai', label: 'AI' },
+    { id: 'caravan', label: 'Caravan' },
     ...(party.city ? [{ id: 'city' as Tab, label: 'City' }] : []),
   ]);
   const tab = $derived(tabs.some((t) => t.id === chosen) ? chosen : 'inventory');
@@ -73,6 +77,8 @@
       <QuestsOrdersTab />
     {:else if tab === 'ai'}
       <AiTab bind:memberId />
+    {:else if tab === 'caravan'}
+      <CaravanTab />
     {:else if tab === 'city'}
       <CityTab />
     {/if}

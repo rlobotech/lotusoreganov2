@@ -227,7 +227,7 @@ const quests: Record<string, QuestDef> = {
     description: 'Goblins are raiding the farms around Oakhaven. Thin their numbers.',
     minLevel: 1,
     objectives: [{ type: 'kill', template: 'goblin', count: 8 }],
-    reward: { gold: 60, xp: 160 },
+    reward: { gold: 60, xp: 160, caravan: { kind: 'pet', tier: 1 } },
   },
   wolves_at_the_door: {
     id: 'wolves_at_the_door',
@@ -260,7 +260,7 @@ const quests: Record<string, QuestDef> = {
     description: 'Goblin archers pick off anyone on the east road. Silence them.',
     minLevel: 3,
     objectives: [{ type: 'kill', template: 'goblin_archer', count: 6 }],
-    reward: { gold: 90, xp: 260 },
+    reward: { gold: 90, xp: 260, caravan: { kind: 'bag', tier: 1 } },
   },
   goblin_king: {
     id: 'goblin_king',
@@ -270,7 +270,12 @@ const quests: Record<string, QuestDef> = {
     minLevel: 5,
     requires: ['clear_the_warren'],
     objectives: [{ type: 'clear', siteId: 'goblin_keep' }],
-    reward: { gold: 300, xp: 900, item: { base: 'Bone Charm', itemLevel: 6, rarity: 'rare' } },
+    reward: {
+      gold: 300,
+      xp: 900,
+      item: { base: 'Bone Charm', itemLevel: 6, rarity: 'rare' },
+      caravan: { kind: 'mount', tier: 2 },
+    },
   },
   welcome_to_stonebridge: {
     id: 'welcome_to_stonebridge',
@@ -307,7 +312,12 @@ const quests: Record<string, QuestDef> = {
     minLevel: 8,
     requires: ['restless_dead'],
     objectives: [{ type: 'clear', siteId: 'old_crypt' }],
-    reward: { gold: 400, xp: 1500, item: { base: 'Spell Tome', itemLevel: 9, rarity: 'epic' } },
+    reward: {
+      gold: 400,
+      xp: 1500,
+      item: { base: 'Spell Tome', itemLevel: 9, rarity: 'epic' },
+      caravan: { kind: 'tent', tier: 3 },
+    },
   },
   goblin_bounty: {
     id: 'goblin_bounty',

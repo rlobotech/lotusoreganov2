@@ -27,6 +27,12 @@ export const SLOT_NAMES = ['weapon', 'offhand', 'head', 'body', 'feet', 'ring', 
 const idStr = z.string().min(1).max(80);
 
 export const equipSchema = z.object({ memberId: idStr, itemId: idStr });
+export const caravanEquipSchema = z.object({ itemId: idStr });
+export const caravanUnequipSchema = z.object({ kind: z.enum(['mount', 'pet', 'bag', 'tent']) });
+export const petSendSchema = z.object({
+  itemIds: z.array(idStr).max(40),
+  stockIds: z.array(idStr).max(20),
+});
 export const learnSchema = z.object({ memberId: idStr, itemId: idStr });
 export const unequipSchema = z.object({ memberId: idStr, slot: z.enum(SLOT_NAMES) });
 export const moveItemSchema = z.object({

@@ -1,10 +1,12 @@
 import type {
   AiRuleInfo,
   AttrMap,
+  CaravanKindName,
   CityInfo,
   FeedPage,
   LoginInput,
   OrderInfo,
+  PetShopInfo,
   PartySummary,
   PublicUser,
   QuestInfo,
@@ -94,6 +96,13 @@ export const api = {
   // management: every call answers with the fresh party summary
   equip: (partyId: string, memberId: string, itemId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/equip`, { memberId, itemId }),
+  equipCaravan: (partyId: string, itemId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/caravan/equip`, { itemId }),
+  unequipCaravan: (partyId: string, kind: CaravanKindName) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/caravan/unequip`, { kind }),
+  petShop: (partyId: string) => request<PetShopInfo>('GET', `/parties/${partyId}/pet/shop`),
+  sendPet: (partyId: string, itemIds: string[], stockIds: string[]) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/pet/send`, { itemIds, stockIds }),
   learn: (partyId: string, memberId: string, itemId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/learn`, { memberId, itemId }),
   unequip: (partyId: string, memberId: string, slot: SlotName) =>

@@ -34,6 +34,18 @@ export function formatFeedEvent(e: FeedEvent): string {
       return `Delivered to the bag: ${(p.items as string[]).join(', ')}.`;
     case 'skill_learned':
       return `${p.member} learned ${p.name}.`;
+    case 'pet_sent':
+      return `The pet set off for the city with ${p.items} item${p.items === 1 ? '' : 's'} to sell${p.buying ? ` and ${p.buying} to buy` : ''}.`;
+    case 'pet_arrived': {
+      const bought = (p.bought as string[]) ?? [];
+      return `The pet reached ${p.city}: sold ${p.items} for ${p.sold} gold${bought.length ? `, bought ${bought.join(', ')} for ${p.spent}` : ''}.`;
+    }
+    case 'pet_home': {
+      const found = (p.found as string[]) ?? [];
+      return `The pet is back${found.length ? ` and found ${found.join(', ')} on the way` : ''}.`;
+    }
+    case 'pet_delivered':
+      return `The pet delivered ${(p.items as string[]).join(', ')}${p.waiting ? ` (${p.waiting} still waiting for room in the bag)` : ''}.`;
     case 'level_up':
       return `The party reached level ${p.level}!`;
     case 'rest':
@@ -54,7 +66,8 @@ export function formatFeedEvent(e: FeedEvent): string {
     }
     case 'quest_completed': {
       const item = p.item ? `, ${p.item}${p.waiting ? ' (waiting for bag space)' : ''}` : '';
-      return `Quest complete: ${p.name}! +${p.gold} gold, +${p.xp} xp${item}.`;
+      const acc = p.caravan ? `, ${p.caravan}` : '';
+      return `Quest complete: ${p.name}! +${p.gold} gold, +${p.xp} xp${item}${acc}.`;
     }
     case 'teleport':
       return `Teleported from ${p.from} to ${p.to} for ${p.cost} gold.`;

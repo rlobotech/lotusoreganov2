@@ -259,6 +259,70 @@ describe('schools and skill books', () => {
   });
 });
 
+describe('caravan', () => {
+  it('equips accessories, shows effects, and sends the pet on a trip through the API', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    const acc = (kind: string, tier: number, aid: string) => ({
+      id: aid,
+      name: `${kind} ${tier}`,
+      rarity: 'uncommon',
+      itemLevel: tier * 10,
+      value: 100,
+      favorite: false,
+      caravan: { kind, tier },
+    });
+    await patch(id, (s) => {
+      s.bag.push(acc('pet', 2, 'pet1') as never, acc('bag', 2, 'bag1') as never);
+      s.bag.push({
+        id: 'junk',
+        name: 'Junk',
+        rarity: 'common',
+        itemLevel: 1,
+        value: 100,
+        favorite: false,
+      } as never);
+    });
+    const base = `/parties/${id}`;
+    const before = (await call(cookie, 'GET', '/parties/me')).json().party;
+    expect(before.caravanEffects.bagSlots).toBe(0);
+    expect(before.pet.equipped).toBe(false);
+
+    const eq = await call(cookie, 'POST', `${base}/caravan/equip`, { itemId: 'bag1' });
+    expect(eq.statusCode).toBe(200);
+    expect(eq.json().party.bagSize).toBe(before.bagSize + eq.json().party.caravanTiers.bagSlots[1]);
+    expect(eq.json().party.caravanEffects.bagSlots).toBe(10);
+    expect(
+      (await call(cookie, 'POST', `${base}/caravan/equip`, { itemId: 'junk' })).statusCode,
+    ).toBe(409);
+
+    expect((await call(cookie, 'GET', `${base}/pet/shop`)).statusCode).toBe(409);
+    await call(cookie, 'POST', `${base}/caravan/equip`, { itemId: 'pet1' });
+    const shop = (await call(cookie, 'GET', `${base}/pet/shop`)).json();
+    expect(shop.city.id).toBe('oakhaven');
+    expect(shop.stock.length).toBeGreaterThan(0);
+
+    const sent = await call(cookie, 'POST', `${base}/pet/send`, {
+      itemIds: ['junk'],
+      stockIds: [],
+    });
+    expect(sent.statusCode).toBe(200);
+    const pet = sent.json().party.pet;
+    expect(pet.trip.phase).toBe('out');
+    expect(sent.json().party.bag.find((i: { id: string }) => i.id === 'junk')).toBeUndefined();
+    const again = await call(cookie, 'POST', `${base}/pet/send`, {
+      itemIds: [],
+      stockIds: [shop.stock[0].id],
+    });
+    expect(again.statusCode).toBeGreaterThanOrEqual(400);
+
+    const off = await call(cookie, 'POST', `${base}/caravan/unequip`, { kind: 'pet' });
+    expect(off.statusCode).toBeGreaterThanOrEqual(400);
+    const bad = await call(cookie, 'POST', `${base}/caravan/unequip`, { kind: 'wing' });
+    expect(bad.statusCode).toBe(400);
+  });
+});
+
 describe('points and combat AI', () => {
   it('spends points, resets them and toggles auto-spend', async () => {
     const cookie = await signUp();

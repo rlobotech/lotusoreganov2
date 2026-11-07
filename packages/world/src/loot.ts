@@ -6,6 +6,7 @@ import {
   type Rng,
   type WeaponKind,
 } from '@game/engine';
+import { caravanBagSlots, makeCaravanItem } from './caravan-data.ts';
 import { SKILLS } from './skills.ts';
 import type { GearStats, Item, Rarity, ShopItem, Slot } from './types.ts';
 
@@ -265,9 +266,18 @@ function bookPool(itemLevel: number): string[] {
     .map((s) => s.id);
 }
 
+/** Share (percent) of drops that are caravan accessories. Rare: they are mostly quest rewards. */
+export const CARAVAN_CHANCE = 1.5;
+
 /** Rolls at most one item for a defeated monster. */
 export function rollDrop(rng: Rng, monsterLevel: number, id: string): Item | null {
   if (!rng.chance(DROP_CHANCE)) return null;
+  if (rng.chance(CARAVAN_CHANCE)) {
+    const kinds = ['mount', 'pet', 'bag', 'tent'] as const;
+    // The tier follows the monster level (one per 25 levels), and is sometimes a step lower.
+    const tier = Math.max(1, 1 + Math.floor(monsterLevel / 25) - (rng.chance(40) ? 1 : 0));
+    return makeCaravanItem(kinds[rng.int(0, kinds.length - 1)]!, tier, id);
+  }
   if (rng.chance(BOOK_CHANCE)) {
     const pool = bookPool(monsterLevel);
     return bookItem(pool[rng.int(0, pool.length - 1)]!, Math.max(1, monsterLevel), id);
@@ -336,8 +346,26 @@ export function starterGear(
 export const itemScore = (i: Item): number => RARITY_RANK[i.rarity] * 1000 + i.itemLevel;
 
 /** The party's shared bag capacity: its own size when it has one, else the config default. */
-export function bagCapacity(p: { bagSize?: number }, cfg: { bagSize: number }): number {
-  return p.bagSize ?? cfg.bagSize;
+export function bagCapacity(
+  p: { bagSize?: number; caravan?: Parameters<typeof caravanBagSlots>[0]['caravan'] },
+  cfg: { bagSize: number },
+): number {
+  return (p.bagSize ?? cfg.bagSize) + caravanBagSlots(p);
+}
+
+/** The item a shop entry turns into when bought (or brought by the pet). */
+export function itemFromStock(stock: ShopItem, id: string): Item {
+  return {
+    id,
+    name: stock.name,
+    rarity: stock.rarity,
+    itemLevel: stock.itemLevel,
+    value: stock.value,
+    favorite: false,
+    slot: stock.slot,
+    bonuses: { ...stock.bonuses },
+    ...gearOf(stock),
+  };
 }
 
 /**

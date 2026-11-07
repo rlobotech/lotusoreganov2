@@ -173,6 +173,43 @@ export interface Item extends GearStats {
   bonuses?: Partial<Attributes>;
   /** A book: using it teaches this skill and uses the book up. */
   teaches?: string;
+  /** A caravan accessory. It lives in a shared bag slot until equipped in the Caravan tab. */
+  caravan?: CaravanInfo;
+}
+
+export type CaravanKind = 'mount' | 'pet' | 'bag' | 'tent';
+export const CARAVAN_KINDS: readonly CaravanKind[] = ['mount', 'pet', 'bag', 'tent'];
+/** Special abilities of pets: scavenger may find an item on the way back, swift is faster on the way back. */
+export type PetAbility = 'scavenger' | 'swift';
+
+export interface CaravanInfo {
+  kind: CaravanKind;
+  /** 1 to 5. What it does comes from the tier table in caravan.ts. */
+  tier: number;
+  abilities?: PetAbility[];
+}
+
+/** A trip of the carrier pet to the nearest city. */
+export interface PetTrip {
+  cityId: string;
+  /** The goods it carries to sell, and the shopping list (shop stock ids) it brings back. */
+  items: Item[];
+  shopping: string[];
+  /** When it reaches the city and when it is back with the party (ms). */
+  arriveAt: number;
+  returnAt: number;
+  phase: 'out' | 'back';
+  /** Each member's share of the sale, minus what that member already spent on the shopping. */
+  shares: Record<string, number>;
+  /** What the items sold for, and what the shopping cost, for the feed. */
+  sold: number;
+  spent: number;
+}
+
+export interface PetState {
+  trip: PetTrip | null;
+  /** Goods the pet brought back that do not fit in the shared bag yet. It waits holding them. */
+  waiting: Item[];
 }
 
 export interface ShopItem extends GearStats {
@@ -210,6 +247,8 @@ export interface QuestReward {
   xp: number;
   /** A guaranteed item, made from an item base like shop stock is. */
   item?: { base: string; itemLevel: number; rarity: Rarity };
+  /** A caravan accessory (mount, pet, bag item or tent) of this tier. */
+  caravan?: { kind: CaravanKind; tier: number };
 }
 
 export interface QuestDef {
@@ -282,6 +321,10 @@ export interface PartyState {
   bag: Item[];
   /** Shared bag capacity. Missing on older saves: SimConfig.bagSize applies. Raised by bag items. */
   bagSize?: number;
+  /** The party's accessories, one per kind. */
+  caravan?: Partial<Record<CaravanKind, Item>>;
+  /** The carrier pet's trip and the goods it is holding. */
+  pet?: PetState;
   /** Quest rewards that did not fit yet. They move to the shared bag as soon as there is room. */
   pendingItems?: Item[];
   orders: Order[];

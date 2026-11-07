@@ -189,7 +189,7 @@ Group accessories and bag items (see backlog), real item sprites, extra slots (g
 3. **(done) Web inventory layout:** drop level and stats from panels, gold beside the name, narrower panels with personal bag aligned, portrait-only team strip filling the width, full-height layout where only the shared bag scrolls, own characters first, others disabled. Send-gold dialog.
 4. **(done) Other screens:** City and Attributes tabs use per-character gold, bag-full message in the log and party home. Verify at 1080p and phone sizes.
 
-### Phase B (steps, details to confirm before starting)
+### Phase B (steps; done, see "Phase B notes" below)
 5. **Caravan tab and accessory items:** slots for mount, pet, bag item, tent; items with tiers and special attributes; obtained as reward, drop or purchase.
 6. **Bag item:** raises `party.bagSize` by its tier.
 7. **Mount:** faster world map movement and optional extra bag slots.
@@ -215,6 +215,15 @@ Five tiers per accessory; values are starting points to balance later.
 | 5 | 50% (+30) | 40 | x2.0 | +50% | +30 | +150% |
 
 Pet abilities start at tier 3 (one ability), tier 5 has two. Mounts may also add personal or shared bag slots at higher tiers.
+
+### Phase B notes (what exists now)
+- Accessories are items (`Item.caravan` = kind, tier 1 to 5, pet abilities) kept in the shared bag until equipped from the Caravan tab; one per kind in `PartyState.caravan`. Names and tier tables (`caravan-data.ts`, also sent to the client as `caravanTiers`): pet sale rate 20/25/30/40/50% of the price, pet bag 10/15/20/30/40, speed x1/1.1/1.25/1.5/2, mount +10..50% travel speed, bag item +5/10/15/20/30 shared slots, tent +25/50/75/100/150% faster recovery. Tier 3 pets have the scavenger ability (30% to find a drop on the way home), tier 5 also swift (the way back takes 60% of the time).
+- Effects: `bagCapacity` adds the bag item's slots (it cannot be removed or swapped for a smaller one while the bag holds more than the base size); the mount shortens every hex step (`travelTicks`); the tent shortens rests.
+- Pet trips (`caravan.ts`): `sendPet` takes shared-bag items to sell and a shopping list of the nearest city's shop stock ids. The sale (item value x rate / 0.25, so a tier 1 pet sells for 20% of the price and the city for 25%) is split evenly with the remainder to the first character; the shares of the characters the sender controls pay for the shopping first, the rest comes from the sender's spendable gold. Everything is reserved on departure, the sale is paid out when the pet reaches the city, and the goods wait in `pet.waiting` until the shared bag has room (`deliverPetGoods`, run every step). Trips are settled lazily by `settlePet` on every update, also while the party is busy. City selling and buying are blocked while the pet is out; the pet cannot be unequipped while out or holding goods. A defeated party recalls the pet to the respawn city, where it finishes at once.
+- Obtained from: quest rewards (`QuestReward.caravan`: Pest control gives a tier 1 pet, Archers' toll a tier 1 bag item, The Goblin King a tier 2 mount, Into the crypt a tier 3 tent) and rare drops (1.5% of drops, tier rises with monster level).
+- API: `POST /parties/:id/caravan/equip` and `/unequip`, `GET /parties/:id/pet/shop`, `POST /parties/:id/pet/send`; the summary has `caravan`, `caravanEffects`, `caravanTiers` and `pet`. UI: Caravan tab with the four slots, accessories in the bag, and the pet panel (status with countdown, goods waiting, items to sell, shopping list with quantities, totals and the send button).
+- Verified in the browser at phone width: equip, effect text, send with a sale and a shopping list, trip status and countdown.
+- Not done: buying accessories in shops (planned as rare), mounts adding bag slots, pet abilities beyond the first two, the pet using personal bags, a tent or mount sprite, and the trip taking the party's current distance into account while the party moves (the trip length is fixed at departure).
 
 ## 3d. Combat rebuild (planned, decided with the user)
 

@@ -35,8 +35,19 @@ export interface GearInfo {
   resist?: Partial<Record<DamageTypeName, number>>;
 }
 
+export type CaravanKindName = 'mount' | 'pet' | 'bag' | 'tent';
+
+export interface CaravanItemInfo {
+  kind: CaravanKindName;
+  /** 1 to 5. */
+  tier: number;
+  abilities?: Array<'scavenger' | 'swift'>;
+}
+
 export interface ItemInfo extends GearInfo {
   id: string;
+  /** A caravan accessory: it is equipped in the Caravan tab, not worn by a character. */
+  caravan?: CaravanItemInfo;
   /** A skill book: the id of the skill it teaches. */
   teaches?: string;
   name: string;
@@ -254,11 +265,60 @@ export interface PartySummary {
   activity: { kind: string; label: string; endsAt: number | null };
   /** Quests being worked on, with progress, and how many have been completed. */
   quests: { active: QuestInfo[]; completedCount: number };
+  /** The party's accessories, one per kind, what they do now, and the carrier pet's state. */
+  caravan: Partial<Record<CaravanKindName, ItemInfo>>;
+  caravanEffects: {
+    /** Extra world speed (0.1 = 10% faster), extra shared bag slots, faster recovery (fraction). */
+    mountSpeed: number;
+    bagSlots: number;
+    tentHealing: number;
+  };
+  /** The tier tables (index 0 is tier 1), so the client can show what a tier does. */
+  caravanTiers: {
+    mountSpeed: number[];
+    bagSlots: number[];
+    tentHealing: number[];
+    petSaleRate: number[];
+    petBag: number[];
+    petSpeed: number[];
+  };
+  pet: PetInfo;
   /** Set while the party stands in a city it can use (shop, sell, teleport). */
   city: { id: string; name: string } | null;
   /** The party is waiting in town and can be sent on its way. */
   inTown: boolean;
   stats: { fights: number; wins: number; defeats: number; draws: number };
+}
+
+export interface PetInfo {
+  /** A pet is equipped. The rest describes it. */
+  equipped: boolean;
+  tier: number;
+  /** How many items it carries out, the share of the price it sells for, and its speed factor. */
+  capacity: number;
+  saleRate: number;
+  speed: number;
+  abilities: Array<'scavenger' | 'swift'>;
+  /** The trip it is on, if any. `endsAt` is when it is back (ms since epoch). */
+  trip: {
+    phase: 'out' | 'back';
+    city: string;
+    items: number;
+    buying: number;
+    arriveAt: number;
+    endsAt: number;
+  } | null;
+  /** Goods it brought back that wait for room in the shared bag. */
+  waiting: ItemInfo[];
+}
+
+export interface PetShopInfo {
+  city: { id: string; name: string };
+  stock: ShopEntry[];
+  /** One way, in minutes of game time (ticks), for the quote. */
+  ticks: number;
+  /** How long a tick is, in ms, so the client can show a duration. */
+  tickMs: number;
 }
 
 export interface WorldInfo {

@@ -9,7 +9,8 @@ import {
 import { hexDistance, siteAt } from './hex.ts';
 import { canControl, spendableGold, spendGold, splitGold } from './gold.ts';
 import { bookProblem } from './learning.ts';
-import { addToBag, bagCapacity, gearOf } from './loot.ts';
+import { petIsOut } from './caravan.ts';
+import { addToBag, bagCapacity, itemFromStock } from './loot.ts';
 import { ATTRS, CLASSES, memberDerived, spentPoints, unmetRequirements } from './progression.ts';
 import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
@@ -544,6 +545,7 @@ export function sellItems(
   viewer?: string,
 ): ActionResult {
   if (!usableCity(p, world)) return fail('not_in_city', 'The party is not in a city');
+  if (petIsOut(p)) return fail('pet_out', 'The pet is out on a trip');
   const ids = new Set(itemIds);
   if (ids.size === 0) return fail('no_item', 'Nothing selected');
   const lists = [p.bag, ...p.members.map((m) => m.bag)];
@@ -571,23 +573,14 @@ export function buyItem(
 ): ActionResult {
   const city = usableCity(p, world);
   if (!city) return fail('not_in_city', 'The party is not in a city');
+  if (petIsOut(p)) return fail('pet_out', 'The pet is out on a trip');
   const stock = city.shop?.find((s) => s.id === stockId);
   if (!stock) return fail('no_stock', 'The shop does not sell that');
   if (spendableGold(p, viewer) < stock.price) return fail('no_gold', 'Not enough gold');
   if (p.bag.length >= bagCapacity(p, cfg)) return fail('bag_full', 'The bag is full');
   p.counter += 1;
   spendGold(p, viewer, stock.price);
-  const item: Item = {
-    id: `b${p.counter}_${stock.id}`,
-    name: stock.name,
-    rarity: stock.rarity,
-    itemLevel: stock.itemLevel,
-    value: stock.value,
-    favorite: false,
-    slot: stock.slot,
-    bonuses: { ...stock.bonuses },
-    ...gearOf(stock),
-  };
+  const item = itemFromStock(stock, `b${p.counter}_${stock.id}`);
   addToBag(p.bag, item, bagCapacity(p, cfg));
   return OK;
 }

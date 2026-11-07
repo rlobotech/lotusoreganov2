@@ -1,5 +1,7 @@
 import { SKILLS } from './skills.ts';
 import { trainFromFight } from './learning.ts';
+import { makeCaravanItem, mountSpeed, tentHealing } from './caravan-data.ts';
+import { deliverPetGoods, recallPet, settlePet, type PetEmit } from './caravan.ts';
 import { createRng, runCombat, weaponRange, type Rng, type UnitDef } from '@game/engine';
 import { ARENAS } from './arenas.ts';
 import {
@@ -151,9 +153,18 @@ interface Ctx {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+const petEmit =
+  (ctx: Ctx): PetEmit =>
+  (at, kind, payload) =>
+    ctx.events.push({ at, kind, payload });
+
 function emit(ctx: Ctx, kind: string, payload: Record<string, unknown>, replayKey?: string) {
   ctx.events.push({ at: ctx.at, kind, payload, ...(replayKey ? { replayKey } : {}) });
 }
+
+/** Walking a hex takes fewer ticks with a mount. */
+const travelTicks = (ctx: Ctx, ticks: number) =>
+  Math.max(1, Math.round(ticks / (1 + mountSpeed(ctx.party))));
 
 function schedule(ctx: Ctx, ticks: number) {
   const jitter = ctx.cfg.jitterMs > 0 ? ctx.rng.int(0, ctx.cfg.jitterMs) : 0;
@@ -343,12 +354,27 @@ function settleQuests(ctx: Ctx) {
         waiting = true;
       }
     }
+    let caravanName: string | undefined;
+    if (def.reward.caravan) {
+      const acc = makeCaravanItem(
+        def.reward.caravan.kind,
+        def.reward.caravan.tier,
+        `qc_${def.id}_${p.stats.fights}_${ctx.at}`,
+      );
+      acc.favorite = true;
+      caravanName = acc.name;
+      if (!addToBag(p.bag, acc, bagCapacity(p, ctx.cfg))) {
+        (p.pendingItems ??= []).push(acc);
+        waiting = true;
+      }
+    }
     emit(ctx, 'quest_completed', {
       questId: def.id,
       name: def.name,
       gold: def.reward.gold,
       xp: def.reward.xp,
       ...(itemName ? { item: itemName } : {}),
+      ...(caravanName ? { caravan: caravanName } : {}),
       ...(waiting ? { waiting: true } : {}),
     });
     if (gained > 0) emit(ctx, 'level_up', { level: p.level, gained });
@@ -426,6 +452,8 @@ function handleDefeat(ctx: Ctx) {
   const city = ctx.world.sites[p.lastCity]!;
   p.pos = { col: city.col, row: city.row };
   p.dungeon = null;
+  // The pet is teleported to the city the party respawns in and finishes its trip there.
+  recallPet(p, ctx.world, ctx.cfg, ctx.at, petEmit(ctx));
   for (const m of p.members) {
     m.alive = true;
     m.hp = Math.max(1, Math.ceil((maxes(p, m).maxHp * ctx.cfg.reviveHpPct) / 100));
@@ -461,7 +489,7 @@ function completeActivity(ctx: Ctx): boolean {
       p.pos = { col: step.col, row: step.row };
       a.i += 1;
       if (a.i < a.path.length) {
-        schedule(ctx, a.path[a.i]!.ticks);
+        schedule(ctx, travelTicks(ctx, a.path[a.i]!.ticks));
         return true;
       }
       emit(ctx, 'travel', { from: a.from, to: p.pos, hexes: a.path.length });
@@ -509,7 +537,9 @@ function restAllowed(ctx: Ctx): boolean {
 function startRest(ctx: Ctx, forced: boolean) {
   const p = ctx.party;
   const missing = 1 - hpFraction(p);
-  const ticks = ctx.cfg.restMinTicks + Math.round(ctx.cfg.restExtraTicks * clamp(missing, 0, 1));
+  const base = ctx.cfg.restMinTicks + Math.round(ctx.cfg.restExtraTicks * clamp(missing, 0, 1));
+  // A tent speeds up recovery.
+  const ticks = Math.max(1, Math.round(base / (1 + tentHealing(p))));
   if (p.dungeon && !forced) p.dungeon.restsUsed += 1;
   p.activity = { kind: 'rest', startedAt: ctx.at, ticks, forced };
   schedule(ctx, ticks);
@@ -518,7 +548,7 @@ function startRest(ctx: Ctx, forced: boolean) {
 function startTravel(ctx: Ctx, path: PathStep[], toSite: string | null) {
   const p = ctx.party;
   p.activity = { kind: 'travel', from: { ...p.pos }, toSite, path, i: 0 };
-  schedule(ctx, path[0]!.ticks);
+  schedule(ctx, travelTicks(ctx, path[0]!.ticks));
 }
 
 interface FightSpec {
@@ -814,9 +844,17 @@ export function advance(
     steps += 1;
     const ctx: Ctx = { party, world, cfg, rng: stepRng(party), at: party.nextAt, events, replays };
     party.counter += 1;
+    settlePet(party, world, cfg, ctx.at, petEmit(ctx));
+    deliverPetGoods(party, cfg, ctx.at, petEmit(ctx));
     deliverPending(ctx);
     const rescheduled = completeActivity(ctx);
     if (!rescheduled && party.status === 'active') decide(ctx);
+  }
+  // The pet keeps travelling while the party's own activity is still running.
+  if (party.status === 'active') {
+    const emitAt: PetEmit = (at, kind, payload) => events.push({ at, kind, payload });
+    settlePet(party, world, cfg, now, emitAt);
+    deliverPetGoods(party, cfg, now, emitAt);
   }
   return { party, events, replays };
 }
