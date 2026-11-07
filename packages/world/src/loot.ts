@@ -110,6 +110,14 @@ export const BASES: readonly ItemBase[] = [
     requires: 'dex',
   },
   {
+    name: 'Great Axe',
+    slot: 'weapon',
+    main: 'str',
+    second: 'vit',
+    weapon: { kind: 'axe', hands: 2, type: 'cut', quality: 1.4 },
+    requires: 'str',
+  },
+  {
     name: 'War Hammer',
     slot: 'weapon',
     main: 'str',

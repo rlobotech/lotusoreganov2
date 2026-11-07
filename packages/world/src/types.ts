@@ -123,7 +123,18 @@ export interface WorldDef {
 // ---------- party ----------
 
 export type Race = 'human' | 'elf' | 'dwarf' | 'orc';
-export type ClassId = 'warrior' | 'mage' | 'priest' | 'ranger' | 'rogue';
+export type ClassId =
+  | 'warrior'
+  | 'barbarian'
+  | 'paladin'
+  | 'priest'
+  | 'mage'
+  | 'warlock'
+  | 'necromancer'
+  | 'shaman'
+  | 'druid'
+  | 'ranger'
+  | 'rogue';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
 export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'feet' | 'ring' | 'charm';

@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: in progress (phases 1 to 4 done, phase 5 next)
+Status: in progress (phases 1 to 5 done, phase 6 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -105,6 +105,26 @@ Most of the learning rules landed with phase 2; phase 3 added what was missing a
 - **Spellbook:** a Wheel / List switch (the wheel is the default; the list stays as the second view), and the skill books stay below.
 - **Not done:** checked on a desktop-sized window only (the SVG scales to its width and uses touch gestures, but I did not test a phone); the node positions are computed, not hand-placed like the reference image, so busy schools (Dark) look crowded until more skills fill the tree.
 - Tests: `wheelLayout.test.ts` (ring order, ring distance, dual skills in both sectors, no overlap, lines, loops, missing requirements, sector zoom).
+
+## Phase 5 notes (what exists now)
+
+Barbarian, Paladin, Warlock, Necromancer, Shaman and Druid are playable (world `CLASSES`, the shared `CLASS_IDS`, the party creation screen). Proposed numbers, for review (all first guesses):
+
+| Class | Attributes at level 1 (str dex int vit wis) | Growth per level | Move | Weapon and kit | Default AI |
+|---|---|---|---|---|---|
+| Barbarian | 11 6 1 8 2 | 1.0 .3 0 .7 .1 | 4 | Great Axe (two handed), cap, vest, boots | Slash, Attack |
+| Paladin | 8 4 3 9 6 | .7 .15 .1 .7 .5 | 3 | War Hammer (two handed mace), cap, mail, boots | Less Heal under 50%, Blunt Strike, Attack |
+| Warlock | 3 5 10 6 5 | .1 .2 .95 .4 .35 | 3 | Staff, hood, robe | Void Bolt, Attack |
+| Necromancer | 2 4 10 5 7 | .1 .15 .9 .35 .5 | 3 | Staff, hood, robe | Attack |
+| Shaman | 4 5 9 6 7 | .2 .2 .8 .4 .5 | 3 | Staff, hood, vest | Fire Bolt, Lightning Bolt, Gust |
+| Druid | 4 6 8 7 7 | .2 .3 .8 .5 .5 | 3 | Staff, cap, vest | Poison Dart (if not poisoned), Attack |
+
+- **Everyone now has the basic Attack** (it was missing for the Mage, Priest, Ranger and Rogue), so no class stands idle when its skills are on cooldown.
+- **Start skills** are the sheet's (`CLASS_START_SKILLS`). The **Necromancer cannot use any of them yet** (Summon Skeleton waits for the summons in phase 6), so until then it fights with a staff strike only; the Warlock has one bolt besides its staff. Both get real before the summons phase.
+- **Two handed weapons:** a new `Great Axe` item base (axe, two hands, cut). Barbarian starts with it instead of the double axe because dual wield is phase 7; Axe Two Handed Mastery trains from it. The Paladin's War Hammer is a hammer kind, which the Mace masteries accept.
+- **Art:** sprites exist for barbarian, mage, necromancer, paladin, rogue and warrior; the others use the placeholder.
+- **Balance check** (a party of Warrior, Priest, Mage plus the class, 30 fights, defeats %): melee classes do best (Barbarian 0 to 10, Paladin 0 to 13, Ranger 0 to 7), casters worst (Mage 17 to 27, Druid 17 to 27, Necromancer 10 to 33). The caster gap was already there for the Mage; it widens with the Necromancer until it has summons. Tuning waits for the summons phase and real play.
+- Tests: `classes.test.ts` (eleven classes, sheet starts, weapons, day-one fighting, masteries training from the starting weapon) and a server test that the API classes equal the world's.
 
 ## Decided after the first draft (from the user)
 

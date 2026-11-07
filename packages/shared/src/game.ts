@@ -1,7 +1,19 @@
 import { z } from 'zod';
 
 export const RACES = ['human', 'elf', 'dwarf', 'orc'] as const;
-export const CLASS_IDS = ['warrior', 'mage', 'priest', 'ranger', 'rogue'] as const;
+export const CLASS_IDS = [
+  'warrior',
+  'barbarian',
+  'paladin',
+  'priest',
+  'mage',
+  'warlock',
+  'necromancer',
+  'shaman',
+  'druid',
+  'ranger',
+  'rogue',
+] as const;
 
 export const raceSchema = z.enum(RACES);
 export const classSchema = z.enum(CLASS_IDS);

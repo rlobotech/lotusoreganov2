@@ -654,3 +654,11 @@ describe('gold and ownership', () => {
     expect((await stateOf(id)).members[1]!.gold).toBe(45);
   });
 });
+
+describe('classes', () => {
+  it('the classes the API accepts are the classes of the world', async () => {
+    const { CLASS_IDS } = await import('@game/shared');
+    const { CLASSES } = await import('@game/world');
+    expect([...CLASS_IDS].sort()).toEqual(Object.keys(CLASSES).sort());
+  });
+});
