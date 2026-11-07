@@ -23,6 +23,8 @@ import { STARTER_WORLD as W } from '../src/starter-world.ts';
 import type { ClassId, Member, PartyState } from '../src/types.ts';
 
 const classes = Object.keys(CLASSES) as ClassId[];
+/** Skills only the units a summon calls up use. */
+const SUMMON_SKILLS = ['imp_firebolt', 'skeleton_strike'];
 const mk = (cls: ClassId, level = 1): Member =>
   createMember(0, { name: 'A', race: 'human', cls }, level);
 
@@ -53,8 +55,8 @@ describe('the skill catalogue', () => {
   it('has a tree that follows the rules, and combat skills only for known ids', () => {
     expect(treeProblems()).toEqual([]);
     for (const id of Object.keys(SKILLS)) {
-      // Skills that are not in the tree (the basic Attack) belong to no school.
-      if (id !== 'attack') expect(SKILL_TREE[id], id).toBeDefined();
+      // Skills that are not in the tree (the basic Attack, and what summons use) belong to no school.
+      if (id !== 'attack' && !SUMMON_SKILLS.includes(id)) expect(SKILL_TREE[id], id).toBeDefined();
     }
   });
 

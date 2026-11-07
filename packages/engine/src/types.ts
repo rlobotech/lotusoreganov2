@@ -1,5 +1,5 @@
 /** Bump LOG_FORMAT_VERSION only for breaking changes to the event log (see PLAN.md, Versioning). */
-export const LOG_FORMAT_VERSION = 2;
+export const LOG_FORMAT_VERSION = 3;
 export const ENGINE_VERSION = '1.0.0';
 /** Hard cap so a fight can never hang a tick. Reaching it ends the fight as a draw. */
 export const MAX_ROUNDS = 50;
@@ -84,10 +84,29 @@ export type StatusDef =
 /** What a weapon is. Skills can ask for one of several kinds. */
 export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
 
+/**
+ * A unit a skill calls up. It fights on the caster's team until it dies, acts from the next round,
+ * and does not count when deciding whether a team has lost. Its attributes are shares of the
+ * caster's (times the caster's `skillMods` power for the skill); its level is the caster's.
+ */
+export interface SummonDef {
+  /** The kind of summon: at most `UnitDef.summonLimits[group]` (default 1) of a kind can be out at once. */
+  group: string;
+  name: string;
+  sprite?: string;
+  /** Each attribute as a share of the caster's (1 = the same; missing = a half). */
+  shares: Partial<Attributes>;
+  move: number;
+  skills: string[];
+  ai: AIRule[];
+  /** Its weapon, for weapon skills: the damage type and quality (1 = a normal weapon of its level). */
+  weapon?: { type: DamageType; quality: number };
+}
+
 export interface SkillDef {
   id: string;
   name: string;
-  kind: 'damage' | 'heal' | 'status';
+  kind: 'damage' | 'heal' | 'status' | 'summon';
   /**
    * 'weapon': the hit uses the unit's weapon (its damage range and, unless `damageType` is set, its
    * type) and always needs an accuracy roll. 'spell': its strength comes from the unit's level.
@@ -116,6 +135,8 @@ export interface SkillDef {
   free?: boolean;
   /** After the skill the user steps away from enemies, up to this many tiles, without provoking. */
   retreat?: number;
+  /** For a 'summon' skill: the unit it calls up beside the caster. */
+  summon?: SummonDef;
   /** Name of the visual effect the client plays. */
   vfx?: string;
   /** The unit must wear one of these kinds of weapon to use the skill. Absent: any (or none). */
@@ -239,6 +260,8 @@ export interface UnitDef {
    * status it applies.
    */
   skillMods?: Record<string, { power?: number; rounds?: number }>;
+  /** How many summons of each kind this unit may have out at once (default 1 per kind). */
+  summonLimits?: Record<string, number>;
   /** Resistance points from armor and the like. */
   resist?: Resistances;
   /** Starting hp / mana when the unit enters the fight hurt. Default: full. */
@@ -302,6 +325,23 @@ export type CombatEvent =
       reaction?: boolean;
     }
   | {
+      /** A summon appears beside its caster. It acts from the next round. */
+      t: 'summon';
+      unit: string;
+      caster: string;
+      skill: string;
+      name: string;
+      team: Team;
+      level: number;
+      sprite: string | null;
+      x: number;
+      y: number;
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+    }
+  | {
       t: 'miss';
       target: string;
       skill: string;
@@ -337,6 +377,8 @@ export type Outcome = 'victory' | 'defeat' | 'draw';
 export interface FinalUnit {
   id: string;
   team: Team;
+  /** Called up during the fight (it is not one of the units that started it). */
+  summon?: boolean;
   hp: number;
   mana: number;
   alive: boolean;
@@ -378,4 +420,7 @@ export interface UnitState {
   reaction: boolean;
   /** Tiles of movement left this turn. */
   movesLeft: number;
+  /** For a summon: the unit that called it up, and its kind. */
+  owner?: string;
+  group?: string;
 }

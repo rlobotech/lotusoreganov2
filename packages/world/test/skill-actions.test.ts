@@ -63,8 +63,10 @@ describe('carrying skills', () => {
     expect(carryProblem(mage, 1, 'whirlwind')).toBe('not learned yet');
     expect(carryProblem(mage, 1, 'nothing')).toBe('unknown skill');
     expect(carryProblem(mage, 1, 'staff_mastery')).toMatch(/takes no slot/);
-    learnSkill(mage, 1, 'summon_imp');
-    expect(carryProblem(mage, 1, 'summon_imp')).toBe('not usable yet');
+    // Dash waits for the stealth feature of the engine.
+    mage.skills.push('dash');
+    mage.skillLevels.dash = 1;
+    expect(carryProblem(mage, 1, 'dash')).toBe('not usable yet');
     // At level 30 there is a seventh slot.
     p.level = 30;
     expect(equipMemberSkill(p, mage.id, 'fortify')).toEqual({ ok: true });
@@ -101,14 +103,15 @@ describe('books and nothing locked to a class', () => {
     expect(warrior.equipped).not.toContain('demonology_mastery');
   });
 
-  it('a dual skill needs both its requirements: Summon Imp waits for Demonology Mastery', () => {
+  it('a warrior who learned Summon Imp from a book can carry it and call an imp', () => {
     const p = party();
     const warrior = p.members[1]!;
     p.bag.push(bookItem('summon_imp', 5, 'b2'));
-    // A book is a shortcut, not a way past a skill's own school levels (Summon Imp has none), so it
-    // teaches the skill but it stays unusable until the summons exist.
     expect(learnFromBook(p, warrior.id, 'b2')).toEqual({ ok: true });
-    expect(carryProblem(warrior, 1, 'summon_imp')).toBe('not usable yet');
+    expect(warrior.skills).toContain('summon_imp');
+    // Nothing is locked to a class: it is carried like any other skill.
+    expect(warrior.equipped).toContain('summon_imp');
+    expect(carryProblem(warrior, 1, 'summon_imp')).toBe('already carried');
   });
 });
 

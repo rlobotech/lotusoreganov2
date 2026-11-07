@@ -124,7 +124,7 @@ export function runLevel(level: number, opts: RunOptions = {}): FightStats {
     rounds += result.rounds;
     if (result.outcome === 'victory') {
       wins++;
-      const party = result.units.filter((u) => u.team === 'party');
+      const party = result.units.filter((u) => u.team === 'party' && !u.summon);
       const maxOf = (id: string) =>
         memberDerived(
           p.members.find((m) => m.id === id)!,

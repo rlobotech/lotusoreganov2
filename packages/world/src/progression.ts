@@ -134,9 +134,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     base: { str: 3, dex: 5, int: 10, vit: 6, wis: 5 },
     growth: { str: 0.1, dex: 0.2, int: 0.95, vit: 0.4, wis: 0.35 },
     move: 3,
-    // Summon Imp waits for the summons (phase 6 of the skill plan): until then a bolt and the staff.
     skills: ['attack', ...CLASS_START_SKILLS.warlock!],
-    ai: [{ skill: 'shadow_bolt' }, { skill: 'attack' }],
+    ai: [{ skill: 'summon_imp' }, { skill: 'shadow_bolt' }, { skill: 'attack' }],
     pointOrder: ['int', 'int', 'vit', 'wis'],
     kit: ['Gnarled Staff', 'Cloth Hood', 'Cloth Robe'],
   },
@@ -146,9 +145,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     base: { str: 2, dex: 4, int: 10, vit: 5, wis: 7 },
     growth: { str: 0.1, dex: 0.15, int: 0.9, vit: 0.35, wis: 0.5 },
     move: 3,
-    // Summon Skeleton waits for the summons: until then the Necromancer can only strike with a staff.
     skills: ['attack', ...CLASS_START_SKILLS.necromancer!],
-    ai: [{ skill: 'attack' }],
+    ai: [{ skill: 'summon_skeleton' }, { skill: 'attack' }],
     pointOrder: ['int', 'wis', 'int', 'vit'],
     kit: ['Gnarled Staff', 'Cloth Hood', 'Cloth Robe'],
   },

@@ -1,4 +1,4 @@
-import { runCombat, samples } from '@game/engine';
+import { runCombat, samples, type CombatEvent } from '@game/engine';
 import { describe, expect, it } from 'vitest';
 import { arenaBounds, gridToScreen } from '../src/viewer/iso.ts';
 import {
@@ -209,5 +209,120 @@ describe('following the party on a big map', () => {
   it('shows everything when the map is smaller than the window', () => {
     const small = { minX: 0, minY: 0, maxX: 300, maxY: 200 };
     expect(followWindow(small, { x: 150, y: 100 }, 400, 400, 800)).toEqual(small);
+  });
+});
+
+describe('summons in a replay', () => {
+  const start: Extract<CombatEvent, { t: 'start' }> = {
+    t: 'start',
+    formatVersion: 3,
+    engineVersion: '1.0.0',
+    seed: 1,
+    arena: { id: 'a', width: 5, height: 5, blocked: [] },
+    units: [
+      {
+        id: 'c',
+        name: 'C',
+        team: 'party',
+        level: 5,
+        sprite: null,
+        x: 0,
+        y: 0,
+        hp: 10,
+        maxHp: 10,
+        mana: 5,
+        maxMana: 5,
+      },
+      {
+        id: 'e',
+        name: 'E',
+        team: 'enemy',
+        level: 5,
+        sprite: null,
+        x: 4,
+        y: 0,
+        hp: 10,
+        maxHp: 10,
+        mana: 0,
+        maxMana: 0,
+      },
+    ],
+  };
+  const summon: Extract<CombatEvent, { t: 'summon' }> = {
+    t: 'summon',
+    unit: 'c~demon1',
+    caster: 'c',
+    skill: 'summon_imp',
+    name: 'Imp',
+    team: 'party',
+    level: 5,
+    sprite: 'imp',
+    x: 1,
+    y: 0,
+    hp: 8,
+    maxHp: 8,
+    mana: 2,
+    maxMana: 2,
+  };
+
+  it('is built hidden from the start and appears with its event', () => {
+    const events: CombatEvent[] = [
+      start,
+      { t: 'round', n: 1, order: ['c', 'e'] },
+      { t: 'skill', unit: 'c', skill: 'summon_imp', target: 'c', x: 0, y: 0, vfx: 'buff' },
+      summon,
+      { t: 'end', outcome: 'draw', rounds: 1 },
+    ];
+    const { steps, states } = buildTimeline(events);
+    // The unit exists in every state (so the scene can build it), hidden until the summon.
+    expect(states[0]!.order).toEqual(['c', 'e', 'c~demon1']);
+    expect(states[0]!.units['c~demon1']!.hidden).toBe(true);
+    const at = steps.indexOf(summon);
+    expect(states[at]!.units['c~demon1']!.hidden).toBe(true);
+    const after = states[at + 1]!.units['c~demon1']!;
+    expect(after.hidden).toBe(false);
+    expect(after).toMatchObject({ x: 1, y: 0, hp: 8, alive: true, faceLeft: false, team: 'party' });
+    expect(eventDuration(summon)).toBeGreaterThan(0);
+  });
+
+  it('plays a real fight with a summon from the engine', () => {
+    const imp = {
+      id: 'call_imp',
+      name: 'Call Imp',
+      kind: 'summon',
+      source: 'spell',
+      attr: 'int',
+      power: 0,
+      range: 0,
+      manaCost: 0,
+      cooldown: 0,
+      side: 'self',
+      summon: {
+        group: 'demon',
+        name: 'Imp',
+        shares: { str: 0.3, dex: 0.5, int: 0.5, vit: 0.5, wis: 0.3 },
+        move: 3,
+        skills: ['attack'],
+        ai: [{ skill: 'attack' }],
+      },
+    } as const;
+    const result = runCombat({
+      seed: 9,
+      arena: samples.arena,
+      units: [
+        {
+          ...samples.input(1).units[0]!,
+          skills: ['call_imp', 'attack'],
+          ai: [{ skill: 'call_imp' }, { skill: 'attack' }],
+        },
+        samples.input(1).units.find((u) => u.team === 'enemy')!,
+      ],
+      skills: { ...samples.input(1).skills, call_imp: imp as never },
+    });
+    const { states } = buildTimeline(result.events);
+    const last = states[states.length - 1]!;
+    const unit = Object.values(last.units).find((u) => u.id.includes('~'))!;
+    expect(unit).toBeDefined();
+    expect(unit.hidden).toBe(false);
   });
 });

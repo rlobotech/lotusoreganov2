@@ -68,20 +68,17 @@ describe('the eleven classes of the sheet', () => {
     expect(kind('rogue')).toBe('dagger/1');
   });
 
-  it('can fight on day one, except that summoners wait for their summons', () => {
+  it('can fight on day one: the summoners carry their summon skill', () => {
     for (const id of ids) {
       const m = createMember(0, { name: 'X', race: 'human', cls: id });
       const usable = m.equipped.filter((s) => isUsable(s));
-      if (id === 'necromancer') {
-        // Summon Skeleton is not usable yet, so only the staff strike is left.
-        expect(usable).toEqual([]);
-        expect(m.skills).toContain('summon_skeleton');
-        expect(isUsable('summon_skeleton')).toBe(false);
-      } else {
-        expect(usable.length, id).toBeGreaterThan(0);
-      }
+      expect(usable.length, id).toBeGreaterThan(0);
       expect(m.skills).toContain('attack');
     }
+    const necro = createMember(0, { name: 'N', race: 'human', cls: 'necromancer' });
+    expect(necro.equipped).toContain('summon_skeleton');
+    const lock = createMember(0, { name: 'L', race: 'human', cls: 'warlock' });
+    expect(lock.equipped).toContain('summon_imp');
   });
 
   it('weapon masteries train from the weapon the class starts with', () => {

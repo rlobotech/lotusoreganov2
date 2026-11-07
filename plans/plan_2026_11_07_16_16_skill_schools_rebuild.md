@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: in progress (phases 1 to 5 done, phase 6 next)
+Status: in progress (phases 1 to 6 done, phase 7 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -129,6 +129,17 @@ Barbarian, Paladin, Warlock, Necromancer, Shaman and Druid are playable (world `
 - **Art:** sprites exist for barbarian, mage, necromancer, paladin, rogue and warrior; the others use the placeholder.
 - **Balance check** (a party of Warrior, Priest, Mage plus the class, 30 fights, defeats %): melee classes do best (Barbarian 0 to 10, Paladin 0 to 13, Ranger 0 to 7), casters worst (Mage 17 to 27, Druid 17 to 27, Necromancer 10 to 33). The caster gap was already there for the Mage; it widens with the Necromancer until it has summons. Tuning waits for the summons phase and real play.
 - Tests: `classes.test.ts` (eleven classes, sheet starts, weapons, day-one fighting, masteries training from the starting weapon) and a server test that the API classes equal the world's.
+
+## Phase 6 notes (what exists now)
+
+Summons work end to end: engine, world, replays.
+- **Engine** (`packages/engine`): a new skill kind `summon` with `SummonDef` (kind of summon, name, sprite, attribute shares of the caster, move, skills, AI, weapon). The summoned unit is created on the free tile beside the caster that is closest to the enemy, on the caster's team, at the caster's level, with attributes = shares of the caster's attributes times the caster's `skillMods` power for the skill (so skill and school levels make it stronger). It acts from the next round, has its own AI, and does not count when deciding whether a team has lost (when every real unit of a side is down the fight ends, summons or not). Limits are per kind: `UnitDef.summonLimits[group]` (default 1); the AI skips a summon rule while the limit is reached or there is no free tile, so it falls back to its other skills and calls a replacement when one dies. Log format version is now **3** (a new `summon` event, and `summon: true` on final units); old stored replays (version 2) still play, since only a new event type was added. Eight new engine tests.
+- **World:** `summon_imp` (group demon: Imp, fire bolt, light and quick) and `summon_skeleton` (group skeleton: Skeleton, cutting strike, sturdy) with their units' own skills (`imp_firebolt`, `skeleton_strike`, in no school). Limits come from the character: one demon, and skeletons 1, 2 from Necromancy Mastery 4 and 3 from 8 (`skeletonLimit`, `summonLimitsOf`). Both skills cost 8 mana and are usable and carried like any other (a Warrior can learn Summon Imp from a book). Warlock default AI: Summon Imp, Void Bolt, Attack; Necromancer: Summon Skeleton, Attack. Summons are never members of the party, never listed as fallen, and using the skill trains it and its mastery.
+- **Viewer:** units called up in a fight are built hidden from the start of the replay and appear (with a spreading ring) at their event; they get the placeholder art until imp and skeleton sprites exist (`/sprites/imp.png`, `/sprites/skeleton.png`).
+- **Balance** (a party of Warrior, Priest, Mage plus the class, defeats %): Warlock now 0 to 13% (was 7 to 20), Necromancer 10 to 30% (it was 10 to 33). The Warlock is now clearly stronger than the Mage; tuning waits for real play.
+- Only one kind of demon and of skeleton exists so far; more kinds come with the skills the user will provide (each kind shares the limit of its group).
+- **Not checked by eye:** a real summon replay playing in the browser (the party needs a few minutes to reach its first fight); the viewer is covered by reducer tests and by a test that builds a timeline from a real engine fight with a summon.
+- Tests: engine `summon.test.ts`, world `summons.test.ts`, web viewer tests.
 
 ## Decided after the first draft (from the user)
 

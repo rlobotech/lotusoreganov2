@@ -1,6 +1,7 @@
 import {
   opportunitySkill,
   planAfterMove,
+  summonTile,
   planKite,
   planRetreat,
   planTurn,
@@ -31,8 +32,33 @@ import {
   type Point,
   type SkillDef,
   type StatusDef,
+  type UnitDef,
   type UnitState,
 } from './types.ts';
+
+/** The runtime state of a unit standing on a tile (a fight can start it hurt). */
+function unitState(def: UnitDef, x: number, y: number): UnitState {
+  const base = derive(def.attributes, def.level, def.move);
+  return {
+    def,
+    id: def.id,
+    team: def.team,
+    x,
+    y,
+    // Fights can start from partial health/mana (the party carries damage between fights).
+    hp: Math.min(base.maxHp, Math.max(1, Math.round(def.hp ?? base.maxHp))),
+    mana: Math.min(base.maxMana, Math.max(0, Math.round(def.mana ?? base.maxMana))),
+    alive: true,
+    base,
+    weapon: def.weapon ?? weaponRange(def.level, 'smash'),
+    extraDamage: def.extraDamage ?? [],
+    resist: def.resist ?? {},
+    cooldowns: {},
+    statuses: [],
+    reaction: true,
+    movesLeft: 0,
+  };
+}
 
 function spawnUnits(input: CombatInput): UnitState[] {
   const { arena } = input;
@@ -49,26 +75,7 @@ function spawnUnits(input: CombatInput): UnitState[] {
     const i = tileIndex(grid, spot.x, spot.y);
     if (grid.blocked[i] || taken.has(i)) throw new Error(`Bad spawn tile ${spot.x},${spot.y}`);
     taken.add(i);
-    const base = derive(def.attributes, def.level, def.move);
-    return {
-      def,
-      id: def.id,
-      team: def.team,
-      x: spot.x,
-      y: spot.y,
-      // Fights can start from partial health/mana (the party carries damage between fights).
-      hp: Math.min(base.maxHp, Math.max(1, Math.round(def.hp ?? base.maxHp))),
-      mana: Math.min(base.maxMana, Math.max(0, Math.round(def.mana ?? base.maxMana))),
-      alive: true,
-      base,
-      weapon: def.weapon ?? weaponRange(def.level, 'smash'),
-      extraDamage: def.extraDamage ?? [],
-      resist: def.resist ?? {},
-      cooldowns: {},
-      statuses: [],
-      reaction: true,
-      movesLeft: 0,
-    };
+    return unitState(def, spot.x, spot.y);
   });
 }
 
@@ -109,7 +116,9 @@ export function runCombat(input: CombatInput): CombatResult {
     })),
   });
 
-  const alive = (team: 'party' | 'enemy') => units.some((u) => u.alive && u.team === team);
+  // A team has lost when its units are gone; summons do not keep it in the fight.
+  const alive = (team: 'party' | 'enemy') =>
+    units.some((u) => u.alive && u.team === team && !u.owner);
 
   function currentOutcome(): Outcome | null {
     if (!alive('party')) return 'defeat';
@@ -200,6 +209,61 @@ export function runCombat(input: CombatInput): CombatResult {
     return true;
   }
 
+  /** How many of each kind a unit has called up in this fight (to give every summon its own id). */
+  const called = new Map<string, number>();
+
+  /** A summon appears on the free tile beside its caster and acts from the next round. */
+  function callUp(caster: UnitState, skill: SkillDef) {
+    const def = skill.summon!;
+    const tile = summonTile(grid, units, caster);
+    if (!tile) return;
+    const n = (called.get(`${caster.id}~${def.group}`) ?? 0) + 1;
+    called.set(`${caster.id}~${def.group}`, n);
+    const power = caster.def.skillMods?.[skill.id]?.power ?? 1;
+    const attr = (k: 'str' | 'dex' | 'int' | 'vit' | 'wis') =>
+      Math.max(1, Math.round(caster.def.attributes[k] * (def.shares[k] ?? 0.5) * power));
+    const unitDef: UnitDef = {
+      id: `${caster.id}~${def.group}${n}`,
+      name: def.name,
+      team: caster.team,
+      level: caster.def.level,
+      attributes: {
+        str: attr('str'),
+        dex: attr('dex'),
+        int: attr('int'),
+        vit: attr('vit'),
+        wis: attr('wis'),
+      },
+      move: def.move,
+      skills: def.skills,
+      ai: def.ai,
+      ...(def.sprite ? { sprite: def.sprite } : {}),
+      ...(def.weapon
+        ? { weapon: weaponRange(caster.def.level, def.weapon.type, def.weapon.quality) }
+        : {}),
+    };
+    const unit = unitState(unitDef, tile.x, tile.y);
+    unit.owner = caster.id;
+    unit.group = def.group;
+    units.push(unit);
+    events.push({
+      t: 'summon',
+      unit: unit.id,
+      caster: caster.id,
+      skill: skill.id,
+      name: unitDef.name,
+      team: unit.team,
+      level: unitDef.level,
+      sprite: unitDef.sprite ?? null,
+      x: unit.x,
+      y: unit.y,
+      hp: unit.hp,
+      maxHp: unit.base.maxHp,
+      mana: unit.mana,
+      maxMana: unit.base.maxMana,
+    });
+  }
+
   function useSkill(caster: UnitState, skill: SkillDef, primary: UnitState, reaction = false) {
     if (!reaction) {
       caster.mana -= skillCost(caster, skill);
@@ -215,6 +279,11 @@ export function runCombat(input: CombatInput): CombatResult {
       vfx: skill.vfx ?? null,
       ...(reaction ? { reaction: true } : {}),
     });
+
+    if (skill.summon) {
+      callUp(caster, skill);
+      return;
+    }
 
     const attr = caster.def.attributes[skill.attr];
     // The unit's own skill and school levels make the skill stronger.
@@ -466,6 +535,13 @@ export function runCombat(input: CombatInput): CombatResult {
     outcome,
     rounds: round,
     events,
-    units: units.map((u) => ({ id: u.id, team: u.team, hp: u.hp, mana: u.mana, alive: u.alive })),
+    units: units.map((u) => ({
+      id: u.id,
+      team: u.team,
+      ...(u.owner ? { summon: true } : {}),
+      hp: u.hp,
+      mana: u.mana,
+      alive: u.alive,
+    })),
   };
 }

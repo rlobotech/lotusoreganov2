@@ -37,6 +37,12 @@ export function formatLog(events: CombatEvent[]): string[] {
           `${name(e.unit)} ${e.reaction ? 'strikes as a reaction with' : 'uses'} ${e.skill} on ${name(e.target)}`,
         );
         break;
+      case 'summon':
+        names.set(e.unit, e.name);
+        lines.push(
+          `  ${name(e.caster)} calls up ${e.name} L${e.level} HP ${e.maxHp} at ${e.x},${e.y}`,
+        );
+        break;
       case 'miss':
         lines.push(`  ${name(e.target)} dodges ${e.skill} (${e.chance}% to hit)`);
         break;

@@ -161,7 +161,7 @@ export interface SchoolInfo {
 export interface SkillInfo {
   id: string;
   name: string;
-  kind: 'damage' | 'heal' | 'status';
+  kind: 'damage' | 'heal' | 'status' | 'summon';
   /** 'weapon' skills hit with the character's weapon; spells come with their own strength. */
   source: 'weapon' | 'spell';
   /** The damage type of a spell, or of a weapon skill that sets its own. Weapon skills use the weapon's. */

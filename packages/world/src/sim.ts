@@ -5,6 +5,7 @@ import {
   skillLevelOf,
   skillLevelPower,
   statusBonusRounds,
+  summonLimitsOf,
 } from './skill-levels.ts';
 import { SKILL_TREE } from './skill-tree.ts';
 import { trainFromFight, learnUnlocked } from './learning.ts';
@@ -233,6 +234,7 @@ export function memberUnit(p: PartyState, m: Member): UnitDef {
     move: cls.move,
     skills: unitSkills(m),
     skillMods: skillMods(m),
+    summonLimits: summonLimitsOf(m),
     ai: m.ai,
     sprite: `${m.race}_${m.cls}`,
     weapon: gear.weapon ?? weaponRange(p.level, 'smash', 0.5),
@@ -669,7 +671,7 @@ function startFight(ctx: Ctx, f: FightSpec) {
       outcome: result.outcome,
       rounds: result.rounds,
       survivors: result.units
-        .filter((u) => u.team === 'party')
+        .filter((u) => u.team === 'party' && !u.summon)
         .map((u) => ({ id: u.id, hp: u.hp, mana: u.mana, alive: u.alive })),
       xp,
       gold,

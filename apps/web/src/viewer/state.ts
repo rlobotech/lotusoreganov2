@@ -13,6 +13,8 @@ export interface UnitView {
   maxHp: number;
   alive: boolean;
   statuses: string[];
+  /** A unit called up in the fight is built before it appears and stays hidden until its summon event. */
+  hidden?: boolean;
   /** The art is drawn facing south-east; the west-facing version is the same sprite flipped. */
   faceLeft: boolean;
 }
@@ -38,6 +40,7 @@ export const DURATION = {
   heal: 550,
   status: 250,
   skip: 350,
+  summon: 700,
   death: 700,
   end: 1500,
 } as const;
@@ -64,6 +67,8 @@ export function eventDuration(e: CombatEvent): number {
       return DURATION.status;
     case 'skip':
       return DURATION.skip;
+    case 'summon':
+      return DURATION.summon;
     case 'death':
       return DURATION.death;
     case 'end':
@@ -71,7 +76,10 @@ export function eventDuration(e: CombatEvent): number {
   }
 }
 
-export function initialState(start: Extract<CombatEvent, { t: 'start' }>): ViewState {
+export function initialState(
+  start: Extract<CombatEvent, { t: 'start' }>,
+  events?: readonly CombatEvent[],
+): ViewState {
   const units: Record<string, UnitView> = {};
   for (const u of start.units) {
     units[u.id] = {
@@ -90,10 +98,31 @@ export function initialState(start: Extract<CombatEvent, { t: 'start' }>): ViewS
       faceLeft: u.team === 'enemy',
     };
   }
+  // Units called up later are built now, hidden, so the scene has them before they appear.
+  const later = (events ?? []).filter(
+    (e): e is Extract<CombatEvent, { t: 'summon' }> => e.t === 'summon',
+  );
+  for (const e of later) {
+    units[e.unit] = {
+      id: e.unit,
+      name: e.name,
+      team: e.team,
+      sprite: e.sprite,
+      level: e.level,
+      x: e.x,
+      y: e.y,
+      hp: e.hp,
+      maxHp: e.maxHp,
+      alive: true,
+      statuses: [],
+      hidden: true,
+      faceLeft: e.team === 'enemy',
+    };
+  }
   return {
     arena: start.arena,
     units,
-    order: start.units.map((u) => u.id),
+    order: [...start.units.map((u) => u.id), ...later.map((e) => e.unit)],
     round: 0,
     active: null,
     outcome: null,
@@ -143,6 +172,17 @@ export function applyEvent(s: ViewState, e: CombatEvent): ViewState {
         : u.statuses.filter((id) => id !== e.status);
       break;
     }
+    case 'summon': {
+      const u = unit(e.unit);
+      u.hidden = false;
+      u.alive = true;
+      u.x = e.x;
+      u.y = e.y;
+      u.hp = e.hp;
+      // It faces the way its side does: parties right, enemies left.
+      u.faceLeft = e.team === 'enemy';
+      break;
+    }
     case 'death':
       unit(e.unit).alive = false;
       unit(e.unit).statuses = [];
@@ -168,7 +208,7 @@ export function buildTimeline(events: CombatEvent[]): {
   const start = events[0];
   if (!start || start.t !== 'start') throw new Error('Replay must begin with a start event');
   const steps = events.slice(1);
-  const states: ViewState[] = [initialState(start)];
+  const states: ViewState[] = [initialState(start, events)];
   for (const e of steps) states.push(applyEvent(states[states.length - 1]!, e));
   return { steps, states };
 }

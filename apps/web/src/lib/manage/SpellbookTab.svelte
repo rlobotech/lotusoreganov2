@@ -33,11 +33,13 @@
     if (!s) return '';
     return s.kind === 'heal'
       ? 'Heals'
-      : s.kind === 'status'
-        ? 'Effect'
-        : s.damageType
-          ? `${cap(s.damageType)} damage`
-          : 'Weapon damage';
+      : s.kind === 'summon'
+        ? 'Calls up an ally'
+        : s.kind === 'status'
+          ? 'Effect'
+          : s.damageType
+            ? `${cap(s.damageType)} damage`
+            : 'Weapon damage';
   };
 
   /** Known skills grouped by school; skills without one (the basic attack) come first. */

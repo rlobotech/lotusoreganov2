@@ -190,7 +190,7 @@ export class Scene {
     let bestD = 16;
     for (const id of st.order) {
       const u = st.units[id]!;
-      if (!u.alive) continue;
+      if (!u.alive || u.hidden) continue;
       const pos = gridToScreen(u.x, u.y);
       const d = Math.hypot(wx - pos.x, wy - (pos.y - 12));
       if (d < bestD) {
@@ -343,6 +343,9 @@ export class Scene {
       const u = st.units[id]!;
       const node = this.nodes.get(id);
       if (!node) continue;
+      // A summon is not there until the event that calls it up.
+      node.root.visible = !u.hidden;
+      if (u.hidden) continue;
 
       let pos = gridToScreen(u.x, u.y);
       let dx = 0;
@@ -551,6 +554,14 @@ export class Scene {
       } else {
         fx.circle(to.x, to.y, 3 + p * 8).stroke({ width: 1.5, color, alpha: 1 - p });
       }
+    }
+
+    // A summon rises out of the ground: rings spreading from its tile.
+    if (ev.t === 'summon') {
+      const at = gridToScreen(ev.x, ev.y);
+      const color = ev.team === 'party' ? 0xb080ff : 0xff7050;
+      fx.circle(at.x, at.y, 4 + p * 16).stroke({ width: 2, color, alpha: 1 - p });
+      fx.circle(at.x, at.y, 2 + p * 9).fill({ color, alpha: 0.35 * (1 - p) });
     }
 
     const floatText = (

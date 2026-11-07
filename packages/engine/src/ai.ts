@@ -36,6 +36,48 @@ const manaPct = (u: UnitState) => (u.base.maxMana > 0 ? (u.mana / u.base.maxMana
 export const skillCost = (unit: UnitState, skill: SkillDef): number =>
   Math.round(skill.manaCost * manaCostMult(unit.def.level));
 
+/** How many summons of the skill's kind the unit may have out at once (default one). */
+export const summonLimit = (unit: UnitState, skill: SkillDef): number =>
+  skill.summon ? (unit.def.summonLimits?.[skill.summon.group] ?? 1) : 0;
+
+/** The free tile beside `unit` that is closest to the enemy, where a summon appears (or null). */
+export function summonTile(grid: Grid, units: readonly UnitState[], unit: UnitState): Point | null {
+  const taken = occupiedTiles(grid, units, unit);
+  taken.add(unit.y * grid.width + unit.x);
+  let best: Point | null = null;
+  let bestScore = Infinity;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const x = unit.x + dx;
+      const y = unit.y + dy;
+      if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue;
+      const i = y * grid.width + x;
+      if (grid.blocked[i] || taken.has(i)) continue;
+      const score = nearestEnemy(units, unit, { x, y }) * 100 + i;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+}
+
+/** Can the unit call up another summon with this skill: below its limit, and room beside it? */
+export function canSummon(
+  grid: Grid,
+  units: readonly UnitState[],
+  unit: UnitState,
+  skill: SkillDef,
+): boolean {
+  if (!skill.summon) return true;
+  const out = units.filter(
+    (u) => u.alive && u.owner === unit.id && u.group === skill.summon!.group,
+  ).length;
+  return out < summonLimit(unit, skill) && summonTile(grid, units, unit) !== null;
+}
+
 /** Does the unit hold the weapon the skill asks for (if it asks for one)? */
 export function holdsWeaponFor(unit: UnitState, skill: SkillDef): boolean {
   if (!skill.weapons) return true;
@@ -213,7 +255,10 @@ export function planTurn(
   const move = unit.movesLeft;
 
   const usable = (s: SkillDef) =>
-    unit.mana >= skillCost(unit, s) && (unit.cooldowns[s.id] ?? 0) === 0 && holdsWeaponFor(unit, s);
+    unit.mana >= skillCost(unit, s) &&
+    (unit.cooldowns[s.id] ?? 0) === 0 &&
+    holdsWeaponFor(unit, s) &&
+    canSummon(grid, units, unit, s);
 
   function canHitFrom(tile: Point, target: UnitState, skill: SkillDef): boolean {
     if (distance(tile, target) > skill.range) return false;

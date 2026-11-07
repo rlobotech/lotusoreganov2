@@ -283,3 +283,22 @@ export function equipSkill(
 export function unequipSkill(s: SkillState, id: string): void {
   s.equipped = s.equipped.filter((x) => x !== id);
 }
+
+// ---------- summons ----------
+
+/** Necromancy Mastery levels that raise the skeleton limit to two and to three. */
+export const SKELETON_LIMIT_LEVELS: readonly [number, number] = [4, 8];
+
+/** How many skeletons a character may have out at once: one, two from Necromancy Mastery 4, three from 8. */
+export function skeletonLimit(necromancyLevel: number): number {
+  return (
+    1 +
+    (necromancyLevel >= SKELETON_LIMIT_LEVELS[0] ? 1 : 0) +
+    (necromancyLevel >= SKELETON_LIMIT_LEVELS[1] ? 1 : 0)
+  );
+}
+
+/** The limits of every kind of summon for a character: one demon, skeletons by Necromancy Mastery. */
+export function summonLimitsOf(s: Pick<SkillState, 'skillLevels'>): Record<string, number> {
+  return { demon: 1, skeleton: skeletonLimit(skillLevelOf(s, 'necromancy_mastery')) };
+}
