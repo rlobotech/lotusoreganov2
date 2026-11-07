@@ -88,7 +88,7 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - Tests: `biome.test.ts` (weights, home share, one search equals the single-target search, hunting spot choice by ground, data checks, wolves met in forest far more than on plains).
 
 ### Phase 6 notes (what exists now)
-- **Map view:** the camera follows the party and shows a window of 14 hexes across (as tall as the screen asks for; `followWindow` in `camera.ts`, which slides along the edges), so hexes stay readable on a phone (checked at 375 px wide). A new **Map** button next to the zoom buttons shows the whole continent and goes back; the middle button centres on the party again.
+- **Map view:** the camera follows the party and shows a window of 9 hexes across (zoomed in, fitted exactly, not to a whole zoom step) (as tall as the screen asks for; `followWindow` in `camera.ts`, which slides along the edges), so hexes stay readable on a phone (checked at 375 px wide). A new **Map** button next to the zoom buttons shows the whole continent and goes back; the middle button centres on the party again.
 - **Fog:** hexes of a region that is still closed are covered by a dark fog (80%), and the places in it are drawn dimmed. Every region's name and level band is written over the middle of its land (stronger while closed, faint once open).
 - **Reset:** done in phase 4 (migration 0003).
 - **Still open:** tile art for the biomes (the colours are drawn in code), a minimap, tapping a hex to send the party there (only sites can be tapped), monster and region art, and the balance notes of phase 4.

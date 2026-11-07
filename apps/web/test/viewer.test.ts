@@ -179,6 +179,15 @@ describe('camera maths', () => {
   });
 });
 
+describe('exact fit', () => {
+  it('keeps the fractional fit when asked, whole steps otherwise', () => {
+    const b = { minX: 0, minY: 0, maxX: 300, maxY: 300 };
+    expect(fitZoom(500, 500, b)).toBe(1);
+    expect(fitZoom(500, 500, b, 12, true)).toBeCloseTo(476 / 300);
+    expect(fitZoom(100, 100, b, 12, true)).toBe(fitZoom(100, 100, b));
+  });
+});
+
 describe('following the party on a big map', () => {
   const all = { minX: 0, minY: 0, maxX: 1200, maxY: 1200 };
 

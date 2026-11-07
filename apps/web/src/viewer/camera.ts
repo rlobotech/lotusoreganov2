@@ -7,12 +7,19 @@ import type { Bounds } from './iso.ts';
 
 export const MAX_ZOOM = 8;
 
-/** Largest integer zoom that shows all of `bounds` in the viewport (fractional only if 1x does not fit). */
-export function fitZoom(viewW: number, viewH: number, bounds: Bounds, margin = 12): number {
+/** Largest integer zoom that shows all of `bounds` in the viewport (fractional only if 1x does not fit; `exact` keeps the fractional fit, for maps drawn as vectors). */
+export function fitZoom(
+  viewW: number,
+  viewH: number,
+  bounds: Bounds,
+  margin = 12,
+  exact = false,
+): number {
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
   const raw = Math.min((viewW - margin * 2) / w, (viewH - margin * 2) / h);
   if (!(raw > 0)) return 1;
+  if (exact) return Math.min(MAX_ZOOM, raw);
   return raw >= 1 ? Math.min(MAX_ZOOM, Math.floor(raw)) : raw;
 }
 

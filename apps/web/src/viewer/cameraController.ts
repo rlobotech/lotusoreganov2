@@ -8,6 +8,8 @@ export interface CameraHost {
   bounds(): Bounds;
   /** The part of the content `fit` shows, when that is less than all of it (a tall map). */
   fitBounds?(): Bounds;
+  /** Fit to the exact size instead of a whole zoom step (for content drawn as vectors). */
+  fitExact?: boolean;
   /** A tap or click (not a drag) at a screen position. */
   onTap?(p: Vec): void;
   onZoom?(zoom: number): void;
@@ -46,7 +48,7 @@ export class CameraController {
     this.mode = 'fit';
     const { width, height } = this.host.size();
     const bounds = this.host.fitBounds?.() ?? this.host.bounds();
-    this.zoom = fitZoom(width, height, bounds);
+    this.zoom = fitZoom(width, height, bounds, 12, this.host.fitExact);
     Object.assign(this, centerOn(width, height, bounds, this.zoom));
     this.host.onZoom?.(this.zoom);
   }

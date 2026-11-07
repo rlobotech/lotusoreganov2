@@ -117,6 +117,7 @@ export class MapScene {
       size: () => this.app.screen,
       bounds: () => this.bounds,
       fitBounds: () => this.windowBounds(),
+      fitExact: true,
       onTap: (p) => this.tap(p),
       onZoom: (z) => this.opts.onZoom?.(z),
     });
@@ -249,8 +250,8 @@ export class MapScene {
     }
   }
 
-  /** How many hexes wide the view around the party is (hexes stay readable on a phone). */
-  private static readonly VIEW_COLS = 14;
+  /** How many hexes wide the view around the party is (close enough to see the land around, and readable on a phone). */
+  private static readonly VIEW_COLS = 9;
 
   /**
    * The continent is too big to read whole, so the view fits a window of a few hexes around the
