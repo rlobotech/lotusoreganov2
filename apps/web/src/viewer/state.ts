@@ -41,6 +41,7 @@ export const DURATION = {
   status: 250,
   skip: 350,
   summon: 700,
+  teleport: 500,
   death: 700,
   end: 1500,
 } as const;
@@ -54,7 +55,7 @@ export function eventDuration(e: CombatEvent): number {
     case 'turn':
       return DURATION.turn;
     case 'move':
-      return DURATION.movePerTile * Math.max(1, e.path.length);
+      return e.teleport ? DURATION.teleport : DURATION.movePerTile * Math.max(1, e.path.length);
     case 'skill':
       return DURATION.skill;
     case 'miss':

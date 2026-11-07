@@ -74,6 +74,16 @@ describe('drop rules', () => {
     expect(canDrop(item(), { kind: 'equip', memberId: 'm1', slot: 'weapon' })).toBe(true);
     expect(canDrop(item(), { kind: 'equip', memberId: 'm1', slot: 'head' })).toBe(false);
     expect(canDrop(item(), { kind: 'equip', memberId: 'm1' })).toBe(true);
+    // A one-handed weapon also fits the off hand (dual wielding); a two-handed one does not.
+    const dagger = item({ slot: 'weapon', hands: 1 });
+    expect(canDrop(dagger, { kind: 'equip', memberId: 'm1', slot: 'offhand' })).toBe(true);
+    expect(
+      canDrop(item({ slot: 'weapon', hands: 2 }), {
+        kind: 'equip',
+        memberId: 'm1',
+        slot: 'offhand',
+      }),
+    ).toBe(false);
     expect(canDrop(item({ slot: undefined }), { kind: 'equip', memberId: 'm1' })).toBe(false);
   });
 

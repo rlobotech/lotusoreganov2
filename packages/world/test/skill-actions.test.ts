@@ -49,7 +49,7 @@ describe('carrying skills', () => {
     expect(equipMemberSkill(p, mage.id, 'ember')).toMatchObject({ code: 'cannot_carry' });
   });
 
-  it('refuses a full set, an unknown or unlearned skill, a passive one and one that is not usable yet', () => {
+  it('refuses a full set, an unknown or unlearned skill, and a passive one', () => {
     const p = party();
     const mage = p.members[0]!;
     for (const id of ['gust', 'rain', 'staff_strike', 'poison_dart', 'fortify']) {
@@ -63,10 +63,8 @@ describe('carrying skills', () => {
     expect(carryProblem(mage, 1, 'whirlwind')).toBe('not learned yet');
     expect(carryProblem(mage, 1, 'nothing')).toBe('unknown skill');
     expect(carryProblem(mage, 1, 'staff_mastery')).toMatch(/takes no slot/);
-    // Dash waits for the stealth feature of the engine.
-    mage.skills.push('dash');
-    mage.skillLevels.dash = 1;
-    expect(carryProblem(mage, 1, 'dash')).toBe('not usable yet');
+    // Every skill of the tree has its combat skill now, so nothing is "not usable yet".
+    expect(carryProblem(mage, 1, 'shadow_step')).toBe('not learned yet');
     // At level 30 there is a seventh slot.
     p.level = 30;
     expect(equipMemberSkill(p, mage.id, 'fortify')).toEqual({ ok: true });

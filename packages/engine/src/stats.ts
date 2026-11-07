@@ -27,3 +27,6 @@ export function hasStatus(u: UnitState, id: string): boolean {
 }
 
 export const isStunned = (u: UnitState): boolean => u.statuses.some((s) => s.def.kind === 'stun');
+
+/** A hidden unit cannot be targeted by enemies and provokes no opportunity attacks. */
+export const isHidden = (u: UnitState): boolean => u.statuses.some((s) => s.def.kind === 'stealth');

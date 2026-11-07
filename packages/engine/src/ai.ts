@@ -8,7 +8,7 @@ import {
   type Reach,
 } from './grid.ts';
 import { manaCostMult } from './scaling.ts';
-import { hasStatus, isStunned } from './stats.ts';
+import { hasStatus, isHidden, isStunned } from './stats.ts';
 import {
   WEAPON_ATTACK,
   type AIRule,
@@ -140,6 +140,8 @@ export function provokers(
       e.alive &&
       e.team !== mover.team &&
       e.reaction &&
+      !mover.noProvoke &&
+      !isHidden(mover) &&
       !isStunned(e) &&
       adjacent(e, from) &&
       !adjacent(e, to) &&
@@ -175,7 +177,8 @@ function candidates(
   let pool = units.filter((u) => {
     if (!u.alive) return false;
     if (skill.side === 'self') return u === unit;
-    return skill.side === 'ally' ? u.team === unit.team : u.team !== unit.team;
+    // Enemies cannot pick a hidden unit.
+    return skill.side === 'ally' ? u.team === unit.team : u.team !== unit.team && !isHidden(u);
   });
 
   // Sensible implicit filters so units do not waste turns.

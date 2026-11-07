@@ -358,7 +358,12 @@ export class Scene {
       const dead = !u.alive;
 
       if (ev) {
-        if (ev.t === 'move' && ev.unit === id) {
+        if (ev.t === 'move' && ev.unit === id && ev.teleport) {
+          // A step through the shadows: it fades out where it was and in where it lands.
+          const end = ev.path[ev.path.length - 1]!;
+          pos = gridToScreen(p < 0.5 ? u.x : end.x, p < 0.5 ? u.y : end.y);
+          alpha = Math.abs(p - 0.5) * 2;
+        } else if (ev.t === 'move' && ev.unit === id) {
           const path = [{ x: u.x, y: u.y }, ...ev.path];
           const segs = path.length - 1;
           const f = p * segs;
@@ -392,6 +397,9 @@ export class Scene {
       if (dead) {
         alpha = 0.35;
         squash = 0.4;
+      } else if (u.statuses.includes('stealth')) {
+        // A hidden unit is half seen.
+        alpha = Math.min(alpha, 0.42);
       }
 
       node.root.position.set(Math.round(pos.x + dx), Math.round(pos.y + dy));

@@ -19,7 +19,7 @@ import {
   spellBase,
   weaponRange,
 } from './scaling.ts';
-import { effectiveStat, pctMult } from './stats.ts';
+import { effectiveStat, isHidden, pctMult } from './stats.ts';
 import {
   ENGINE_VERSION,
   LOG_FORMAT_VERSION,
@@ -184,7 +184,7 @@ export function runCombat(input: CombatInput): CombatResult {
     type: DamageType,
     crit: boolean,
     chance: number | undefined,
-    extra: boolean,
+    flags: { extra?: boolean; offhand?: boolean; ricochet?: boolean; ambush?: boolean } = {},
   ): boolean {
     const resist = resistOf(target, type);
     const amount = Math.max(1, Math.round(raw * (1 - resist)));
@@ -200,7 +200,10 @@ export function runCombat(input: CombatInput): CombatResult {
       type,
       resist: Math.round(resist * 100),
       ...(chance !== undefined ? { chance: Math.round(chance) } : {}),
-      ...(extra ? { extra: true } : {}),
+      ...(flags.extra ? { extra: true } : {}),
+      ...(flags.offhand ? { offhand: true as const } : {}),
+      ...(flags.ricochet ? { ricochet: true as const } : {}),
+      ...(flags.ambush ? { ambush: true as const } : {}),
     });
     if (target.hp === 0) {
       kill(target);
@@ -289,60 +292,28 @@ export function runCombat(input: CombatInput): CombatResult {
       return;
     }
 
+    if (skill.dash) {
+      caster.movesLeft += skill.dash;
+      caster.noProvoke = true;
+    }
+    if (skill.teleport) {
+      stepBeside(caster, primary);
+      if (skill.status && caster.alive && rng.chance(skill.statusChance ?? 100)) {
+        applyStatus(caster, caster, skill.status, skill);
+      }
+      return;
+    }
+
     const attr = caster.def.attributes[skill.attr];
     // The unit's own skill and school levels make the skill stronger.
     const strength = caster.def.skillMods?.[skill.id]?.power ?? 1;
+    // Hiding is broken by a damaging skill, and the first hit out of it is an ambush.
+    const ambush = skill.kind === 'damage' && isHidden(caster);
+    let firstHit = false;
     for (const target of targetsOf(caster, skill, primary)) {
       if (skill.kind === 'damage') {
-        let chance: number | undefined;
-        if (skill.source === 'weapon' || skill.dodgeable) {
-          chance = hitChance(
-            caster.base.accuracy * pctMult(caster, 'accuracy'),
-            target.base.evasion * pctMult(target, 'evasion'),
-          );
-          if (!rng.chance(chance)) {
-            events.push({
-              t: 'miss',
-              target: target.id,
-              skill: skill.id,
-              chance: Math.round(chance),
-            });
-            continue;
-          }
-        }
-        const crit = rng.chance(caster.base.crit);
-        const critMult = crit ? SCALING.critMultiplier : 1;
-        const dmgMult = attrMult(attr) * pctMult(caster, 'damage') * critMult;
-        let base: number;
-        let type: DamageType;
-        if (skill.source === 'weapon') {
-          base = roll(caster.weapon.min, caster.weapon.max);
-          type = skill.damageType ?? caster.weapon.type;
-        } else {
-          const s = SCALING.rollSpread;
-          base = spellBase(caster.def.level) * roll(1 - s, 1 + s);
-          type = skill.damageType ?? 'smash';
-        }
-        if (
-          !deal(
-            target,
-            caster,
-            skill,
-            base * (skill.power / 10) * strength * dmgMult,
-            type,
-            crit,
-            chance,
-            false,
-          )
-        ) {
-          continue;
-        }
-        if (skill.source === 'weapon') {
-          for (const x of caster.extraDamage) {
-            const extra = roll(x.min, x.max) * pctMult(caster, 'damage') * critMult;
-            if (!deal(target, caster, skill, extra, x.type, crit, chance, true)) break;
-          }
-        }
+        const res = strike(caster, skill, target, strength, { ambush });
+        if (target === primary) firstHit = res !== 'miss';
       } else if (skill.kind === 'heal') {
         const s = SCALING.rollSpread;
         const wanted = Math.max(
@@ -370,6 +341,174 @@ export function runCombat(input: CombatInput): CombatResult {
         applyStatus(target, caster, skill.status, skill);
       }
     }
+    // A bouncing arrow goes on from the target it hit to the nearest other enemy, weaker each time.
+    if (skill.kind === 'damage' && skill.ricochet && firstHit) {
+      const { bounces, falloff, reach } = skill.ricochet;
+      const hit = new Set([primary.id]);
+      let last = primary;
+      for (let i = 1; i <= bounces; i++) {
+        const next = units
+          .filter(
+            (u) =>
+              u.alive &&
+              u.team !== caster.team &&
+              !hit.has(u.id) &&
+              !isHidden(u) &&
+              distance(u, last) <= reach,
+          )
+          .sort((a, b) => distance(a, last) - distance(b, last) || (a.id < b.id ? -1 : 1))[0];
+        if (!next) break;
+        hit.add(next.id);
+        strike(caster, skill, next, strength, { mult: falloff ** i, ricochet: true, ambush });
+        if (skill.status && next.alive && rng.chance(skill.statusChance ?? 100)) {
+          applyStatus(next, caster, skill.status, skill);
+        }
+        last = next;
+      }
+    }
+    if (ambush) {
+      for (const st of [...caster.statuses]) {
+        if (st.def.kind !== 'stealth') continue;
+        caster.statuses.splice(caster.statuses.indexOf(st), 1);
+        events.push({ t: 'status', unit: caster.id, status: st.def.id, on: false });
+      }
+    }
+  }
+
+  /** The free tile beside `target` that is nearest to `unit`, or null. */
+  function stepBeside(unit: UnitState, target: UnitState) {
+    const taken = new Set(
+      units.filter((u) => u.alive && u !== unit).map((u) => u.y * grid.width + u.x),
+    );
+    let best: Point | null = null;
+    let bestScore = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = target.x + dx;
+        const y = target.y + dy;
+        if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue;
+        const i = y * grid.width + x;
+        if (grid.blocked[i] || taken.has(i)) continue;
+        const score = distance(unit, { x, y }) * 100 + i;
+        if (score < bestScore) {
+          bestScore = score;
+          best = { x, y };
+        }
+      }
+    }
+    if (!best) return;
+    unit.x = best.x;
+    unit.y = best.y;
+    events.push({ t: 'move', unit: unit.id, path: [best], teleport: true });
+  }
+
+  /**
+   * One attack of a damage skill on one target: its hit roll, damage and weapon extras, and the
+   * off-hand weapon's strike when the unit dual wields. `mult` weakens a bounce of a ricochet.
+   */
+  function strike(
+    caster: UnitState,
+    skill: SkillDef,
+    target: UnitState,
+    strength: number,
+    o: { mult?: number; ricochet?: boolean; ambush?: boolean } = {},
+  ): 'miss' | 'hit' | 'killed' {
+    const attr = caster.def.attributes[skill.attr];
+    let chance: number | undefined;
+    if (skill.source === 'weapon' || skill.dodgeable) {
+      chance = hitChance(
+        caster.base.accuracy * pctMult(caster, 'accuracy'),
+        target.base.evasion * pctMult(target, 'evasion'),
+      );
+      if (!rng.chance(chance)) {
+        events.push({ t: 'miss', target: target.id, skill: skill.id, chance: Math.round(chance) });
+        return 'miss';
+      }
+    }
+    const crit = rng.chance(caster.base.crit);
+    const critMult = crit ? SCALING.critMultiplier : 1;
+    const ambushMult = o.ambush ? SCALING.ambushMultiplier : 1;
+    const dmgMult =
+      attrMult(attr) * pctMult(caster, 'damage') * critMult * ambushMult * (o.mult ?? 1);
+    let base: number;
+    let type: DamageType;
+    if (skill.source === 'weapon') {
+      base = roll(caster.weapon.min, caster.weapon.max);
+      type = skill.damageType ?? caster.weapon.type;
+    } else {
+      const s = SCALING.rollSpread;
+      base = spellBase(caster.def.level) * roll(1 - s, 1 + s);
+      type = skill.damageType ?? 'smash';
+    }
+    const flags = {
+      ...(o.ricochet ? { ricochet: true } : {}),
+      ...(o.ambush ? { ambush: true } : {}),
+    };
+    if (
+      !deal(
+        target,
+        caster,
+        skill,
+        base * (skill.power / 10) * strength * dmgMult,
+        type,
+        crit,
+        chance,
+        flags,
+      )
+    ) {
+      return 'killed';
+    }
+    if (skill.source === 'weapon') {
+      for (const x of caster.extraDamage) {
+        const extra = roll(x.min, x.max) * pctMult(caster, 'damage') * critMult;
+        if (!deal(target, caster, skill, extra, x.type, crit, chance, { ...flags, extra: true })) {
+          return 'killed';
+        }
+      }
+      // Dual wielding: a melee weapon skill that fits the off-hand weapon strikes with it too.
+      const off = caster.def.offWeapon;
+      const kind = caster.def.offWeaponKind;
+      if (
+        off &&
+        skill.range <= 1 &&
+        !o.ricochet &&
+        (!skill.weapons || (kind && skill.weapons.includes(kind)))
+      ) {
+        const offChance = hitChance(
+          caster.base.accuracy * pctMult(caster, 'accuracy'),
+          target.base.evasion * pctMult(target, 'evasion'),
+        );
+        if (!rng.chance(offChance)) {
+          events.push({
+            t: 'miss',
+            target: target.id,
+            skill: skill.id,
+            chance: Math.round(offChance),
+          });
+          return 'hit';
+        }
+        const offCrit = rng.chance(caster.base.crit);
+        const raw =
+          roll(off.min, off.max) *
+          (skill.power / 10) *
+          strength *
+          attrMult(attr) *
+          pctMult(caster, 'damage') *
+          (offCrit ? SCALING.critMultiplier : 1) *
+          ambushMult *
+          SCALING.offhandMultiplier;
+        if (
+          !deal(target, caster, skill, raw, off.type, offCrit, offChance, {
+            ...flags,
+            offhand: true,
+          })
+        ) {
+          return 'killed';
+        }
+      }
+    }
+    return 'hit';
   }
 
   /**
@@ -425,6 +564,7 @@ export function runCombat(input: CombatInput): CombatResult {
       }
       return;
     }
+    unit.noProvoke = false;
     unit.movesLeft = effectiveStat(unit, 'move');
     // Free skills do not use the action, so a unit can chain a few of them before its real action.
     for (let step = 0; step < 4 && unit.alive; step++) {

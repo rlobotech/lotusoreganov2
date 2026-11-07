@@ -54,7 +54,10 @@ export class InventoryDnd {
   }
 
   /** A valid place to drop the item being dragged: right slot, and the viewer's own. */
-  canDropOn(item: Pick<ItemInfo, 'slot'>, target: DropTarget): boolean {
+  canDropOn(
+    item: Pick<ItemInfo, 'slot'> & Partial<Pick<ItemInfo, 'hands'>>,
+    target: DropTarget,
+  ): boolean {
     return canDrop(item, target) && this.owns(target);
   }
 

@@ -103,6 +103,9 @@ export function autoEquip(m: Member, level: number): void {
 /** What a character's skills and gear make of an event of a fight: one `SkillUse` per skill use. */
 function usesOf(m: Member, events: readonly CombatEvent[]): SkillUse[] {
   const weapon = m.equipment.weapon;
+  // Dual wielding: a one-handed weapon in each hand.
+  const off = m.equipment.offhand;
+  const dual = !!off?.weapon && off.hands === 1 && weapon?.hands === 1;
   const uses: SkillUse[] = [];
   let current: SkillUse | null = null;
   for (const e of events) {
@@ -114,7 +117,7 @@ function usesOf(m: Member, events: readonly CombatEvent[]): SkillUse[] {
         heal: 0,
         weaponKind: weapon?.kind as WeaponKind | undefined,
         hands: weapon?.hands as 1 | 2 | undefined,
-        dual: false,
+        dual,
         spell: def?.source === 'spell',
         element: def?.damageType as DamageType | undefined,
       };

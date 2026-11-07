@@ -240,6 +240,7 @@ export function memberUnit(p: PartyState, m: Member): UnitDef {
     weapon: gear.weapon ?? weaponRange(p.level, 'smash', 0.5),
     weaponKind: gear.kind,
     extraDamage: gear.extra,
+    ...(gear.offWeapon ? { offWeapon: gear.offWeapon, offWeaponKind: gear.offKind } : {}),
     resist: gear.resist,
     hp: m.hp,
     mana: m.mana,

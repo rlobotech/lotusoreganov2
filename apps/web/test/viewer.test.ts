@@ -326,3 +326,56 @@ describe('summons in a replay', () => {
     expect(unit.hidden).toBe(false);
   });
 });
+
+describe('stealth and unseen steps in a replay', () => {
+  const start: Extract<CombatEvent, { t: 'start' }> = {
+    t: 'start',
+    formatVersion: 3,
+    engineVersion: '1.0.0',
+    seed: 1,
+    arena: { id: 'a', width: 9, height: 3, blocked: [] },
+    units: [
+      {
+        id: 'r',
+        name: 'R',
+        team: 'party',
+        level: 5,
+        sprite: null,
+        x: 0,
+        y: 0,
+        hp: 10,
+        maxHp: 10,
+        mana: 5,
+        maxMana: 5,
+      },
+      {
+        id: 'e',
+        name: 'E',
+        team: 'enemy',
+        level: 5,
+        sprite: null,
+        x: 8,
+        y: 0,
+        hp: 10,
+        maxHp: 10,
+        mana: 0,
+        maxMana: 0,
+      },
+    ],
+  };
+
+  it('moves the unit at once, takes longer to play, and tracks the hiding', () => {
+    const step: CombatEvent = { t: 'move', unit: 'r', path: [{ x: 7, y: 0 }], teleport: true };
+    const { states } = buildTimeline([
+      start,
+      step,
+      { t: 'status', unit: 'r', status: 'stealth', on: true },
+      { t: 'status', unit: 'r', status: 'stealth', on: false },
+    ]);
+    expect(states[1]!.units.r).toMatchObject({ x: 7, y: 0 });
+    expect(states[2]!.units.r!.statuses).toContain('stealth');
+    expect(states[3]!.units.r!.statuses).not.toContain('stealth');
+    const walk: CombatEvent = { t: 'move', unit: 'r', path: [{ x: 1, y: 0 }] };
+    expect(eventDuration(step)).toBeGreaterThan(eventDuration(walk));
+  });
+});

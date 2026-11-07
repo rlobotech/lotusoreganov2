@@ -84,6 +84,7 @@ const list: SkillDef[] = [
   skill({
     id: 'ricochet_arrow',
     name: 'Ricochet Arrow',
+    ricochet: { bounces: 2, falloff: 0.7, reach: 3 },
     attr: 'dex',
     power: 14,
     range: 5,
@@ -221,6 +222,40 @@ const list: SkillDef[] = [
       ai: [{ skill: 'skeleton_strike' }],
       weapon: { type: 'cut', quality: 0.8 },
     },
+  }),
+
+  // Stealth: Dash hides the unit and gives it more movement; Shadow Step puts it beside its target.
+  skill({
+    id: 'dash',
+    name: 'Dash',
+    kind: 'status',
+    source: 'spell',
+    side: 'self',
+    attr: 'dex',
+    power: 0,
+    range: 0,
+    manaCost: 3,
+    cooldown: 3,
+    free: true,
+    dash: 3,
+    vfx: 'buff',
+    status: { id: 'stealth', kind: 'stealth', duration: 2 },
+  }),
+  skill({
+    id: 'shadow_step',
+    name: 'Shadow Step',
+    kind: 'status',
+    source: 'spell',
+    side: 'enemy',
+    attr: 'dex',
+    power: 0,
+    range: 7,
+    manaCost: 5,
+    cooldown: 4,
+    free: true,
+    teleport: true,
+    vfx: 'buff',
+    status: { id: 'stealth', kind: 'stealth', duration: 2 },
   }),
 
   // Sword

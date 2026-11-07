@@ -72,9 +72,14 @@ export function compareItems(item: ItemInfo, worn?: ItemInfo | null): BonusDiff[
 }
 
 /** Can this item be dropped on that target? (Bags take anything, slots only their own kind.) */
-export function canDrop(item: Pick<ItemInfo, 'slot'>, target: DropTarget): boolean {
+export function canDrop(
+  item: Pick<ItemInfo, 'slot'> & Partial<Pick<ItemInfo, 'hands'>>,
+  target: DropTarget,
+): boolean {
   if (target.kind !== 'equip') return true;
   if (!item.slot) return false;
+  // A one-handed weapon may also go in the off hand (dual wielding).
+  if (target.slot === 'offhand' && item.slot === 'weapon' && item.hands === 1) return true;
   return target.slot === undefined || target.slot === item.slot;
 }
 

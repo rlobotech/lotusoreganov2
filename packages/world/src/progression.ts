@@ -193,7 +193,11 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     growth: { str: 0.3, dex: 0.9, int: 0.1, vit: 0.5, wis: 0.1 },
     move: 5,
     skills: ['attack', ...CLASS_START_SKILLS.rogue!],
-    ai: [{ skill: 'dagger_slash' }, { skill: 'attack' }],
+    ai: [
+      { skill: 'dash', when: { enemyAdjacent: false } },
+      { skill: 'dagger_slash' },
+      { skill: 'attack' },
+    ],
     pointOrder: ['dex', 'dex', 'vit', 'str'],
     kit: ['Iron Dagger', 'Leather Cap', 'Padded Vest', 'Worn Boots'],
   },
@@ -229,15 +233,27 @@ export function memberGear(m: Pick<Member, 'equipment'>): {
   kind: WeaponKind | undefined;
   extra: ExtraDamage[];
   resist: Resistances;
+  /** The off-hand weapon, when the member dual wields (one-handed weapons in both hands). */
+  offWeapon: WeaponDef | undefined;
+  offKind: WeaponKind | undefined;
 } {
   const weapon = m.equipment.weapon;
+  const off = m.equipment.offhand;
+  const dual = !!off?.weapon && off.hands === 1 && weapon?.hands === 1;
   const resist: Record<string, number> = {};
   for (const it of Object.values(m.equipment)) {
     for (const [type, pts] of Object.entries(it?.resist ?? {})) {
       resist[type] = (resist[type] ?? 0) + pts;
     }
   }
-  return { weapon: weapon?.weapon, kind: weapon?.kind, extra: weapon?.extra ?? [], resist };
+  return {
+    weapon: weapon?.weapon,
+    kind: weapon?.kind,
+    extra: weapon?.extra ?? [],
+    resist,
+    offWeapon: dual ? off!.weapon : undefined,
+    offKind: dual ? off!.kind : undefined,
+  };
 }
 
 /** Attribute requirements of `item` that `m` does not meet (counting base and spent points only). */

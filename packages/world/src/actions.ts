@@ -133,6 +133,10 @@ function cannotWear(p: PartyState, m: Member, item: Item, slot: Slot): ActionRes
   if (slot === 'offhand' && m.equipment.weapon?.hands === 2) {
     return fail('two_handed', 'The two-handed weapon takes both hands');
   }
+  // A weapon in the off hand needs a one-handed weapon in the main hand too (dual wielding).
+  if (slot === 'offhand' && item.slot === 'weapon' && m.equipment.weapon?.hands !== 1) {
+    return fail('dual_wield', 'Dual wielding needs a one-handed weapon in the main hand');
+  }
   return null;
 }
 
@@ -161,7 +165,10 @@ export function moveItem(
   if (to.kind === 'equip') {
     if (!item.slot) return fail('not_equippable', 'That item cannot be worn');
     const slot = to.slot ?? item.slot;
-    if (slot !== item.slot) return fail('wrong_slot', 'That item does not go in that slot');
+    // A one-handed weapon may also go in the off hand (dual wielding).
+    const dual = slot === 'offhand' && item.slot === 'weapon' && !!item.weapon && item.hands === 1;
+    if (slot !== item.slot && !dual)
+      return fail('wrong_slot', 'That item does not go in that slot');
     if (from.kind === 'equip' && from.memberId === to.memberId) return OK;
     const old = owner!.equipment[slot];
     const blocked = cannotWear(p, owner!, item, slot);

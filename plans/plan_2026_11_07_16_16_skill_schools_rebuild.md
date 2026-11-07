@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: in progress (phases 1 to 6 done, phase 7 next)
+Status: in progress (phases 1 to 7 done, phase 8 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -140,6 +140,18 @@ Summons work end to end: engine, world, replays.
 - Only one kind of demon and of skeleton exists so far; more kinds come with the skills the user will provide (each kind shares the limit of its group).
 - **Not checked by eye:** a real summon replay playing in the browser (the party needs a few minutes to reach its first fight); the viewer is covered by reducer tests and by a test that builds a timeline from a real engine fight with a summon.
 - Tests: engine `summon.test.ts`, world `summons.test.ts`, web viewer tests.
+
+## Phase 7 notes (what exists now)
+
+Dual wield, the ricochet arrow, stealth, dashes and unseen steps work in the engine and the game. The log format stays at 3: the changes only add optional fields (`offhand`, `ricochet`, `ambush` on a damage event, `teleport` on a move), so old replays still play.
+- **Dual wield:** a one-handed weapon can be worn in the off hand when the main hand holds a one-handed weapon too (a two-handed weapon needs both hands, as before; a shield is not a weapon). The combat unit gets `offWeapon` and `offWeaponKind`; a melee weapon skill that fits the off-hand weapon strikes a second time with it, rolled on its own (it can miss or crit alone) for 70% of the damage (`SCALING.offhandMultiplier`). Ranged skills and skills that ask for another weapon never dual wield. The off-hand strike shows in the log and counts for Axe Dual Wield Mastery (the two-handed mastery does not train from a dual wield). The inventory lets a one-handed weapon drop on the off-hand slot. The Barbarian still starts with the two-handed Great Axe; two Iron Axes make it a dual wielder.
+- **Ricochet Arrow:** `SkillDef.ricochet {bounces, falloff, reach}`: after the target it hits, the arrow jumps to the nearest other enemy within `reach` tiles of the last one, up to `bounces` times (2), each 70% as strong as the one before, each with its own hit roll; never the same enemy twice, and no bounce when the first arrow misses.
+- **Stealth:** a new status kind `stealth`: enemies cannot pick a hidden unit as a target and it provokes no opportunity attacks; its own next damaging skill breaks it and that hit is an **ambush** (+50%, `SCALING.ambushMultiplier`). Hidden units are drawn half seen in the viewer.
+- **Dash:** `SkillDef.dash`: this many more tiles of movement this turn and no opportunity attacks on the way. **Dash** (Dark, a starter) is a free skill (cooldown 3, 3 mana) that gives +3 movement and hides the unit for two rounds; the Rogue's AI opens with it whenever no enemy is adjacent.
+- **Unseen step:** `SkillDef.teleport`: the caster steps at once to a free tile beside the target, and the skill's status goes on the caster. **Shadow Step** (Dagger and Dark, requires Dash 2 and Dagger 10, name still a proposal) is that skill with stealth; it sits in the Dagger sector of the wheel. The viewer fades the unit out and in.
+- **Balance** (defeats %, a party of Warrior, Priest, Mage plus the class): Rogue 3 to 10% (was 10 to 17), Ranger 0 to 3%, Barbarian 0 to 10%. The Ranger and the Barbarian are strong; tuning waits for real play.
+- Engine `specials.test.ts` (10), world `dual-wield.test.ts` (9), web tests for the drop rule and the viewer.
+- **Not done:** Throwing Dagger, Backstab and Dagger Dual Wield Mastery (in the sheet's description of Dagger; they are part of the skills the user will provide), more ricochet bounces at higher skill levels, a stealth skill of its own (the sheet's `Stealth` after Shadow Step).
 
 ## Decided after the first draft (from the user)
 

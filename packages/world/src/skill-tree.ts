@@ -279,6 +279,11 @@ const EARLIER: TreeNode[] = [
     measure: 'damage',
     requires: { schools: { bow: 25 }, skills: { poison_arrow: 2 } },
   }),
+  // Dagger and Dark: Shadow Step follows Dash (the example of the sheet; the name is still a proposal).
+  node('shadow_step', 'Shadow Step', ['dagger', 'dark'], {
+    proposed: true,
+    requires: { schools: { dagger: 10 }, skills: { dash: 2 } },
+  }),
   // Fire, Air / Electric, Earth, Light
   node('fireball', 'Fireball', ['fire'], {
     measure: 'damage',

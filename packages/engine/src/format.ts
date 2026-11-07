@@ -28,7 +28,7 @@ export function formatLog(events: CombatEvent[]): string[] {
       case 'move': {
         const end = e.path[e.path.length - 1]!;
         lines.push(
-          `${name(e.unit)} ${e.retreat ? 'steps back' : 'moves'} ${e.path.length} to ${end.x},${end.y}`,
+          `${name(e.unit)} ${e.teleport ? 'steps unseen' : e.retreat ? 'steps back' : 'moves'} ${e.path.length} to ${end.x},${end.y}`,
         );
         break;
       }
@@ -49,7 +49,7 @@ export function formatLog(events: CombatEvent[]): string[] {
       case 'damage':
         lines.push(
           `  ${name(e.target)} takes ${e.amount} ${e.type}${e.crit ? ' (crit)' : ''}` +
-            `${e.resist ? ` (${e.resist}% resisted)` : ''} from ${e.skill}${e.extra ? ' (extra)' : ''} -> HP ${e.hp}`,
+            `${e.resist ? ` (${e.resist}% resisted)` : ''} from ${e.skill}${e.extra ? ' (extra)' : ''}${e.offhand ? ' (off hand)' : ''}${e.ricochet ? ' (ricochet)' : ''}${e.ambush ? ' (ambush)' : ''} -> HP ${e.hp}`,
         );
         break;
       case 'heal':

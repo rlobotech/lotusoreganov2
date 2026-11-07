@@ -20,6 +20,10 @@ export const SCALING = {
   /** Mana costs grow with level by this much per level. */
   manaCostPerLevel: 0.1,
   critMultiplier: 1.5,
+  /** The off-hand weapon's strike is this share of a full hit. */
+  offhandMultiplier: 0.7,
+  /** A hit from hiding is this much stronger. */
+  ambushMultiplier: 1.5,
   /** Resistance: points / (points + resistBase + resistPerLevel * level), capped. */
   resistBase: 30,
   resistPerLevel: 12,

@@ -79,7 +79,12 @@ export type StatusDef =
   /** Modifier to a stat (negative for debuffs). */
   | { id: string; kind: 'mod'; duration: number; stat: StatName; amount: number }
   /** Skips the unit's next `duration` turns (counted in turns, not rounds). */
-  | { id: string; kind: 'stun'; duration: number };
+  | { id: string; kind: 'stun'; duration: number }
+  /**
+   * Hidden: enemies cannot pick the unit as a target and it provokes no opportunity attacks. The unit's
+   * next damaging skill breaks it, and that hit is an ambush (stronger).
+   */
+  | { id: string; kind: 'stealth'; duration: number };
 
 /** What a weapon is. Skills can ask for one of several kinds. */
 export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
@@ -138,6 +143,15 @@ export interface SkillDef {
   retreat?: number;
   /** For a 'summon' skill: the unit it calls up beside the caster. */
   summon?: SummonDef;
+  /**
+   * An arrow that bounces: after the target it jumps to the nearest other enemy within `reach` tiles of
+   * the last one hit, up to `bounces` times, each hit `falloff` times as strong as the one before.
+   */
+  ricochet?: { bounces: number; falloff: number; reach: number };
+  /** A dash: this many more tiles of movement this turn, and no opportunity attacks on the way. */
+  dash?: number;
+  /** The caster steps (at once, unseen) to a free tile beside the target; `status` then goes on the caster. */
+  teleport?: boolean;
   /** Name of the visual effect the client plays. */
   vfx?: string;
   /** The unit must wear one of these kinds of weapon to use the skill. Absent: any (or none). */
@@ -256,6 +270,12 @@ export interface UnitDef {
   weaponKind?: WeaponKind;
   extraDamage?: ExtraDamage[];
   /**
+   * A weapon in the off hand (dual wielding): a melee weapon skill that fits it strikes again with it
+   * for part of the damage. Only set when both hands hold one-handed weapons.
+   */
+  offWeapon?: WeaponDef;
+  offWeaponKind?: WeaponKind;
+  /**
    * Per-skill strength for this unit, from its skill and school levels: `power` multiplies the
    * damage or healing of the skill (1 = unchanged) and `rounds` is added to the duration of the
    * status it applies.
@@ -313,7 +333,7 @@ export type CombatEvent =
   | { t: 'round'; n: number; order: string[] }
   | { t: 'turn'; unit: string }
   /** One stretch of walking. A walk is split where an opportunity attack interrupts it. */
-  | { t: 'move'; unit: string; path: Point[]; retreat?: boolean }
+  | { t: 'move'; unit: string; path: Point[]; retreat?: boolean; teleport?: boolean }
   | {
       t: 'skill';
       unit: string;
@@ -364,6 +384,12 @@ export type CombatEvent =
       resist: number;
       /** Hit chance in percent, absent when the hit could not miss. */
       chance?: number;
+      /** The off-hand weapon's strike, rolled and resisted on its own. */
+      offhand?: true;
+      /** A bounce of a ricochet arrow, not the first target. */
+      ricochet?: true;
+      /** A hit from hiding, made stronger by surprise. */
+      ambush?: true;
       /** Extra damage from the weapon (a second, separately resisted part of the same hit). */
       extra?: boolean;
     }
@@ -424,4 +450,6 @@ export interface UnitState {
   /** For a summon: the unit that called it up, and its kind. */
   owner?: string;
   group?: string;
+  /** Set by a dash: this turn's movement provokes no opportunity attacks. */
+  noProvoke?: boolean;
 }
