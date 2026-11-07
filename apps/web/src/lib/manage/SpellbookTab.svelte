@@ -4,6 +4,7 @@
   import { cap } from '../labels.ts';
   import { manage, session } from '../session.svelte.ts';
   import MemberChips from './MemberChips.svelte';
+  import SkillWheel from './SkillWheel.svelte';
 
   let { memberId = $bindable() }: { memberId: string } = $props();
 
@@ -11,6 +12,8 @@
   const m = $derived(party.members.find((x) => x.id === memberId) ?? party.members[0]!);
   const skillInfo = (id: string) => session.skills.find((s) => s.id === id);
   let error = $state('');
+  /** The skills as a wheel of schools (default) or as a plain list. */
+  let view = $state<'wheel' | 'list'>('wheel');
 
   function skillLine(id: string): string {
     const s = skillInfo(id);
@@ -81,86 +84,114 @@
     <h3>{m.name}</h3>
     <span class="muted">{cap(m.race)} {cap(m.cls)}</span>
   </div>
-
-  <div class="label">Schools</div>
-  {#each m.schools as s (s.id)}
-    <div class="school">
-      <div class="row">
-        <span>{s.name}</span>
-        <span class="muted small">level {s.level}/{s.max}</span>
-      </div>
-      <div
-        class="bar"
-        role="progressbar"
-        aria-label="{s.name} level"
-        aria-valuenow={s.level}
-        aria-valuemin={0}
-        aria-valuemax={s.max}
+  <div class="row views">
+    <span class="muted small">{m.equipped.length}/{m.equipLimit} skills carried</span>
+    <span class="tabs">
+      <button
+        class:on={view === 'wheel'}
+        aria-pressed={view === 'wheel'}
+        onclick={() => (view = 'wheel')}>Wheel</button
       >
-        <div class="fill xp" style:width="{(s.level / s.max) * 100}%"></div>
-      </div>
-    </div>
-  {/each}
-  <div class="muted small">
-    A school's level is the sum of its skills' levels. Skills level up by being used, and only the
-    skills you carry ({m.equipped.length}/{m.equipLimit}) are used.
+      <button
+        class:on={view === 'list'}
+        aria-pressed={view === 'list'}
+        onclick={() => (view = 'list')}>List</button
+      >
+    </span>
   </div>
 </div>
 
-<div class="card">
-  <div class="label">Skills ({m.equipped.length}/{m.equipLimit} carried)</div>
-  {#if error}<p class="bad small">{error}</p>{/if}
-  {#each groups as [school, ids] (school)}
-    {#if school}<div class="group">{schoolName(school)}</div>{/if}
-    {#each ids as id (id)}
-      {@const s = skillInfo(id)}
-      <div class="skill">
-        <div class="head">
-          <span>
-            {s?.name ?? id}
-            {#if m.equipped.includes(id)}<span class="muted small">(carried)</span>{/if}
-          </span>
-          {#if m.mine && s?.usable && !s.passive && s.schools.length > 0}
-            {#if m.equipped.includes(id)}
-              <button class="small-btn" onclick={() => putDown(id)}>Put down</button>
-            {:else}
-              <button
-                class="small-btn"
-                disabled={m.equipped.length >= m.equipLimit}
-                title={m.equipped.length >= m.equipLimit
-                  ? `Only ${m.equipLimit} skills can be carried at this level`
-                  : ''}
-                onclick={() => carry(id)}>Carry</button
-              >
-            {/if}
-          {/if}
+{#if view === 'wheel'}
+  <SkillWheel
+    skills={session.skills}
+    member={m}
+    level={party.level}
+    {error}
+    onCarry={carry}
+    onPutDown={putDown}
+  />
+{:else}
+  <div class="card">
+    <div class="label">Schools</div>
+    {#each m.schools as s (s.id)}
+      <div class="school">
+        <div class="row">
+          <span>{s.name}</span>
+          <span class="muted small">level {s.level}/{s.max}</span>
         </div>
-        {#if m.skillIssues[id]}<div class="bad small">
-            Cannot be used now: {m.skillIssues[id]}
-          </div>{/if}
-        <div class="muted small">
-          {progress(id)}{levelOf(id) ? ' · ' : ''}{s?.passive
-            ? 'passive'
-            : kindLine(id)}{s?.usable === false && !s?.passive ? ' · not usable yet' : ''}{s?.usable
-            ? ' · '
-            : ''}{s?.usable ? skillLine(id) : ''}
+        <div
+          class="bar"
+          role="progressbar"
+          aria-label="{s.name} level"
+          aria-valuenow={s.level}
+          aria-valuemin={0}
+          aria-valuemax={s.max}
+        >
+          <div class="fill xp" style:width="{(s.level / s.max) * 100}%"></div>
         </div>
       </div>
     {/each}
-  {/each}
+    <div class="muted small">
+      A school's level is the sum of its skills' levels. Skills level up by being used, and only the
+      skills you carry ({m.equipped.length}/{m.equipLimit}) are used.
+    </div>
+  </div>
 
-  {#if m.locked.length}
-    <div class="label">Not learned yet</div>
-    {#each m.locked as l (l.skill)}
-      {@const s = skillInfo(l.skill)}
-      <div class="skill locked">
-        <div>{s?.name ?? l.skill}</div>
-        <div class="muted small">Needs: {l.missing}</div>
-      </div>
+  <div class="card">
+    <div class="label">Skills ({m.equipped.length}/{m.equipLimit} carried)</div>
+    {#if error}<p class="bad small">{error}</p>{/if}
+    {#each groups as [school, ids] (school)}
+      {#if school}<div class="group">{schoolName(school)}</div>{/if}
+      {#each ids as id (id)}
+        {@const s = skillInfo(id)}
+        <div class="skill">
+          <div class="head">
+            <span>
+              {s?.name ?? id}
+              {#if m.equipped.includes(id)}<span class="muted small">(carried)</span>{/if}
+            </span>
+            {#if m.mine && s?.usable && !s.passive && s.schools.length > 0}
+              {#if m.equipped.includes(id)}
+                <button class="small-btn" onclick={() => putDown(id)}>Put down</button>
+              {:else}
+                <button
+                  class="small-btn"
+                  disabled={m.equipped.length >= m.equipLimit}
+                  title={m.equipped.length >= m.equipLimit
+                    ? `Only ${m.equipLimit} skills can be carried at this level`
+                    : ''}
+                  onclick={() => carry(id)}>Carry</button
+                >
+              {/if}
+            {/if}
+          </div>
+          {#if m.skillIssues[id]}<div class="bad small">
+              Cannot be used now: {m.skillIssues[id]}
+            </div>{/if}
+          <div class="muted small">
+            {progress(id)}{levelOf(id) ? ' · ' : ''}{s?.passive
+              ? 'passive'
+              : kindLine(id)}{s?.usable === false && !s?.passive
+              ? ' · not usable yet'
+              : ''}{s?.usable ? ' · ' : ''}{s?.usable ? skillLine(id) : ''}
+          </div>
+        </div>
+      {/each}
     {/each}
-  {/if}
-  <div class="muted small">Choose when each skill is used in the AI tab.</div>
-</div>
+
+    {#if m.locked.length}
+      <div class="label">Not learned yet</div>
+      {#each m.locked as l (l.skill)}
+        {@const s = skillInfo(l.skill)}
+        <div class="skill locked">
+          <div>{s?.name ?? l.skill}</div>
+          <div class="muted small">Needs: {l.missing}</div>
+        </div>
+      {/each}
+    {/if}
+    <div class="muted small">Choose when each skill is used in the AI tab.</div>
+  </div>
+{/if}
 
 {#if books.length}
   <div class="card">
@@ -187,6 +218,16 @@
 <style>
   h3 {
     margin: 0;
+  }
+  .views {
+    align-items: center;
+  }
+  .tabs {
+    display: flex;
+    gap: 6px;
+  }
+  .tabs button.on {
+    border-color: var(--gold);
   }
   .skill {
     border-top: 1px solid var(--line);
