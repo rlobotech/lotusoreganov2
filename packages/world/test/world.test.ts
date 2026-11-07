@@ -6,7 +6,7 @@ import {
   isPassable,
   neighbors,
   sameHex,
-  TERRAIN_COST,
+  stepCost,
   terrainAt,
   zoneAt,
 } from '../src/hex.ts';
@@ -56,8 +56,8 @@ describe('pathfinding', () => {
   });
 
   it('prefers roads: a road step is cheaper than plains and forest', () => {
-    expect(TERRAIN_COST.road).toBeLessThan(TERRAIN_COST.plains);
-    expect(TERRAIN_COST.plains).toBeLessThan(TERRAIN_COST.forest);
+    expect(stepCost('plains', 'road')).toBeLessThan(stepCost('plains', 'none'));
+    expect(stepCost('plains', 'none')).toBeLessThan(stepCost('forest', 'none'));
   });
 
   it('refuses water and closed zones until the boss dungeon is cleared', () => {

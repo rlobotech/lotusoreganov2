@@ -11,7 +11,28 @@ import type {
 
 // ---------- world content ----------
 
-export type Terrain = 'road' | 'plains' | 'forest' | 'hills' | 'swamp' | 'mountain' | 'water';
+/** The ground of a hex (its biome). Roads, fords, bridges and passes are an overlay, not a biome. */
+export type Terrain =
+  | 'plains'
+  | 'savanna'
+  | 'forest'
+  | 'dense_forest'
+  | 'hills'
+  | 'swamp'
+  | 'desert'
+  | 'snow'
+  | 'ice'
+  | 'ashlands'
+  | 'lava'
+  | 'mountains'
+  | 'river'
+  | 'water';
+
+/**
+ * What is built on top of a hex. The biome stays underneath: a road through a forest is still a
+ * forest. A ford or bridge makes a river crossable and a pass makes a mountain crossable.
+ */
+export type Overlay = 'none' | 'road' | 'ford' | 'bridge' | 'pass';
 
 export interface Hex {
   col: number;
@@ -85,6 +106,8 @@ export interface WorldDef {
   height: number;
   /** Row-major, width * height. */
   terrain: Terrain[];
+  /** Row-major, width * height, parallel to `terrain`. */
+  overlay: Overlay[];
   zoneOf: string[];
   zones: Record<string, ZoneDef>;
   sites: Record<string, SiteDef>;

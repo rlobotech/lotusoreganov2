@@ -1,8 +1,16 @@
 import { highContent, highMapRows, tierOfRow, TIERS } from './high-world.ts';
 import { shopItem } from './loot.ts';
-import type { EncounterDef, QuestDef, SiteDef, Terrain, WorldDef, ZoneDef } from './types.ts';
+import type {
+  EncounterDef,
+  Overlay,
+  QuestDef,
+  SiteDef,
+  Terrain,
+  WorldDef,
+  ZoneDef,
+} from './types.ts';
 
-// r = road, . = plains, f = forest, h = hills, s = swamp, m = mountain, ~ = water
+// R = road, . = plains, f = forest, h = hills, s = swamp, m = mountains, ~ = water (see MAP_CODES)
 const BASE_MAP = [
   'mmmhh.ffff~~~~',
   'mmhh..fRfffh~~',
@@ -19,15 +27,32 @@ const BASE_MAP = [
 // The high-level regions continue the map to the south, one block of rows each.
 const MAP = [...BASE_MAP, ...highMapRows()];
 
-const TERRAIN_CODES: Record<string, Terrain> = {
-  R: 'road',
-  '.': 'plains',
-  f: 'forest',
-  h: 'hills',
-  s: 'swamp',
-  m: 'mountain',
-  '~': 'water',
+// Legend of the map text: each character is a biome, and R is plains with a road on top.
+const MAP_CODES: Record<string, [Terrain, Overlay]> = {
+  R: ['plains', 'road'],
+  '.': ['plains', 'none'],
+  S: ['savanna', 'none'],
+  f: ['forest', 'none'],
+  F: ['dense_forest', 'none'],
+  h: ['hills', 'none'],
+  s: ['swamp', 'none'],
+  d: ['desert', 'none'],
+  n: ['snow', 'none'],
+  i: ['ice', 'none'],
+  a: ['ashlands', 'none'],
+  l: ['lava', 'none'],
+  m: ['mountains', 'none'],
+  r: ['river', 'none'],
+  '~': ['water', 'none'],
 };
+
+const cells = MAP.flatMap((row) =>
+  [...row].map((c) => {
+    const t = MAP_CODES[c];
+    if (!t) throw new Error(`Unknown terrain code ${c}`);
+    return t;
+  }),
+);
 
 const WIDTH = MAP[0]!.length;
 const HEIGHT = MAP.length;
@@ -345,13 +370,8 @@ export const STARTER_WORLD: WorldDef = {
   id: 'starter',
   width: WIDTH,
   height: HEIGHT,
-  terrain: MAP.flatMap((row) =>
-    [...row].map((c) => {
-      const t = TERRAIN_CODES[c];
-      if (!t) throw new Error(`Unknown terrain code ${c}`);
-      return t;
-    }),
-  ),
+  terrain: cells.map(([t]) => t),
+  overlay: cells.map(([, o]) => o),
   zoneOf,
   zones: { ...zones, ...high.zones },
   sites: { ...sites, ...high.sites },

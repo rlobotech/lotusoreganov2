@@ -15,15 +15,29 @@ export function hexCenter(col: number, row: number): Vec {
   return { x: (col + 0.5 + 0.5 * (row & 1)) * HEX_W, y: row * ROW_STEP + S };
 }
 
+/** Biome colours (the palette the game design uses). */
 const TERRAIN_COLORS: Record<string, number> = {
-  road: 0x8a7a58,
-  plains: 0x5f8a4a,
-  forest: 0x2f5a35,
-  hills: 0x7a8a4a,
-  swamp: 0x3f5a4a,
-  mountain: 0x6a6a74,
-  water: 0x2a4a7a,
+  plains: 0x8dbb45,
+  savanna: 0xd9c36b,
+  forest: 0x278044,
+  dense_forest: 0x174d32,
+  hills: 0x777b37,
+  swamp: 0x568d79,
+  desert: 0xe6b653,
+  snow: 0xb8d8f5,
+  ice: 0xe6f2ff,
+  ashlands: 0x6e6862,
+  lava: 0xf15a24,
+  mountains: 0x777783,
+  river: 0x49b9f2,
+  water: 0x07509b,
 };
+
+/** Overlays are drawn over the biome, which stays visible underneath. */
+const ROAD_COLOR = 0x6b5535;
+const BRIDGE_COLOR = 0x8a6a3a;
+const FORD_COLOR = 0xd8e8f0;
+const PASS_COLOR = 0xe0dccc;
 
 const SITE_COLORS = { city: 0xe0c060, dungeon: 0xa070d0, boss_dungeon: 0xe05050 } as const;
 
@@ -157,7 +171,55 @@ export class MapScene {
           .stroke({ width: 1, color: 0x1a1a22, alpha: 0.55 });
       }
     }
+    this.drawOverlays(info);
     this.camera.fit();
+  }
+
+  /** Roads, fords, bridges and passes on top of the biome colours. */
+  private drawOverlays(info: WorldInfo) {
+    const g = this.tiles;
+    const at = (col: number, row: number) =>
+      col < 0 || row < 0 || col >= info.width || row >= info.height
+        ? 'none'
+        : (info.overlay[row * info.width + col] ?? 'none');
+    for (let row = 0; row < info.height; row++) {
+      for (let col = 0; col < info.width; col++) {
+        const kind = at(col, row);
+        if (kind === 'none') continue;
+        const c = hexCenter(col, row);
+        if (kind === 'road' || kind === 'bridge') {
+          const color = kind === 'road' ? ROAD_COLOR : BRIDGE_COLOR;
+          const width = kind === 'road' ? 4 : 6;
+          // Joined to the road/bridge hexes next to it (each pair is drawn once, from the left/upper one).
+          const odd = row & 1;
+          const half: Array<[number, number]> = odd
+            ? [
+                [1, 0],
+                [0, 1],
+                [1, 1],
+              ]
+            : [
+                [1, 0],
+                [-1, 1],
+                [0, 1],
+              ];
+          for (const [dc, dr] of half) {
+            const k = at(col + dc, row + dr);
+            if (k !== 'road' && k !== 'bridge') continue;
+            const n = hexCenter(col + dc, row + dr);
+            g.moveTo(c.x, c.y).lineTo(n.x, n.y).stroke({ width, color, cap: 'round' });
+          }
+          g.circle(c.x, c.y, width / 2 + 0.5).fill(color);
+        } else if (kind === 'ford') {
+          for (const dx of [-5, 0, 5]) g.circle(c.x + dx, c.y + (dx ? 2 : -2), 2).fill(FORD_COLOR);
+        } else if (kind === 'pass') {
+          g.poly([c.x - 7, c.y + 5, c.x, c.y - 6, c.x + 7, c.y + 5]).stroke({
+            width: 2,
+            color: PASS_COLOR,
+          });
+        }
+      }
+    }
   }
 
   /**

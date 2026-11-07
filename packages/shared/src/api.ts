@@ -330,6 +330,8 @@ export interface WorldInfo {
   width: number;
   height: number;
   terrain: string[];
+  /** Parallel to `terrain`: 'none', 'road', 'ford', 'bridge' or 'pass'. */
+  overlay: string[];
   zoneOf: string[];
   startCity: string;
   zones: Array<{

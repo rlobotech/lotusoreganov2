@@ -290,6 +290,7 @@ export function publicWorld(world: WorldDef): WorldInfo {
     width: world.width,
     height: world.height,
     terrain: world.terrain,
+    overlay: world.overlay,
     zoneOf: world.zoneOf,
     startCity: world.startCity,
     zones: Object.values(world.zones).map((z) => ({

@@ -1,6 +1,6 @@
 # World map rebuild
 
-Status: planned (phase 1 not started)
+Status: in progress (phase 1 done, phase 2 next)
 
 
 Goal: replace the 14x60 strip with an organic continent of about 40x36 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
@@ -44,6 +44,13 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 4. **Regions and content:** the zone table (regions, their level bands re-spread over 1 to 100 in unlock order, the extra zones, boss sites on passes, quests and the unlock chain), cities and dungeons placed on suitable biomes, shops and encounters, new monsters for the extra zones (Sand Warden, Ancient Guardian, Swamp Lord, Dragon Wyrm and so on) using the monster families, quest chain, and re-checked balance with the harness.
 5. **Biome gameplay:** biome travel costs in the sim, encounters tagged by biome (weights inside the region), hunting-spot choice that respects biome and level, mount and tent interaction, balance run.
 6. **Map view polish and reset:** colours and overlays, a minimap or whole-continent view, the camera following the party, locked regions shown as fog, and the migration (parties reset).
+
+### Phase 1 notes (what exists now)
+- `Terrain` is the 14 biomes of the table above; `Overlay` (`none`, `road`, `ford`, `bridge`, `pass`) is a parallel `overlay` array on `WorldDef` (and in `WorldInfo` for the client). A road keeps the biome underneath.
+- `hex.ts`: `BIOME_COST`, `ROAD_FACTOR` (0.5), `CROSSING_COST` (ford 3, bridge 0.5, pass 2), `stepCost(biome, overlay)`, `costAt`, `overlayAt`. A crossing only opens its own biome (ford and bridge: river, pass: mountains); lava, dense forest and the sea never open. `findPath` is Dijkstra with a binary heap (same costs as the old search, checked against it in a test).
+- The current 14x60 world is converted: map text has a legend (`MAP_CODES`), `R` is plains with a road; mountains are now impassable (everything stays connected, tested); the high regions use themed biomes (snow and ice, desert and ashlands, dense forest). The world has the same size, so saved parties keep working until the new map lands.
+- Renderer: the design palette for biomes, and roads, bridges, fords and passes drawn over them.
+- Tests: `terrain.test.ts` (rules, crossings, heap vs plain search, speed, connectivity of the current world).
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).
