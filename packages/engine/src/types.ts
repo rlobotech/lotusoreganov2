@@ -85,7 +85,8 @@ export type StatusDef =
 export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
 
 /**
- * A unit a skill calls up. It fights on the caster's team until it dies, acts from the next round,
+ * A unit a skill calls up. It fights on the caster's team until it dies, acts in the turn it was
+ * called (last in line for that round),
  * and does not count when deciding whether a team has lost. Its attributes are shares of the
  * caster's (times the caster's `skillMods` power for the skill); its level is the caster's.
  */
@@ -325,7 +326,7 @@ export type CombatEvent =
       reaction?: boolean;
     }
   | {
-      /** A summon appears beside its caster. It acts from the next round. */
+      /** A summon appears beside its caster. It acts later in the same round, last in line. */
       t: 'summon';
       unit: string;
       caster: string;

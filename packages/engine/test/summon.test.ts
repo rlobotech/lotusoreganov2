@@ -85,23 +85,32 @@ describe('summons', () => {
     expect(formatLog(r.events).join('\n')).toMatch(/Imp/);
   });
 
-  it('act from the next round, and fight', () => {
+  it('act in the turn they are called, last in line, and fight', () => {
     const r = fight({});
     const [s] = summons(r.events);
     const at = r.events.indexOf(s!);
-    // Rounds after the summon list it in their order; the round it came in did not.
-    const rounds = r.events.filter(
-      (e): e is Extract<CombatEvent, { t: 'round' }> => e.t === 'round',
+    // The turns of the round it came in: the summon takes the last one, after everyone else.
+    let start = at;
+    while (r.events[start]!.t !== 'round') start -= 1;
+    let end = at;
+    while (end < r.events.length && r.events[end]!.t !== 'round' && r.events[end]!.t !== 'end')
+      end += 1;
+    const turns = r.events.slice(start, end).flatMap((e) => (e.t === 'turn' ? [e.unit] : []));
+    expect(turns[turns.length - 1]).toBe(s!.unit);
+    expect(turns.filter((u) => u === s!.unit)).toHaveLength(1);
+    // The round listed only the units that were there when it began...
+    const round = r.events[start] as Extract<CombatEvent, { t: 'round' }>;
+    expect(round.order).not.toContain(s!.unit);
+    // ...and later rounds list it in their order.
+    const later = r.events.filter(
+      (e): e is Extract<CombatEvent, { t: 'round' }> => e.t === 'round' && r.events.indexOf(e) > at,
     );
-    const before = rounds.filter((e) => r.events.indexOf(e) < at);
-    expect(before.every((e) => !e.order.includes(s!.unit))).toBe(true);
-    const after = rounds.filter((e) => r.events.indexOf(e) > at);
-    expect(after.length).toBeGreaterThan(0);
-    expect(after.every((e) => e.order.includes(s!.unit))).toBe(true);
-    // It uses its own skill on the enemy.
-    expect(
-      r.events.some((e) => e.t === 'damage' && e.source === s!.unit && e.target === 'dummy'),
-    ).toBe(true);
+    expect(later.length).toBeGreaterThan(0);
+    expect(later.every((e) => e.order.includes(s!.unit))).toBe(true);
+    // It uses its own skill on the enemy, already in that first round.
+    const firstHit = r.events.findIndex((e) => e.t === 'damage' && e.source === s!.unit);
+    expect(firstHit).toBeGreaterThan(at);
+    expect(r.events.slice(at, firstHit).every((e) => e.t !== 'round')).toBe(true);
   });
 
   it('are limited to one of a kind by default, and the AI falls back to its other skills', () => {

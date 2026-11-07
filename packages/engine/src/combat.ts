@@ -211,8 +211,10 @@ export function runCombat(input: CombatInput): CombatResult {
 
   /** How many of each kind a unit has called up in this fight (to give every summon its own id). */
   const called = new Map<string, number>();
+  /** The turn order of the round being played: a summon joins the end of it and acts this round. */
+  let roundOrder: UnitState[] | null = null;
 
-  /** A summon appears on the free tile beside its caster and acts from the next round. */
+  /** A summon appears on the free tile beside its caster and acts in the turn it was called, last in line. */
   function callUp(caster: UnitState, skill: SkillDef) {
     const def = skill.summon!;
     const tile = summonTile(grid, units, caster);
@@ -246,6 +248,8 @@ export function runCombat(input: CombatInput): CombatResult {
     unit.owner = caster.id;
     unit.group = def.group;
     units.push(unit);
+    // It acts in the turn it was called, last in line (after everyone already waiting for theirs).
+    roundOrder?.push(unit);
     events.push({
       t: 'summon',
       unit: unit.id,
@@ -517,6 +521,7 @@ export function runCombat(input: CombatInput): CombatResult {
       .sort((a, b) => b.speed - a.speed || a.tie - b.tie)
       .map((e) => e.u);
     events.push({ t: 'round', n: round, order: order.map((u) => u.id) });
+    roundOrder = order;
 
     for (const unit of order) {
       if (!unit.alive) continue;
