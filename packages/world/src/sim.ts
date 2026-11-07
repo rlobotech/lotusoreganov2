@@ -7,7 +7,7 @@ import {
   statusBonusRounds,
 } from './skill-levels.ts';
 import { SKILL_TREE } from './skill-tree.ts';
-import { trainFromFight } from './learning.ts';
+import { trainFromFight, learnUnlocked } from './learning.ts';
 import { makeCaravanItem, mountSpeed, tentHealing } from './caravan-data.ts';
 import { deliverPetGoods, recallPet, settlePet, type PetEmit } from './caravan.ts';
 import { createRng, runCombat, weaponRange, type Rng, type UnitDef } from '@game/engine';
@@ -315,6 +315,12 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
       else missed.push(item.name);
     }
     levelsGained = addXp(p, r.xp);
+    // A new character level can be the last thing a skill was waiting for.
+    if (levelsGained > 0) {
+      for (const m of p.members) {
+        for (const skill of learnUnlocked(m, p.level)) learned.push({ member: m, skill });
+      }
+    }
     grantLevelPoints(ctx, levelsGained);
     recordKills(p, ctx.world, r.kills ?? {});
     payload.xp = r.xp;

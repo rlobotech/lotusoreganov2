@@ -62,6 +62,13 @@
     ),
   );
 
+  async function carry(id: string) {
+    error = await manage(() => api.carrySkill(party.id, m.id, id));
+  }
+  async function putDown(id: string) {
+    error = await manage(() => api.putDownSkill(party.id, m.id, id));
+  }
+
   async function learn(item: ItemInfo) {
     error = await manage(() => api.learn(party.id, m.id, item.id));
   }
@@ -101,16 +108,36 @@
 </div>
 
 <div class="card">
-  <div class="label">Skills</div>
+  <div class="label">Skills ({m.equipped.length}/{m.equipLimit} carried)</div>
+  {#if error}<p class="bad small">{error}</p>{/if}
   {#each groups as [school, ids] (school)}
     {#if school}<div class="group">{schoolName(school)}</div>{/if}
     {#each ids as id (id)}
       {@const s = skillInfo(id)}
       <div class="skill">
-        <div>
-          {s?.name ?? id}
-          {#if m.equipped.includes(id)}<span class="muted small">(carried)</span>{/if}
+        <div class="head">
+          <span>
+            {s?.name ?? id}
+            {#if m.equipped.includes(id)}<span class="muted small">(carried)</span>{/if}
+          </span>
+          {#if m.mine && s?.usable && !s.passive && s.schools.length > 0}
+            {#if m.equipped.includes(id)}
+              <button class="small-btn" onclick={() => putDown(id)}>Put down</button>
+            {:else}
+              <button
+                class="small-btn"
+                disabled={m.equipped.length >= m.equipLimit}
+                title={m.equipped.length >= m.equipLimit
+                  ? `Only ${m.equipLimit} skills can be carried at this level`
+                  : ''}
+                onclick={() => carry(id)}>Carry</button
+              >
+            {/if}
+          {/if}
         </div>
+        {#if m.skillIssues[id]}<div class="bad small">
+            Cannot be used now: {m.skillIssues[id]}
+          </div>{/if}
         <div class="muted small">
           {progress(id)}{levelOf(id) ? ' · ' : ''}{s?.passive
             ? 'passive'
@@ -164,6 +191,17 @@
   .skill {
     border-top: 1px solid var(--line);
     padding-top: 8px;
+  }
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .small-btn {
+    min-height: 0;
+    padding: 2px 10px;
+    font-size: 13px;
   }
   .locked {
     opacity: 0.75;

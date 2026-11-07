@@ -245,7 +245,7 @@ export const BOOK_CHANCE = 10;
 
 /** A skill book: basic skills are common, advanced ones rare, and book-only ones at least rare. */
 export function bookItem(skillId: string, itemLevel: number, id: string): Item {
-  const skill = SKILLS[skillId];
+  const skill = SKILL_TREE[skillId];
   if (!skill) throw new Error(`Unknown skill ${skillId}`);
   const node = SKILL_TREE[skillId];
   const level = node ? unlockLevel(node) : 0;
@@ -266,7 +266,7 @@ export function bookItem(skillId: string, itemLevel: number, id: string): Item {
 function bookPool(itemLevel: number): string[] {
   const reach = 10 + itemLevel;
   return Object.values(SKILL_TREE)
-    .filter((n) => SKILLS[n.id] && unlockLevel(n) <= reach)
+    .filter((n) => (SKILLS[n.id] || n.passive) && unlockLevel(n) <= reach)
     .map((n) => n.id);
 }
 

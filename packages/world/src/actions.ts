@@ -8,7 +8,7 @@ import {
 } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
 import { canControl, payWithShares, spendableGold, spendGold, splitGold } from './gold.ts';
-import { bookProblem, learnSkill } from './learning.ts';
+import { bookProblem, carryProblem, learnSkill, putDownProblem } from './learning.ts';
 import { evenShares } from './caravan-data.ts';
 import { petIsOut } from './caravan.ts';
 import { cityStock } from './stock.ts';
@@ -241,6 +241,36 @@ export function learnFromBook(
   if (problem) return fail('cannot_learn', problem);
   learnSkill(m, p.level, found.item.teaches);
   removeFrom(p, found.place, found.item);
+  return OK;
+}
+
+/** Carries a learned skill (the AI can then use it, and it trains). */
+export function equipMemberSkill(
+  p: PartyState,
+  memberId: string,
+  skillId: string,
+  viewer?: string,
+): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
+  const problem = carryProblem(m, p.level, skillId);
+  if (problem) return fail('cannot_carry', problem);
+  m.equipped.push(skillId);
+  return OK;
+}
+
+/** Puts a carried skill down to make room for another. */
+export function unequipMemberSkill(
+  p: PartyState,
+  memberId: string,
+  skillId: string,
+  viewer?: string,
+): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
+  const problem = putDownProblem(m, skillId);
+  if (problem) return fail('cannot_put_down', problem);
+  m.equipped = m.equipped.filter((id) => id !== skillId);
   return OK;
 }
 

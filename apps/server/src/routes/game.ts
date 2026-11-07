@@ -9,6 +9,7 @@ import {
   caravanEquipSchema,
   caravanUnequipSchema,
   equipSchema,
+  carrySchema,
   learnSchema,
   petSendSchema,
   tradeSchema,
@@ -36,7 +37,9 @@ import {
   moveOrder,
   normalizeParty,
   equipCaravan,
+  equipMemberSkill,
   learnFromBook,
+  unequipMemberSkill,
   petQuote,
   sendPet,
   unequipCaravan,
@@ -390,6 +393,16 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/pet/send', { preHandler: auth }, async (req) => {
     const { itemIds, stockIds } = petSendSchema.parse(req.body);
     return act(req, (s) => sendPet(s, world, cfg, itemIds, stockIds, Date.now(), req.user!.id));
+  });
+
+  app.post('/parties/:id/skills/carry', { preHandler: auth }, async (req) => {
+    const { memberId, skillId } = carrySchema.parse(req.body);
+    return act(req, (s) => equipMemberSkill(s, memberId, skillId, req.user!.id));
+  });
+
+  app.post('/parties/:id/skills/put-down', { preHandler: auth }, async (req) => {
+    const { memberId, skillId } = carrySchema.parse(req.body);
+    return act(req, (s) => unequipMemberSkill(s, memberId, skillId, req.user!.id));
   });
 
   app.post('/parties/:id/learn', { preHandler: auth }, async (req) => {

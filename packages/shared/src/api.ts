@@ -143,6 +143,8 @@ export interface MemberInfo {
   /** The skills carried into a fight (the AI can use only these), and how many fit at this level. */
   equipped: string[];
   equipLimit: number;
+  /** Carried skills that cannot be used with the gear worn now, with the reason (a missing weapon). */
+  skillIssues: Record<string, string>;
   /** Skills still locked in those schools, with what is missing. */
   locked: Array<{ skill: string; missing: string }>;
   ai: AiRuleInfo[];
@@ -182,6 +184,18 @@ export interface SkillInfo {
   bookOnly?: boolean;
   /** A passive mastery: always on, takes no slot. */
   passive?: boolean;
+  /** What raises its level: damage, healing or uses. */
+  measure: 'damage' | 'healing' | 'uses';
+  /** What learning it needs (character level, school levels, other skills at levels). */
+  requires: {
+    charLevel?: number;
+    schools?: Record<string, number>;
+    skills?: Record<string, number>;
+  };
+  /** Skills with the same name in several schools (Slash) share a family. */
+  family?: string;
+  /** Only a proposal until the name is settled. */
+  proposed?: boolean;
   /** Has a combat definition. A skill without one waits for its engine feature. */
   usable: boolean;
   /** Weapon kinds it needs in hand. */

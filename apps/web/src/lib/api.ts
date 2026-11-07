@@ -103,6 +103,16 @@ export const api = {
   petShop: (partyId: string) => request<PetShopInfo>('GET', `/parties/${partyId}/pet/shop`),
   sendPet: (partyId: string, itemIds: string[], stockIds: string[]) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/pet/send`, { itemIds, stockIds }),
+  carrySkill: (partyId: string, memberId: string, skillId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/skills/carry`, {
+      memberId,
+      skillId,
+    }),
+  putDownSkill: (partyId: string, memberId: string, skillId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/skills/put-down`, {
+      memberId,
+      skillId,
+    }),
   learn: (partyId: string, memberId: string, itemId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/learn`, { memberId, itemId }),
   unequip: (partyId: string, memberId: string, slot: SlotName) =>

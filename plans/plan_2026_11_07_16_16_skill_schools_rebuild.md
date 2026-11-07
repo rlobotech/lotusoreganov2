@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: in progress (phases 1 and 2 done, phase 3 next)
+Status: in progress (phases 1 to 3 done, phase 4 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -83,6 +83,17 @@ The new rules now run the game: the old school experience system is gone.
 - **Combat:** a new optional `UnitDef.skillMods` (engine) makes a skill stronger: +5% per skill level above 1 times the school's 1% per point (the better school for a dual skill) on damage and healing, and +1 round of its status per 20 school points. The engine has three new tests.
 - **Server and web:** members report `schools` (level out of 100), `skillLevels`, `equipped` and `equipLimit`; skills report their `schools`, `passive` and `usable`; the Attributes and Spellbook tabs show the new levels (the wheel comes in phase 4).
 - **Balance:** the monster power curve was raised (`+0.9` instead of `+0.4`, since school power makes characters stronger in the late game) and the new starter skills were strengthened; `balance:levels` now shows about 4 to 14% defeats at levels 1 to 10, 13 to 20% in the middle and under 10% above level 90. The level 90 to 100 band is still too easy and needs another pass (as does the world's boss tuning).
+
+## Phase 3 notes (what exists now)
+
+Most of the learning rules landed with phase 2; phase 3 added what was missing around them.
+- **Choosing what to carry:** `equipMemberSkill` and `unequipMemberSkill` (world actions) and `POST /parties/:id/skills/carry` and `/skills/put-down`. A skill can be carried only if it is learned, usable (has a combat skill), not passive, and there is room (6, 7 from level 30, 8 from level 60). A skill an AI rule uses cannot be put down ("AI rule 2 uses it: change the rule first"), so no rule is left pointing at a skill the character does not carry. Only the owner of a character changes it.
+- **Books for any skill:** a book can teach any tree skill that is usable or passive (a Warrior can learn Demonology Mastery from a book); it waives skill-level requirements but not school levels. Skills still waiting for the engine (the summons, Dash) are not dropped as books.
+- **Level-ups:** a new character level teaches any skill that was waiting only for it, in the same fight.
+- **Weapon warnings:** `weaponProblem` says when a carried skill needs a weapon the character does not hold ("needs dagger in hand"); members report it as `skillIssues` and the Spellbook shows it.
+- **Data for the tree view:** the skill catalogue now has each skill's `requires` (character level, school levels, skills at levels), `measure`, `family`, `proposed` and `passive`; members already report school levels, skill levels, `equipped` and `equipLimit`. Phase 4 draws the wheel from these.
+- **Spellbook:** Carry and Put down buttons, the carried count, and refusals shown on the card.
+- Tests: `skill-actions.test.ts` (carrying, limit, owner, weapon problems, books for another class, level-up learning) and a server API test.
 
 ## Decided after the first draft (from the user)
 

@@ -8,6 +8,7 @@ import {
   memberDerived,
   MAX_RING_SCHOOL_LEVEL,
   equippedLimit,
+  weaponProblem,
   levelUpCost,
   memberSchools,
   memberSchoolLevel,
@@ -212,6 +213,12 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
         ),
         equipped: m.equipped,
         equipLimit: equippedLimit(state.level),
+        skillIssues: Object.fromEntries(
+          m.equipped.flatMap((id) => {
+            const why = weaponProblem(m, id);
+            return why ? [[id, why]] : [];
+          }),
+        ),
         locked: Object.values(SKILL_TREE).flatMap((n) => {
           // Skills of schools the character has, that it cannot learn yet.
           const why = unlockProblem(m, state.level, n);
@@ -286,6 +293,11 @@ export function skillCatalog(): SkillInfo[] {
       ...(s.free ? { free: true } : {}),
       schools: node ? [...node.schools] : [],
       ...(node?.bookOnly ? { bookOnly: true } : {}),
+      ...(node?.passive ? { passive: true } : {}),
+      measure: node?.measure ?? 'uses',
+      requires: node?.requires ?? {},
+      ...(node?.family ? { family: node.family } : {}),
+      ...(node?.proposed ? { proposed: true } : {}),
       usable: true,
       ...(s.weapons ? { weapons: s.weapons } : {}),
       ...(s.status
@@ -310,6 +322,10 @@ export function skillCatalog(): SkillInfo[] {
       side: 'self',
       schools: [...n.schools],
       ...(n.passive ? { passive: true } : {}),
+      measure: n.measure,
+      requires: n.requires,
+      ...(n.family ? { family: n.family } : {}),
+      ...(n.proposed ? { proposed: true } : {}),
       usable: false,
     }));
   return [...fromCombat, ...fromTree];

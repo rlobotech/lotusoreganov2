@@ -34,6 +34,7 @@ export const petSendSchema = z.object({
   stockIds: z.array(idStr).max(20),
 });
 export const learnSchema = z.object({ memberId: idStr, itemId: idStr });
+export const carrySchema = z.object({ memberId: idStr, skillId: idStr });
 export const unequipSchema = z.object({ memberId: idStr, slot: z.enum(SLOT_NAMES) });
 export const moveItemSchema = z.object({
   itemId: idStr,

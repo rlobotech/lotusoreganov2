@@ -262,6 +262,41 @@ describe('schools and skill books', () => {
   });
 });
 
+describe('carrying skills', () => {
+  it('puts a skill down and carries it again through the API, and reports weapon problems', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    const base = `/parties/${id}/skills`;
+    const body = { memberId: 'm1', skillId: 'defensive_stance' };
+    // The warrior's AI uses Defensive Stance, so it cannot be put down yet.
+    const blocked = await call(cookie, 'POST', `${base}/put-down`, body);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toBe('cannot_put_down');
+    await call(cookie, 'PUT', `/parties/${id}/members/m1/ai`, {
+      rules: [{ skill: 'sword_slash' }, { skill: 'attack' }],
+    });
+    const down = await call(cookie, 'POST', `${base}/put-down`, body);
+    expect(down.statusCode).toBe(200);
+    expect(down.json().party.members[0].equipped).not.toContain('defensive_stance');
+    const up = await call(cookie, 'POST', `${base}/carry`, body);
+    expect(up.statusCode).toBe(200);
+    expect(up.json().party.members[0].equipped).toContain('defensive_stance');
+    const again = await call(cookie, 'POST', `${base}/carry`, body);
+    expect(again.statusCode).toBe(409);
+    expect(up.json().party.members[0].skillIssues).toEqual({});
+    // The catalogue tells the tree view what a skill needs.
+    const body2 = (await call(cookie, 'GET', '/content/skills')).json();
+    const catalog = (Array.isArray(body2) ? body2 : body2.skills) as Array<{
+      id: string;
+      requires: { schools?: Record<string, number> };
+      measure: string;
+    }>;
+    const whirl = catalog.find((s) => s.id === 'whirlwind')!;
+    expect(whirl.requires.schools).toEqual({ sword: 30 });
+    expect(whirl.measure).toBe('damage');
+  });
+});
+
 describe('caravan', () => {
   it('equips accessories, shows effects, and sends the pet on a trip through the API', async () => {
     const cookie = await signUp();

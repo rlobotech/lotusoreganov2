@@ -2,6 +2,7 @@ import type { CombatEvent, DamageType, WeaponKind } from '@game/engine';
 import {
   addSkillXp,
   equippedLimit,
+  equipProblem,
   equipSkill,
   schoolLevelOf,
   skillLevelOf,
@@ -169,8 +170,7 @@ export function bookRequirement(node: TreeNode): number {
 /** Why `m` cannot learn the book's skill right now, or null. */
 export function bookProblem(m: Member, level: number, book: Pick<Item, 'teaches'>): string | null {
   const node = book.teaches ? SKILL_TREE[book.teaches] : undefined;
-  const def = book.teaches ? SKILLS[book.teaches] : undefined;
-  if (!node || !def) return 'That book is blank';
+  if (!node) return 'That book is blank';
   if (m.skills.includes(node.id)) return `${m.name} already knows ${node.name}`;
   if (node.requires.charLevel && level < node.requires.charLevel) {
     return `${m.name} needs character level ${node.requires.charLevel} to learn ${node.name}`;
@@ -187,3 +187,27 @@ export function bookProblem(m: Member, level: number, book: Pick<Item, 'teaches'
 }
 
 export { equippedLimit };
+
+/** Why a carried or learned skill cannot be used with the gear the member wears, or null. */
+export function weaponProblem(m: Pick<Member, 'equipment'>, id: string): string | null {
+  const def = SKILLS[id];
+  if (!def?.weapons || def.weapons.length === 0) return null;
+  const kind = m.equipment.weapon?.kind;
+  if (kind && def.weapons.includes(kind)) return null;
+  return `needs ${def.weapons.join(' or ')} in hand`;
+}
+
+/** Why `id` cannot be carried now, or null: it must be learned, usable, not passive, and fit. */
+export function carryProblem(m: Member, level: number, id: string): string | null {
+  if (!m.skills.includes(id) && SKILL_TREE[id]) return 'not learned yet';
+  if (SKILL_TREE[id] && !isUsable(id) && !SKILL_TREE[id]!.passive) return 'not usable yet';
+  return equipProblem(m, level, id);
+}
+
+/** Puts a skill down. Refuses while an AI rule still uses it, so no rule is left without a skill. */
+export function putDownProblem(m: Member, id: string): string | null {
+  if (!m.equipped.includes(id)) return 'not carried';
+  const rule = m.ai.findIndex((r) => r.skill === id);
+  if (rule >= 0) return `AI rule ${rule + 1} uses it: change the rule first`;
+  return null;
+}
