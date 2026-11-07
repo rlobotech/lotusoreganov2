@@ -1,8 +1,21 @@
 export * from './types.ts';
 export { createRng, type Rng } from './rng.ts';
-export { derive, effectiveStat } from './stats.ts';
-export { makeGrid, hasLineOfSight, manhattan, reach, pathTo, type Grid } from './grid.ts';
-export { planTurn, type Plan } from './ai.ts';
+export { effectiveStat, pctMult } from './stats.ts';
+export {
+  armorPoints,
+  attrMult,
+  damageMult,
+  derive,
+  hitChance,
+  hpMult,
+  manaCostMult,
+  resistPct,
+  SCALING,
+  spellBase,
+  weaponRange,
+} from './scaling.ts';
+export { adjacent, distance, hasLineOfSight, makeGrid, pathTo, reach, type Grid } from './grid.ts';
+export { opportunitySkill, planTurn, skillCost, type Plan } from './ai.ts';
 export { runCombat } from './combat.ts';
 export { formatLog } from './format.ts';
 export * as samples from './samples.ts';

@@ -51,5 +51,10 @@ export const autoAllocSchema = z.object({ auto: z.boolean() });
 export const aiSchema = z.object({ rules: z.array(z.record(z.string(), z.unknown())).max(32) });
 export const sellSchema = z.object({ itemIds: z.array(idStr).min(1).max(40) });
 export const buySchema = z.object({ stockId: idStr });
+export const sendGoldSchema = z.object({
+  fromId: idStr,
+  toId: idStr,
+  amount: z.number().int().min(1).max(1_000_000_000),
+});
 export const teleportSchema = z.object({ siteId: idStr });
 export const moveOrderSchema = z.object({ dir: z.union([z.literal(-1), z.literal(1)]) });

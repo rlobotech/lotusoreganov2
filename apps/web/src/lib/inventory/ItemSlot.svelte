@@ -2,7 +2,7 @@
   import type { ItemInfo } from '@game/shared';
   import { useDnd } from './dnd.svelte.ts';
   import ItemIcon from './ItemIcon.svelte';
-  import { canDrop, encodeTarget, samePlace, SLOT_GLYPHS, type ItemPlace } from './itemUi.ts';
+  import { encodeTarget, samePlace, SLOT_GLYPHS, type ItemPlace } from './itemUi.ts';
 
   let {
     place,
@@ -26,7 +26,7 @@
   const valid = $derived(
     droppable &&
       !!dnd.dragging &&
-      canDrop(dnd.dragging.item, place) &&
+      dnd.canDropOn(dnd.dragging.item, place) &&
       !samePlace(dnd.dragging.from, place),
   );
   const hot = $derived(valid && !!dnd.over && encodeTarget(dnd.over) === target);

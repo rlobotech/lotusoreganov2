@@ -4,7 +4,38 @@ export type SlotName = 'weapon' | 'offhand' | 'head' | 'body' | 'feet' | 'ring' 
 export type AttrName = 'str' | 'dex' | 'int' | 'vit' | 'wis';
 export type AttrMap = Record<AttrName, number>;
 
-export interface ItemInfo {
+export type DamageTypeName =
+  | 'piercing'
+  | 'smash'
+  | 'cut'
+  | 'blood'
+  | 'fire'
+  | 'water'
+  | 'electric'
+  | 'earth'
+  | 'dark'
+  | 'light';
+
+export interface DamageRange {
+  type: DamageTypeName;
+  min: number;
+  max: number;
+}
+
+/** Combat stats an item may have, besides its attribute bonuses. */
+export interface GearInfo {
+  /** Attribute points the wearer needs (base and spent points; gear does not count). */
+  requires?: Partial<AttrMap>;
+  /** Weapons: the kind, hands, damage, and extra damage added to every hit. */
+  kind?: 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
+  hands?: 1 | 2;
+  weapon?: DamageRange;
+  extra?: DamageRange[];
+  /** Armor: resistance points per damage type. */
+  resist?: Partial<Record<DamageTypeName, number>>;
+}
+
+export interface ItemInfo extends GearInfo {
   id: string;
   name: string;
   rarity: 'common' | 'uncommon' | 'rare' | 'epic';
@@ -39,12 +70,28 @@ export interface MemberInfo {
   maxMana: number;
   /** Where the attributes come from: class/race/level, points spent, and worn gear. */
   attributes: { base: AttrMap; alloc: AttrMap; gear: AttrMap; total: AttrMap };
-  derived: { atk: number; magic: number; def: number; res: number; speed: number; move: number };
+  derived: {
+    speed: number;
+    move: number;
+    accuracy: number;
+    evasion: number;
+    crit: number;
+  };
+  /** What the worn gear does in a fight: weapon damage and resistances (points and percent). */
+  combat: {
+    weapon: DamageRange | null;
+    extra: DamageRange[];
+    resist: Partial<Record<DamageTypeName, { points: number; pct: number }>>;
+  };
   points: number;
   autoAlloc: boolean;
   equipment: Partial<Record<SlotName, ItemInfo>>;
   /** Personal bag: only its owner moves items in or out, and it is safe from defeat losses. */
   bag: ItemInfo[];
+  /** This character's own gold. */
+  gold: number;
+  /** The viewing player controls this character (solo: all of them). Others are look-only. */
+  mine: boolean;
   skills: string[];
   ai: AiRuleInfo[];
 }
@@ -53,17 +100,26 @@ export interface SkillInfo {
   id: string;
   name: string;
   kind: 'damage' | 'heal' | 'status';
-  damageType: 'physical' | 'magical';
+  /** 'weapon' skills hit with the character's weapon; spells come with their own strength. */
+  source: 'weapon' | 'spell';
+  /** The damage type of a spell, or of a weapon skill that sets its own. Weapon skills use the weapon's. */
+  damageType: string | null;
+  /** The attribute that makes it stronger. */
+  attr: string;
   power: number;
   range: number;
   manaCost: number;
   cooldown: number;
   side: 'enemy' | 'ally' | 'self';
   radius?: number;
+  /** Steps back this many tiles after use, without provoking. */
+  retreat?: number;
+  /** Costs no action. */
+  free?: boolean;
   status?: { id: string; kind: string; duration: number };
 }
 
-export interface ShopEntry {
+export interface ShopEntry extends GearInfo {
   id: string;
   name: string;
   slot: SlotName;
@@ -121,11 +177,15 @@ export interface PartySummary {
   level: number;
   xp: number;
   xpToNext: number;
+  /** All gold carried by the party, and the part the viewer can spend. */
   gold: number;
+  spendableGold: number;
   pos: { col: number; row: number };
   lastCity: string;
   members: MemberInfo[];
   bag: ItemInfo[];
+  /** Items waiting for a free shared bag slot (quest rewards); they arrive on their own. */
+  pendingItems: ItemInfo[];
   /** Shared bag capacity and personal bag capacity (per member). */
   bagSize: number;
   personalBagSize: number;

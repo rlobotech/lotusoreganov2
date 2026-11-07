@@ -17,6 +17,8 @@ interface Handlers {
   move: (item: ItemInfo, from: ItemPlace, to: DropTarget) => void;
   /** Double click or right click: do the obvious thing with the item (wear it, or send it back). */
   quick: (item: ItemInfo, from: ItemPlace) => void;
+  /** Does the viewer control this character? Others' gear and bags can be looked at, not moved. */
+  owns?: (memberId: string) => boolean;
 }
 
 /**
@@ -44,6 +46,16 @@ export class InventoryDnd {
 
   select(h: Held | null) {
     this.selected = h;
+  }
+
+  /** Can the viewer move things in or out of this place? The shared bag is open to everyone. */
+  owns(place: ItemPlace | DropTarget): boolean {
+    return place.kind === 'bag' || (this.#handlers.owns?.(place.memberId) ?? true);
+  }
+
+  /** A valid place to drop the item being dragged: right slot, and the viewer's own. */
+  canDropOn(item: Pick<ItemInfo, 'slot'>, target: DropTarget): boolean {
+    return canDrop(item, target) && this.owns(target);
   }
 
   /** Svelte action for a cell that holds an item. */
@@ -94,7 +106,7 @@ export class InventoryDnd {
       }
       const el = document.elementFromPoint(x, y)?.closest('[data-drop]');
       const target = decodeTarget(el?.getAttribute('data-drop'));
-      this.over = target && canDrop(held.item, target) ? target : null;
+      this.over = target && this.canDropOn(held.item, target) ? target : null;
     };
 
     const finish = (drop: boolean) => {
@@ -118,11 +130,13 @@ export class InventoryDnd {
 
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // Someone else's item: tapping still opens its card, but it cannot be picked up.
+      const movable = this.owns(held.from);
       const kind = pointerKind(e.pointerType);
       this.#lastKind = kind;
       start = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, kind };
       blockClick = false;
-      if (kind === 'touch') {
+      if (kind === 'touch' && movable) {
         timer = setTimeout(() => start && !active && begin(e.clientX, e.clientY), LONG_PRESS_MS);
       }
     };
@@ -141,7 +155,7 @@ export class InventoryDnd {
           start = null;
           return;
         }
-        if (d === 'wait') return;
+        if (d === 'wait' || !this.owns(held.from)) return;
         begin(e.clientX, e.clientY);
       }
       track(e.clientX, e.clientY);
@@ -174,13 +188,14 @@ export class InventoryDnd {
 
     const onDouble = (e: MouseEvent) => {
       e.preventDefault();
+      if (!this.owns(held.from)) return;
       this.hovered = null;
       this.selected = null;
       this.#handlers.quick(held.item, held.from);
     };
     const onContext = (e: MouseEvent) => {
       e.preventDefault();
-      if (this.#lastKind === 'touch') return;
+      if (this.#lastKind === 'touch' || !this.owns(held.from)) return;
       this.hovered = null;
       this.selected = null;
       this.#handlers.quick(held.item, held.from);

@@ -109,8 +109,9 @@ A character has attributes, equipment, skills and a combat AI. Attributes are mo
 ### Bags
 
 - The party has a shared bag of 40 slots. Items can be sold in cities.
-- When the bag is full, new items take the place of the item with the lowest item level or rarity.
-- Any player can mark an item as a favorite so it is never discarded automatically.
+- Nothing is thrown away automatically. When the bag is full the party simply stops picking up loot (a "bag full" line appears in the feed), so players must discard, sell in a city, or use the carrier pet.
+- Any player can mark an item as a favorite so it cannot be sold, discarded or lost on defeat.
+- Gold belongs to each character. Battle, quest and sale money is shared evenly among them.
 - Each player also has a personal bag of 5 slots (see Parties).
 
 ---

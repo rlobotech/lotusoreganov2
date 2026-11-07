@@ -21,6 +21,19 @@ const BG = 0x0d0b10;
 const PARTY_COLORS = [0x4a7fb0, 0x6a5acd, 0x3a9d8f, 0xc9a24a, 0x8a6ad0, 0x5aa0d0];
 const ENEMY_COLORS = [0xb04a4a, 0x8f5a2a, 0x7a2a6a, 0x5a7a2a, 0xa05a2a, 0x6a2a2a];
 const GREENS = [0x2f4a33, 0x2a4230, 0x34523a, 0x2c4632];
+const DAMAGE_COLORS: Record<string, number> = {
+  piercing: 0xd8d8e8,
+  smash: 0xd2a878,
+  cut: 0xff7a6a,
+  blood: 0xc01838,
+  fire: 0xff8a3a,
+  water: 0x5ab0ff,
+  electric: 0xf2e24a,
+  earth: 0xa8884a,
+  dark: 0xb070e0,
+  light: 0xfff2b0,
+};
+
 const STATUS_COLORS: Record<string, number> = {
   poison: 0x6adf3a,
   stun: 0xf2d04a,
@@ -540,14 +553,21 @@ export class Scene {
       }
     }
 
-    const floatText = (target: string, text: string, color: number, size = 14, key = 'f') => {
+    const floatText = (
+      target: string,
+      text: string,
+      color: number,
+      size = 14,
+      key = 'f',
+      off = 0,
+    ) => {
       const c = chest(target);
       if (!c) return;
       const top = this.toScreen({ x: c.x, y: c.y - 26 });
       this.label(
         `${key}-${target}`,
         text,
-        { x: top.x, y: top.y - p * 18 },
+        { x: top.x, y: top.y - p * 18 + off },
         {
           color,
           size,
@@ -558,16 +578,34 @@ export class Scene {
     };
 
     if (ev.t === 'damage') {
+      // Coloured by damage type; a crit is bigger. Extra damage from the weapon stacks below.
+      const color = DAMAGE_COLORS[ev.type] ?? 0xff6a6a;
+      const key = ev.extra ? 'x' : 'f';
+      const off = ev.extra ? 14 : 0;
       floatText(
         ev.target,
         `${ev.amount}${ev.crit ? '!' : ''}`,
-        ev.crit ? 0xffd04a : 0xff6a6a,
+        ev.crit ? 0xffd04a : color,
         ev.crit ? 18 : 14,
+        key,
+        off,
       );
+      if (ev.resist !== 0) {
+        floatText(
+          ev.target,
+          ev.resist > 0 ? `${ev.resist}% resisted` : `${-ev.resist}% weak`,
+          ev.resist > 0 ? 0x9ab0c8 : 0xff9a6a,
+          10,
+          ev.extra ? 'rx' : 'r',
+          off + 12,
+        );
+      }
+    } else if (ev.t === 'skill' && ev.reaction) {
+      floatText(ev.unit, 'opportunity!', 0xf2d04a, 11, 'k');
     } else if (ev.t === 'heal') {
       floatText(ev.target, `+${ev.amount}`, 0x6aff9a);
     } else if (ev.t === 'miss') {
-      floatText(ev.target, 'miss', 0xcccccc, 12);
+      floatText(ev.target, `miss (${ev.chance}%)`, 0xcccccc, 12);
     } else if (ev.t === 'status' && ev.on) {
       floatText(
         ev.unit,

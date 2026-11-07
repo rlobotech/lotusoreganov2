@@ -1,4 +1,4 @@
-import { derive } from '../src/stats.ts';
+import { derive, weaponRange } from '../src/scaling.ts';
 import type { AIRule, ArenaDef, Point, SkillDef, Team, UnitDef, UnitState } from '../src/types.ts';
 
 export const attrs = { str: 10, dex: 5, int: 10, vit: 10, wis: 10 };
@@ -30,8 +30,13 @@ export function stateOf(
     mana: base.maxMana,
     alive: true,
     base,
+    weapon: def.weapon ?? weaponRange(def.level, 'smash'),
+    extraDamage: def.extraDamage ?? [],
+    resist: def.resist ?? {},
     cooldowns: {},
     statuses: [],
+    reaction: true,
+    movesLeft: def.move,
     ...over,
   };
 }
@@ -51,7 +56,8 @@ export const melee: SkillDef = {
   id: 'attack',
   name: 'Attack',
   kind: 'damage',
-  damageType: 'physical',
+  source: 'weapon',
+  attr: 'str',
   power: 10,
   range: 1,
   manaCost: 0,
@@ -62,7 +68,21 @@ export const bolt: SkillDef = {
   id: 'bolt',
   name: 'Bolt',
   kind: 'damage',
-  damageType: 'magical',
+  source: 'spell',
+  damageType: 'fire',
+  attr: 'int',
+  power: 10,
+  range: 5,
+  manaCost: 0,
+  cooldown: 0,
+  side: 'enemy',
+};
+export const bow: SkillDef = {
+  id: 'shoot',
+  name: 'Shoot',
+  kind: 'damage',
+  source: 'weapon',
+  attr: 'dex',
   power: 10,
   range: 5,
   manaCost: 0,
@@ -73,7 +93,8 @@ export const heal: SkillDef = {
   id: 'heal',
   name: 'Heal',
   kind: 'heal',
-  damageType: 'magical',
+  source: 'spell',
+  attr: 'wis',
   power: 10,
   range: 4,
   manaCost: 5,
@@ -84,7 +105,8 @@ export const bigHeal: SkillDef = {
   id: 'big_heal',
   name: 'Big Heal',
   kind: 'heal',
-  damageType: 'magical',
+  source: 'spell',
+  attr: 'wis',
   power: 20,
   range: 4,
   manaCost: 10,
@@ -95,7 +117,9 @@ export const nuke: SkillDef = {
   id: 'nuke',
   name: 'Nuke',
   kind: 'damage',
-  damageType: 'magical',
+  source: 'spell',
+  damageType: 'fire',
+  attr: 'int',
   power: 30,
   range: 5,
   manaCost: 5,

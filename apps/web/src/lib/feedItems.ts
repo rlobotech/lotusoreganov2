@@ -42,6 +42,7 @@ function fightItem(e: FeedEntry): FeedItem {
   ];
   if (p.xp) bits.push(`+${p.xp} xp`);
   if (p.gold) bits.push(`+${p.gold} gold`);
+  if (Array.isArray(p.missed) && p.missed.length) bits.push('bag full');
   return {
     kind: 'fight',
     title: String(p.title ?? 'Fight'),
@@ -65,7 +66,7 @@ export function buildFeedItems(entries: FeedEntry[], collapseAbove = COLLAPSE_AB
   let lines: string[] = [];
   let tone: Tone = 'info';
   let linesLast = 0;
-  let run = { n: 0, xp: 0, gold: 0, loot: 0, lastId: 0 };
+  let run = { n: 0, xp: 0, gold: 0, loot: 0, missed: 0, lastId: 0 };
 
   const flushLines = () => {
     if (lines.length > 0) {
@@ -77,7 +78,9 @@ export function buildFeedItems(entries: FeedEntry[], collapseAbove = COLLAPSE_AB
   };
   const flushRun = () => {
     if (run.n > 0) {
-      const extra = run.loot > 0 ? `, ${run.loot} items` : '';
+      const extra =
+        (run.loot > 0 ? `, ${run.loot} items` : '') +
+        (run.missed > 0 ? `, ${run.missed} left behind (bag full)` : '');
       items.push({
         kind: 'card',
         title: 'Routine hunting',
@@ -86,7 +89,7 @@ export function buildFeedItems(entries: FeedEntry[], collapseAbove = COLLAPSE_AB
         lastId: run.lastId,
       });
     }
-    run = { n: 0, xp: 0, gold: 0, loot: 0, lastId: 0 };
+    run = { n: 0, xp: 0, gold: 0, loot: 0, missed: 0, lastId: 0 };
   };
 
   for (const e of entries) {
@@ -98,6 +101,7 @@ export function buildFeedItems(entries: FeedEntry[], collapseAbove = COLLAPSE_AB
         run.xp += Number(p.xp ?? 0);
         run.gold += Number(p.gold ?? 0);
         run.loot += Array.isArray(p.loot) ? p.loot.length : 0;
+        run.missed += Array.isArray(p.missed) ? p.missed.length : 0;
         run.lastId = e.id;
         continue;
       }
@@ -107,6 +111,8 @@ export function buildFeedItems(entries: FeedEntry[], collapseAbove = COLLAPSE_AB
       continue;
     }
     if (collapse && CHATTER.has(e.kind)) continue;
+    // In a long catch-up the "bag full" lines are already counted in the fight summaries.
+    if (collapse && e.kind === 'bag_full') continue;
     flushRun();
     lines.push(formatFeedEvent({ at: e.at, kind: e.kind, payload: e.payload }));
     if (BAD.has(e.kind)) tone = 'bad';

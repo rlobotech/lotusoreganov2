@@ -3,6 +3,7 @@ export * from './hex.ts';
 export * from './progression.ts';
 export * from './monsters.ts';
 export * from './loot.ts';
+export * from './gold.ts';
 export * from './actions.ts';
 export * from './quests.ts';
 export { ARENAS } from './arenas.ts';

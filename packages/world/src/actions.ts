@@ -1,12 +1,21 @@
 import type { AIRule, Attributes } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
+import { canControl, spendableGold, spendGold, splitGold } from './gold.ts';
 import { addToBag, bagCapacity } from './loot.ts';
-import { ATTRS, CLASSES, memberDerived, SKILLS, spentPoints } from './progression.ts';
+import {
+  ATTRS,
+  CLASSES,
+  memberDerived,
+  SKILLS,
+  spentPoints,
+  unmetRequirements,
+} from './progression.ts';
 import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
   PERSONAL_BAG_SIZE,
   SLOTS,
   type FeedEvent,
+  type GearStats,
   type Item,
   type Member,
   type PartyState,
@@ -66,6 +75,24 @@ function locate(p: PartyState, itemId: string): { item: Item; place: ItemPlace }
   return null;
 }
 
+const NOT_YOURS = 'That character is not yours';
+
+/** Shared things belong to everyone; a personal bag or worn slot belongs to its character. */
+function placeIsYours(p: PartyState, place: ItemPlace, viewer?: string): boolean {
+  if (place.kind === 'bag') return true;
+  const m = findMember(p, place.memberId);
+  return !m || canControl(m, viewer);
+}
+
+/** The character exists and the viewer may act for it. */
+function ownMember(p: PartyState, memberId: string, viewer?: string): Member | ActionResult {
+  const m = findMember(p, memberId);
+  if (!m) return fail('no_member', 'No such party member');
+  if (!canControl(m, viewer)) return fail('not_yours', NOT_YOURS);
+  return m;
+}
+const isFail = (r: Member | ActionResult): r is ActionResult => 'ok' in r;
+
 function container(p: PartyState, place: ItemPlace): Item[] | null {
   if (place.kind === 'bag') return p.bag;
   if (place.kind === 'personal') return findMember(p, place.memberId)?.bag ?? null;
@@ -81,6 +108,30 @@ function removeFrom(p: PartyState, from: ItemPlace, item: Item) {
   list.splice(list.indexOf(item), 1);
 }
 
+const ATTR_NAMES = {
+  str: 'Strength',
+  dex: 'Dexterity',
+  int: 'Intelligence',
+  vit: 'Vitality',
+  wis: 'Wisdom',
+};
+
+/** Why `m` cannot wear `item` in `slot` right now (requirements, hands), or null if it can. */
+function cannotWear(p: PartyState, m: Member, item: Item, slot: Slot): ActionResult | null {
+  const unmet = unmetRequirements(m, p.level, item);
+  if (unmet.length) {
+    const text = unmet.map((u) => `${u.need} ${ATTR_NAMES[u.attr]} (has ${u.have})`).join(', ');
+    return fail('requirements', `${m.name} needs ${text}`);
+  }
+  if (slot === 'weapon' && item.hands === 2 && m.equipment.offhand) {
+    return fail('two_handed', 'A two-handed weapon needs a free off hand');
+  }
+  if (slot === 'offhand' && m.equipment.weapon?.hands === 2) {
+    return fail('two_handed', 'The two-handed weapon takes both hands');
+  }
+  return null;
+}
+
 /**
  * Moves an item between the shared bag, personal bags and worn slots. Wearing an item over another
  * one swaps them: the old item goes where the new one came from (and into the other member's slot
@@ -91,6 +142,7 @@ export function moveItem(
   itemId: string,
   to: ItemTarget,
   cfg: Pick<SimConfig, 'bagSize'>,
+  viewer?: string,
 ): ActionResult {
   const found = locate(p, itemId);
   if (!found) return fail('no_item', 'No such item');
@@ -98,6 +150,9 @@ export function moveItem(
 
   const owner = to.kind === 'bag' ? null : findMember(p, to.memberId);
   if (to.kind !== 'bag' && !owner) return fail('no_member', 'No such party member');
+  // Both ends must be the viewer's own: you cannot take from or hand things to someone else's gear.
+  if (!placeIsYours(p, from, viewer) || (owner && !canControl(owner, viewer)))
+    return fail('not_yours', NOT_YOURS);
 
   if (to.kind === 'equip') {
     if (!item.slot) return fail('not_equippable', 'That item cannot be worn');
@@ -105,6 +160,12 @@ export function moveItem(
     if (slot !== item.slot) return fail('wrong_slot', 'That item does not go in that slot');
     if (from.kind === 'equip' && from.memberId === to.memberId) return OK;
     const old = owner!.equipment[slot];
+    const blocked = cannotWear(p, owner!, item, slot);
+    if (blocked) return blocked;
+    if (old && from.kind === 'equip') {
+      const other = cannotWear(p, findMember(p, from.memberId)!, old, from.slot);
+      if (other) return other;
+    }
     removeFrom(p, from, item);
     owner!.equipment[slot] = item;
     if (old) {
@@ -131,11 +192,16 @@ export function moveItem(
 }
 
 /** Wears an item from any bag on a member (swapping with what is worn). */
-export function equipItem(p: PartyState, memberId: string, itemId: string): ActionResult {
+export function equipItem(
+  p: PartyState,
+  memberId: string,
+  itemId: string,
+  viewer?: string,
+): ActionResult {
   const found = locate(p, itemId);
   if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
   if (!findMember(p, memberId)) return fail('no_member', 'No such party member');
-  return moveItem(p, itemId, { kind: 'equip', memberId }, { bagSize: 0 });
+  return moveItem(p, itemId, { kind: 'equip', memberId }, { bagSize: 0 }, viewer);
 }
 
 export function unequipItem(
@@ -143,25 +209,34 @@ export function unequipItem(
   memberId: string,
   slot: Slot,
   cfg: Pick<SimConfig, 'bagSize'>,
+  viewer?: string,
 ): ActionResult {
   const m = findMember(p, memberId);
   if (!m) return fail('no_member', 'No such party member');
+  if (!canControl(m, viewer)) return fail('not_yours', NOT_YOURS);
   if (!SLOTS.includes(slot)) return fail('bad_slot', 'Unknown slot');
   const item = m.equipment[slot];
   if (!item) return fail('empty_slot', 'Nothing is worn there');
-  return moveItem(p, item.id, { kind: 'bag' }, cfg);
+  return moveItem(p, item.id, { kind: 'bag' }, cfg, viewer);
 }
 
-export function setFavorite(p: PartyState, itemId: string, favorite: boolean): ActionResult {
+export function setFavorite(
+  p: PartyState,
+  itemId: string,
+  favorite: boolean,
+  viewer?: string,
+): ActionResult {
   const found = locate(p, itemId);
   if (!found) return fail('no_item', 'That item is not in a bag');
+  if (!placeIsYours(p, found.place, viewer)) return fail('not_yours', NOT_YOURS);
   found.item.favorite = favorite;
   return OK;
 }
 
-export function discardItem(p: PartyState, itemId: string): ActionResult {
+export function discardItem(p: PartyState, itemId: string, viewer?: string): ActionResult {
   const found = locate(p, itemId);
   if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
+  if (!placeIsYours(p, found.place, viewer)) return fail('not_yours', NOT_YOURS);
   if (found.item.favorite) return fail('favorite', 'Remove the favorite mark first');
   removeFrom(p, found.place, found.item);
   return OK;
@@ -190,9 +265,10 @@ export function allocatePoints(
   p: PartyState,
   memberId: string,
   add: Partial<Attributes>,
+  viewer?: string,
 ): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
   let total = 0;
   for (const [k, v] of Object.entries(add)) {
     if (!ATTRS.includes(k as keyof Attributes))
@@ -209,17 +285,22 @@ export function allocatePoints(
   return OK;
 }
 
-export function setAutoAlloc(p: PartyState, memberId: string, auto: boolean): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
+export function setAutoAlloc(
+  p: PartyState,
+  memberId: string,
+  auto: boolean,
+  viewer?: string,
+): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
   m.autoAlloc = auto;
   return OK;
 }
 
 /** Takes all spent points back so they can be placed again (free for now). */
-export function resetPoints(p: PartyState, memberId: string): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
+export function resetPoints(p: PartyState, memberId: string, viewer?: string): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
   m.points += spentPoints(m);
   for (const k of ATTRS) m.alloc[k] = 0;
   clampVitals(p, m);
@@ -288,18 +369,23 @@ function cleanRule(r: AIRule): AIRule {
   return out;
 }
 
-export function setMemberAi(p: PartyState, memberId: string, rules: unknown): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
+export function setMemberAi(
+  p: PartyState,
+  memberId: string,
+  rules: unknown,
+  viewer?: string,
+): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
   const problem = validateAiRules(rules, m.skills);
   if (problem) return fail('bad_rules', problem);
   m.ai = (rules as AIRule[]).map(cleanRule);
   return OK;
 }
 
-export function resetMemberAi(p: PartyState, memberId: string): ActionResult {
-  const m = findMember(p, memberId);
-  if (!m) return fail('no_member', 'No such party member');
+export function resetMemberAi(p: PartyState, memberId: string, viewer?: string): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
   m.ai = structuredClone(CLASSES[m.cls].ai);
   return OK;
 }
@@ -399,7 +485,12 @@ export function sellPrice(item: Item): number {
   return item.value;
 }
 
-export function sellItems(p: PartyState, world: WorldDef, itemIds: string[]): ActionResult {
+export function sellItems(
+  p: PartyState,
+  world: WorldDef,
+  itemIds: string[],
+  viewer?: string,
+): ActionResult {
   if (!usableCity(p, world)) return fail('not_in_city', 'The party is not in a city');
   const ids = new Set(itemIds);
   if (ids.size === 0) return fail('no_item', 'Nothing selected');
@@ -407,10 +498,25 @@ export function sellItems(p: PartyState, world: WorldDef, itemIds: string[]): Ac
   const chosen = lists.flatMap((l) => l.filter((i) => ids.has(i.id)));
   if (chosen.length !== ids.size) return fail('no_item', 'Some items are not in a bag');
   if (chosen.some((i) => i.favorite)) return fail('favorite', 'Favorites cannot be sold');
-  p.gold += chosen.reduce((s, i) => s + sellPrice(i), 0);
+  const others = p.members.filter((m) => !canControl(m, viewer));
+  if (others.some((m) => m.bag.some((i) => ids.has(i.id)))) return fail('not_yours', NOT_YOURS);
+  // The money is shared by every character, rounded down.
+  splitGold(
+    p.members,
+    chosen.reduce((s, i) => s + sellPrice(i), 0),
+  );
   p.bag = p.bag.filter((i) => !ids.has(i.id));
   for (const m of p.members) m.bag = m.bag.filter((i) => !ids.has(i.id));
   return OK;
+}
+
+function gearOf(s: GearStats): GearStats {
+  const { requires, kind, hands, weapon, extra, resist } = s;
+  return Object.fromEntries(
+    Object.entries({ requires, kind, hands, weapon, extra, resist }).filter(
+      ([, v]) => v !== undefined,
+    ),
+  );
 }
 
 export function buyItem(
@@ -418,15 +524,16 @@ export function buyItem(
   world: WorldDef,
   stockId: string,
   cfg: Pick<SimConfig, 'bagSize'>,
+  viewer?: string,
 ): ActionResult {
   const city = usableCity(p, world);
   if (!city) return fail('not_in_city', 'The party is not in a city');
   const stock = city.shop?.find((s) => s.id === stockId);
   if (!stock) return fail('no_stock', 'The shop does not sell that');
-  if (p.gold < stock.price) return fail('no_gold', 'Not enough gold');
+  if (spendableGold(p, viewer) < stock.price) return fail('no_gold', 'Not enough gold');
   if (p.bag.length >= bagCapacity(p, cfg)) return fail('bag_full', 'The bag is full');
   p.counter += 1;
-  p.gold -= stock.price;
+  spendGold(p, viewer, stock.price);
   const item: Item = {
     id: `b${p.counter}_${stock.id}`,
     name: stock.name,
@@ -436,6 +543,7 @@ export function buyItem(
     favorite: false,
     slot: stock.slot,
     bonuses: { ...stock.bonuses },
+    ...structuredClone(gearOf(stock)),
   };
   addToBag(p.bag, item, bagCapacity(p, cfg));
   return OK;
@@ -468,15 +576,16 @@ export function teleport(
   cfg: SimConfig,
   siteId: string,
   now: number,
+  viewer?: string,
 ): ActionResult {
   const here = usableCity(p, world);
   if (!here) return fail('not_in_city', 'The party is not in a city');
   const option = teleportOptions(p, world, cfg).find((o) => o.siteId === siteId);
   if (!option)
     return fail('no_destination', 'You can only teleport to other cities you have visited');
-  if (p.gold < option.cost) return fail('no_gold', 'Not enough gold');
+  if (spendableGold(p, viewer) < option.cost) return fail('no_gold', 'Not enough gold');
   const dest = world.sites[siteId]!;
-  p.gold -= option.cost;
+  spendGold(p, viewer, option.cost);
   p.pos = { col: dest.col, row: dest.row };
   p.lastCity = dest.id;
   p.dungeon = null;
@@ -488,4 +597,24 @@ export function teleport(
       { at: now, kind: 'teleport', payload: { from: here.name, to: dest.name, cost: option.cost } },
     ],
   };
+}
+
+/** Gives gold from one of the viewer's characters to any character in the party. */
+export function sendGold(
+  p: PartyState,
+  fromId: string,
+  toId: string,
+  amount: number,
+  viewer?: string,
+): ActionResult {
+  const from = findMember(p, fromId);
+  const to = findMember(p, toId);
+  if (!from || !to) return fail('no_member', 'No such character');
+  if (!canControl(from, viewer)) return fail('not_yours', 'That character is not yours');
+  if (from.id === to.id) return fail('bad_target', 'Pick another character');
+  if (!Number.isInteger(amount) || amount < 1) return fail('bad_amount', 'Send at least 1 gold');
+  if (from.gold < amount) return fail('no_gold', 'Not enough gold');
+  from.gold -= amount;
+  to.gold += amount;
+  return OK;
 }

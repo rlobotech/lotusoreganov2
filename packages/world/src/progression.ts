@@ -1,5 +1,17 @@
-import { derive, samples, type AIRule, type Attributes, type Derived } from '@game/engine';
-import type { ClassDef, ClassId, Member, MemberTemplate, Race } from './types.ts';
+import {
+  armorPoints,
+  derive,
+  samples,
+  type AIRule,
+  type Attributes,
+  type DamageType,
+  type Derived,
+  type ExtraDamage,
+  type Resistances,
+  type WeaponDef,
+} from '@game/engine';
+import { starterGear } from './loot.ts';
+import type { ClassDef, ClassId, Item, Member, MemberTemplate, Race } from './types.ts';
 
 export const MAX_LEVEL = 100;
 
@@ -37,6 +49,19 @@ const warriorAi: AIRule[] = [
   { skill: 'attack' },
 ];
 
+/**
+ * Turns armor shares (1 = a full set at that level, negative = a weakness) into resistance points.
+ * Monsters use it; characters get theirs from the armor they wear.
+ */
+export function armorResist(
+  shares: Partial<Record<DamageType, number>>,
+  level: number,
+): Resistances {
+  return Object.fromEntries(
+    Object.entries(shares).map(([type, share]) => [type, Math.round(armorPoints(level) * share)]),
+  );
+}
+
 export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: {
     id: 'warrior',
@@ -47,6 +72,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     skills: ['attack', 'power_strike', 'war_cry'],
     ai: warriorAi,
     pointOrder: ['str', 'vit', 'str', 'vit', 'dex'],
+    kit: ['Rusty Sword', 'Wooden Shield', 'Leather Cap', 'Iron Mail', 'Worn Boots'],
   },
   mage: {
     id: 'mage',
@@ -57,6 +83,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     skills: ['staff_bolt', 'fireball'],
     ai: [{ skill: 'fireball', order: 'highest_hp' }, { skill: 'staff_bolt' }],
     pointOrder: ['int', 'int', 'wis', 'vit'],
+    kit: ['Gnarled Staff', 'Cloth Hood', 'Cloth Robe'],
   },
   priest: {
     id: 'priest',
@@ -71,6 +98,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       { skill: 'staff_bolt' },
     ],
     pointOrder: ['wis', 'wis', 'int', 'vit'],
+    kit: ['Oak Mace', 'Spell Tome', 'Cloth Hood', 'Cloth Robe'],
   },
   ranger: {
     id: 'ranger',
@@ -78,12 +106,14 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     base: { str: 6, dex: 10, int: 3, vit: 6, wis: 4 },
     growth: { str: 0.4, dex: 0.8, int: 0.1, vit: 0.4, wis: 0.2 },
     move: 4,
-    skills: ['shoot', 'poison_arrow'],
+    skills: ['shoot', 'poison_arrow', 'backstep_shot'],
     ai: [
+      { skill: 'backstep_shot', when: { enemyAdjacent: true } },
       { skill: 'poison_arrow', order: 'highest_hp', filter: { lacksStatus: 'poison' } },
       { skill: 'shoot' },
     ],
     pointOrder: ['dex', 'dex', 'str', 'vit'],
+    kit: ['Short Bow', 'Leather Cap', 'Padded Vest', 'Worn Boots'],
   },
 };
 
@@ -114,6 +144,38 @@ export function memberBreakdown(m: MemberLike, level: number) {
   return { base, alloc, gear, total };
 }
 
+/** What a member's worn gear does in combat: weapon, extra damage and summed resistances. */
+export function memberGear(m: Pick<Member, 'equipment'>): {
+  weapon: WeaponDef | undefined;
+  extra: ExtraDamage[];
+  resist: Resistances;
+} {
+  const weapon = m.equipment.weapon;
+  const resist: Record<string, number> = {};
+  for (const it of Object.values(m.equipment)) {
+    for (const [type, pts] of Object.entries(it?.resist ?? {})) {
+      resist[type] = (resist[type] ?? 0) + pts;
+    }
+  }
+  return { weapon: weapon?.weapon, extra: weapon?.extra ?? [], resist };
+}
+
+/** Attribute requirements of `item` that `m` does not meet (counting base and spent points only). */
+export function unmetRequirements(
+  m: MemberLike,
+  level: number,
+  item: Pick<Item, 'requires'>,
+): Array<{ attr: keyof Attributes; need: number; have: number }> {
+  const { base, alloc } = memberBreakdown({ ...m, equipment: {} }, level);
+  const out: Array<{ attr: keyof Attributes; need: number; have: number }> = [];
+  for (const k of ATTRS) {
+    const need = item.requires?.[k] ?? 0;
+    const have = base[k] + alloc[k];
+    if (need > have) out.push({ attr: k, need, have });
+  }
+  return out;
+}
+
 export function memberAttributes(m: MemberLike, level: number): Attributes {
   return memberBreakdown(m, level).total;
 }
@@ -134,12 +196,14 @@ export function createMember(index: number, t: MemberTemplate, level = 1): Membe
     alive: true,
     equipment: {},
     bag: [],
+    gold: 0,
     alloc: zeroAttrs(),
     points: 0,
     autoAlloc: true,
     skills: [...cls.skills],
     ai: structuredClone(cls.ai),
   };
+  m.equipment = starterGear(cls.kit, m.id, level);
   const d = memberDerived(m, level);
   m.hp = d.maxHp;
   m.mana = d.maxMana;
@@ -151,6 +215,7 @@ export function normalizeMember(m: Member): Member {
   const cls = CLASSES[m.cls];
   m.equipment ??= {};
   m.bag ??= [];
+  m.gold ??= 0;
   m.alloc ??= zeroAttrs();
   m.points ??= 0;
   m.autoAlloc ??= true;

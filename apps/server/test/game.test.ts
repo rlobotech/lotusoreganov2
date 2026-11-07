@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { CombatEvent } from '@game/engine';
+import { LOG_FORMAT_VERSION, type CombatEvent } from '@game/engine';
 import { advance, createParty, defaultConfig, STARTER_WORLD, type PartyState } from '@game/world';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -170,7 +170,7 @@ describe('scheduler and feed', () => {
     const body = replay.json();
     expect(body.events[0].t).toBe('start');
     expect(body.events[body.events.length - 1].t).toBe('end');
-    expect(body.logFormatVersion).toBe(1);
+    expect(body.logFormatVersion).toBe(LOG_FORMAT_VERSION);
 
     const list = await app.inject({
       method: 'GET',

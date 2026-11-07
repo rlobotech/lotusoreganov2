@@ -1,4 +1,11 @@
-import type { AttrName, ItemInfo, SlotName } from '@game/shared';
+import type {
+  AttrName,
+  DamageRange,
+  DamageTypeName,
+  GearInfo,
+  ItemInfo,
+  SlotName,
+} from '@game/shared';
 import { ATTRS } from '../labels.ts';
 
 /** Where an item can be dropped. Matches the `move` endpoint of the API. */
@@ -101,4 +108,40 @@ export function iconSize(room: number): number {
   if (room >= 48) return 48;
   if (room >= 32) return 32;
   return Math.max(16, Math.floor(room / 8) * 8);
+}
+
+export const DAMAGE_LABELS: Record<DamageTypeName, string> = {
+  piercing: 'Piercing',
+  smash: 'Smash',
+  cut: 'Cut',
+  blood: 'Blood',
+  fire: 'Fire',
+  water: 'Water',
+  electric: 'Electric',
+  earth: 'Earth',
+  dark: 'Dark',
+  light: 'Light',
+};
+
+export const DAMAGE_TYPE_ORDER = Object.keys(DAMAGE_LABELS) as DamageTypeName[];
+
+const range = (d: DamageRange) => `${d.min}-${d.max} ${DAMAGE_LABELS[d.type].toLowerCase()}`;
+
+/** The combat lines of an item: weapon damage, extra damage, resistances and requirements. */
+export function gearLines(g: GearInfo): string[] {
+  const out: string[] = [];
+  if (g.weapon) {
+    const hands = g.hands === 2 ? 'two-handed' : 'one-handed';
+    out.push(`${range(g.weapon)} damage · ${hands}${g.kind ? ` ${g.kind}` : ''}`);
+  }
+  for (const e of g.extra ?? []) out.push(`+${range(e)} damage`);
+  const res = DAMAGE_TYPE_ORDER.filter((t) => g.resist?.[t]).map(
+    (t) => `${DAMAGE_LABELS[t]} ${g.resist![t]}`,
+  );
+  if (res.length) out.push(`Resists ${res.join(', ')}`);
+  const need = ATTRS.filter((a) => g.requires?.[a]).map(
+    (a) => `${g.requires![a]} ${a.toUpperCase()}`,
+  );
+  if (need.length) out.push(`Needs ${need.join(', ')}`);
+  return out;
 }

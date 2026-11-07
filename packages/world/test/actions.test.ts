@@ -1,4 +1,5 @@
 import { createRng } from '@game/engine';
+import { partyGold } from '../src/gold.ts';
 import { describe, expect, it } from 'vitest';
 import {
   allocatePoints,
@@ -47,6 +48,13 @@ function party(seed = 1): PartyState {
   });
 }
 
+/** A party whose members start with empty gear slots, so tests control exactly what is worn. */
+function naked(seed = 1): PartyState {
+  const p = party(seed);
+  for (const m of p.members) m.equipment = {};
+  return p;
+}
+
 const sword = (id = 's1', over: Partial<Item> = {}): Item => ({
   id,
   name: 'Rusty Sword',
@@ -61,7 +69,7 @@ const sword = (id = 's1', over: Partial<Item> = {}): Item => ({
 
 describe('gear', () => {
   it('equipping moves the item from the bag and adds its bonuses', () => {
-    const p = party();
+    const p = naked();
     const before = memberAttributes(p.members[0]!, p.level);
     p.bag.push(sword());
     expect(equipItem(p, 'm1', 's1')).toEqual({ ok: true });
@@ -73,7 +81,7 @@ describe('gear', () => {
   });
 
   it('swaps with what is already worn and returns the old item to the bag', () => {
-    const p = party();
+    const p = naked();
     p.bag.push(sword('a'), sword('b', { bonuses: { str: 5 } }));
     equipItem(p, 'm1', 'a');
     equipItem(p, 'm1', 'b');
@@ -91,7 +99,7 @@ describe('gear', () => {
   });
 
   it('unequip puts the item back, refuses when the bag is full or the slot is empty', () => {
-    const p = party();
+    const p = naked();
     p.bag.push(sword());
     equipItem(p, 'm1', 's1');
     expect(unequipItem(p, 'm1', 'head', cfg)).toMatchObject({ code: 'empty_slot' });
@@ -335,7 +343,7 @@ describe('town, city and teleport', () => {
     expect(sellItems(p, W, ['c'])).toMatchObject({ code: 'favorite' });
     expect(sellItems(p, W, ['a', 'nope'])).toMatchObject({ code: 'no_item' });
     expect(sellItems(p, W, ['a', 'b'])).toEqual({ ok: true });
-    expect(p.gold).toBe(50);
+    expect(partyGold(p)).toBe(50);
     expect(p.bag.map((i) => i.id)).toEqual(['c']);
 
     p.pos = { col: 0, row: 0 };
@@ -346,15 +354,15 @@ describe('town, city and teleport', () => {
     const p = party();
     const stock = W.sites.oakhaven!.shop![0]!;
     expect(buyItem(p, W, stock.id, cfg)).toMatchObject({ code: 'no_gold' });
-    p.gold = stock.price + 5;
+    p.members[0]!.gold = stock.price + 5;
     expect(buyItem(p, W, 'nothing', cfg)).toMatchObject({ code: 'no_stock' });
     expect(buyItem(p, W, stock.id, { bagSize: 0 })).toMatchObject({ code: 'bag_full' });
-    expect(p.gold).toBe(stock.price + 5);
+    expect(partyGold(p)).toBe(stock.price + 5);
     expect(buyItem(p, W, stock.id, cfg)).toEqual({ ok: true });
-    expect(p.gold).toBe(5);
+    expect(partyGold(p)).toBe(5);
     expect(p.bag[0]).toMatchObject({ name: stock.name, slot: stock.slot, bonuses: stock.bonuses });
     buyItem(p, W, stock.id, { bagSize: 40 });
-    p.gold = stock.price;
+    p.members[0]!.gold = stock.price;
     buyItem(p, W, stock.id, cfg);
     expect(new Set(p.bag.map((i) => i.id)).size).toBe(p.bag.length);
   });
@@ -368,7 +376,7 @@ describe('town, city and teleport', () => {
     expect(options[0]!.cost).toBeGreaterThan(cfg.teleportBaseCost);
 
     expect(teleport(p, W, cfg, 'stonebridge', 1000)).toMatchObject({ code: 'no_gold' });
-    p.gold = 1000;
+    p.members[0]!.gold = 1000;
     expect(teleport(p, W, cfg, 'goblin_warren', 1000)).toMatchObject({ code: 'no_destination' });
     expect(teleport(p, W, cfg, 'oakhaven', 1000)).toMatchObject({ code: 'no_destination' });
 
@@ -376,7 +384,7 @@ describe('town, city and teleport', () => {
     expect(r.ok).toBe(true);
     expect(p.pos).toEqual({ col: W.sites.stonebridge!.col, row: W.sites.stonebridge!.row });
     expect(p.lastCity).toBe('stonebridge');
-    expect(p.gold).toBe(1000 - options[0]!.cost);
+    expect(partyGold(p)).toBe(1000 - options[0]!.cost);
     expect(p.activity.kind).toBe('town');
     expect(r.ok && r.events?.[0]?.kind).toBe('teleport');
 

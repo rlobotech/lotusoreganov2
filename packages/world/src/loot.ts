@@ -1,9 +1,13 @@
-import type { Attributes, Rng } from '@game/engine';
-import type { Item, Rarity, ShopItem, Slot } from './types.ts';
+import { armorPoints, weaponRange, type Attributes, type DamageType, type Rng } from '@game/engine';
+import type { GearStats, Item, Rarity, ShopItem, Slot, WeaponKind } from './types.ts';
 
 export const RARITY_RANK: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
 const RARITY_VALUE: Record<Rarity, number> = { common: 1, uncommon: 2.5, rare: 6, epic: 15 };
 const RARITY_BONUS: Record<Rarity, number> = { common: 1, uncommon: 1.5, rare: 2.2, epic: 3.2 };
+/** How much better the damage or resistances of an item are at each rarity. */
+const RARITY_GEAR: Record<Rarity, number> = { common: 1, uncommon: 1.1, rare: 1.25, epic: 1.45 };
+/** Extra elemental damage of a weapon as a share of its own damage (rare and epic drops). */
+const EXTRA_SHARE: Partial<Record<Rarity, number>> = { rare: 0.2, epic: 0.35 };
 const RARITY_PREFIX: Record<Rarity, string> = {
   common: '',
   uncommon: 'Fine ',
@@ -11,28 +15,164 @@ const RARITY_PREFIX: Record<Rarity, string> = {
   epic: 'Ancient ',
 };
 
+export const ELEMENTS: readonly DamageType[] = [
+  'fire',
+  'water',
+  'electric',
+  'earth',
+  'dark',
+  'light',
+];
+const ELEMENT_PREFIX: Partial<Record<DamageType, string>> = {
+  fire: 'Flaming ',
+  water: 'Frozen ',
+  electric: 'Shocking ',
+  earth: 'Venomous ',
+  dark: 'Cursed ',
+  light: 'Radiant ',
+};
+
+const PHYSICAL3: DamageType[] = ['cut', 'piercing', 'smash'];
+const MAGIC5: DamageType[] = ['fire', 'water', 'electric', 'dark', 'light'];
+
 export interface ItemBase {
   name: string;
   slot: Slot;
   /** Gets most of the bonus; `second` gets the rest. */
   main: keyof Attributes;
   second: keyof Attributes;
+  /** Weapons: kind, hands, damage type and damage quality (1 = an average one-handed weapon). */
+  weapon?: { kind: WeaponKind; hands: 1 | 2; type: DamageType; quality: number };
+  /** Armor: the types it resists, and its share of a full set (head + body + feet + off hand = 1). */
+  armor?: { types: DamageType[]; share: number };
+  /** The attribute the wearer needs, at 40% of the item level. */
+  requires?: keyof Attributes;
 }
 
 export const BASES: readonly ItemBase[] = [
-  { name: 'Rusty Sword', slot: 'weapon', main: 'str', second: 'dex' },
-  { name: 'Iron Dagger', slot: 'weapon', main: 'dex', second: 'str' },
-  { name: 'Gnarled Staff', slot: 'weapon', main: 'int', second: 'wis' },
-  { name: 'Short Bow', slot: 'weapon', main: 'dex', second: 'str' },
-  { name: 'Wooden Shield', slot: 'offhand', main: 'vit', second: 'str' },
-  { name: 'Spell Tome', slot: 'offhand', main: 'int', second: 'wis' },
-  { name: 'Leather Cap', slot: 'head', main: 'vit', second: 'dex' },
-  { name: 'Padded Vest', slot: 'body', main: 'vit', second: 'str' },
-  { name: 'Cloth Robe', slot: 'body', main: 'wis', second: 'int' },
-  { name: 'Worn Boots', slot: 'feet', main: 'dex', second: 'vit' },
+  {
+    name: 'Rusty Sword',
+    slot: 'weapon',
+    main: 'str',
+    second: 'dex',
+    weapon: { kind: 'sword', hands: 1, type: 'cut', quality: 1 },
+    requires: 'str',
+  },
+  {
+    name: 'Iron Dagger',
+    slot: 'weapon',
+    main: 'dex',
+    second: 'str',
+    weapon: { kind: 'dagger', hands: 1, type: 'piercing', quality: 0.85 },
+    requires: 'dex',
+  },
+  {
+    name: 'Iron Axe',
+    slot: 'weapon',
+    main: 'str',
+    second: 'vit',
+    weapon: { kind: 'axe', hands: 1, type: 'cut', quality: 1.05 },
+    requires: 'str',
+  },
+  {
+    name: 'Oak Mace',
+    slot: 'weapon',
+    main: 'wis',
+    second: 'str',
+    weapon: { kind: 'mace', hands: 1, type: 'smash', quality: 0.95 },
+    requires: 'wis',
+  },
+  {
+    name: 'Gnarled Staff',
+    slot: 'weapon',
+    main: 'int',
+    second: 'wis',
+    weapon: { kind: 'staff', hands: 2, type: 'smash', quality: 0.9 },
+    requires: 'int',
+  },
+  {
+    name: 'Short Bow',
+    slot: 'weapon',
+    main: 'dex',
+    second: 'str',
+    weapon: { kind: 'bow', hands: 2, type: 'piercing', quality: 1.25 },
+    requires: 'dex',
+  },
+  {
+    name: 'War Hammer',
+    slot: 'weapon',
+    main: 'str',
+    second: 'vit',
+    weapon: { kind: 'hammer', hands: 2, type: 'smash', quality: 1.4 },
+    requires: 'str',
+  },
+  {
+    name: 'Wooden Shield',
+    slot: 'offhand',
+    main: 'vit',
+    second: 'str',
+    armor: { types: PHYSICAL3, share: 0.25 },
+    requires: 'str',
+  },
+  {
+    name: 'Spell Tome',
+    slot: 'offhand',
+    main: 'int',
+    second: 'wis',
+    armor: { types: MAGIC5, share: 0.25 },
+  },
+  {
+    name: 'Leather Cap',
+    slot: 'head',
+    main: 'vit',
+    second: 'dex',
+    armor: { types: ['cut', 'piercing', 'earth'], share: 0.2 },
+  },
+  {
+    name: 'Cloth Hood',
+    slot: 'head',
+    main: 'wis',
+    second: 'int',
+    armor: { types: MAGIC5, share: 0.2 },
+  },
+  {
+    name: 'Padded Vest',
+    slot: 'body',
+    main: 'vit',
+    second: 'str',
+    armor: { types: ['cut', 'piercing', 'earth'], share: 0.4 },
+  },
+  {
+    name: 'Iron Mail',
+    slot: 'body',
+    main: 'vit',
+    second: 'str',
+    armor: { types: [...PHYSICAL3, 'blood'], share: 0.4 },
+    requires: 'str',
+  },
+  {
+    name: 'Cloth Robe',
+    slot: 'body',
+    main: 'wis',
+    second: 'int',
+    armor: { types: MAGIC5, share: 0.4 },
+  },
+  {
+    name: 'Worn Boots',
+    slot: 'feet',
+    main: 'dex',
+    second: 'vit',
+    armor: { types: ['cut', 'piercing', 'earth', 'water'], share: 0.15 },
+  },
   { name: 'Copper Ring', slot: 'ring', main: 'str', second: 'dex' },
   { name: 'Bone Charm', slot: 'charm', main: 'int', second: 'wis' },
 ];
+
+export const baseByName = (name: string): ItemBase => {
+  const base = BASES.find((b) => b.name === name);
+  if (!base) throw new Error(`Unknown item base ${name}`);
+  return base;
+};
 
 /** Chance (percent) that one defeated monster drops an item. */
 export const DROP_CHANCE = 35;
@@ -48,6 +188,32 @@ export function makeBonuses(
   return { [base.main]: main, [base.second]: Math.max(1, total - main) };
 }
 
+/** Combat stats of an item: weapon damage, resistances, requirements, and rolled extra damage. */
+export function makeGear(base: ItemBase, itemLevel: number, rarity: Rarity, rng?: Rng): GearStats {
+  const gear: GearStats = {};
+  if (base.requires) {
+    const need = Math.floor(itemLevel * 0.4);
+    if (need > 0) gear.requires = { [base.requires]: need };
+  }
+  if (base.weapon) {
+    const w = base.weapon;
+    gear.kind = w.kind;
+    gear.hands = w.hands;
+    gear.weapon = weaponRange(itemLevel, w.type, w.quality * RARITY_GEAR[rarity]);
+    const share = EXTRA_SHARE[rarity];
+    if (share && rng) {
+      const type = ELEMENTS[rng.int(0, ELEMENTS.length - 1)]!;
+      const avg = weaponRange(itemLevel, type, w.quality * share);
+      gear.extra = [{ type, min: avg.min, max: avg.max }];
+    }
+  }
+  if (base.armor) {
+    const points = Math.round(armorPoints(itemLevel) * base.armor.share * RARITY_GEAR[rarity]);
+    gear.resist = Object.fromEntries(base.armor.types.map((t) => [t, Math.max(1, points)]));
+  }
+  return gear;
+}
+
 function itemValue(itemLevel: number, rarity: Rarity): number {
   return Math.max(1, Math.round(itemLevel * 2 * RARITY_VALUE[rarity]));
 }
@@ -60,65 +226,85 @@ function rollRarity(rng: Rng): Rarity {
   return 'common';
 }
 
+const itemName = (base: ItemBase, rarity: Rarity, gear: GearStats): string =>
+  `${RARITY_PREFIX[rarity]}${gear.extra ? (ELEMENT_PREFIX[gear.extra[0]!.type] ?? '') : ''}${base.name}`;
+
 /** Rolls at most one item for a defeated monster. */
 export function rollDrop(rng: Rng, monsterLevel: number, id: string): Item | null {
   if (!rng.chance(DROP_CHANCE)) return null;
   const rarity = rollRarity(rng);
   const base = BASES[rng.int(0, BASES.length - 1)]!;
   const itemLevel = Math.max(1, monsterLevel + rng.int(-1, 1));
+  const gear = makeGear(base, itemLevel, rarity, rng);
   return {
     id,
-    name: `${RARITY_PREFIX[rarity]}${base.name}`,
+    name: itemName(base, rarity, gear),
     rarity,
     itemLevel,
     value: itemValue(itemLevel, rarity),
     favorite: false,
     slot: base.slot,
     bonuses: makeBonuses(base, itemLevel, rarity),
+    ...gear,
   };
 }
 
 /** Shop stock is not random: the same base, level and rarity always make the same item. */
 export function shopItem(baseName: string, itemLevel: number, rarity: Rarity): ShopItem {
-  const base = BASES.find((b) => b.name === baseName);
-  if (!base) throw new Error(`Unknown item base ${baseName}`);
+  const base = baseByName(baseName);
   const value = itemValue(itemLevel, rarity);
+  const gear = makeGear(base, itemLevel, rarity);
   return {
     id: `${base.name.toLowerCase().replace(/\s+/g, '_')}_${itemLevel}_${rarity}`,
-    name: `${RARITY_PREFIX[rarity]}${base.name}`,
+    name: itemName(base, rarity, gear),
     slot: base.slot,
     rarity,
     itemLevel,
     bonuses: makeBonuses(base, itemLevel, rarity),
     value,
     price: value * 4,
+    ...gear,
   };
+}
+
+/** What a new character of a class wears: its kit at common quality and the given level. */
+export function starterGear(
+  kit: string[],
+  memberId: string,
+  level: number,
+): Partial<Record<Slot, Item>> {
+  const worn: Partial<Record<Slot, Item>> = {};
+  for (const name of kit) {
+    const base = baseByName(name);
+    worn[base.slot] = {
+      id: `${memberId}_${base.slot}`,
+      name: base.name,
+      rarity: 'common',
+      itemLevel: level,
+      value: itemValue(level, 'common'),
+      favorite: false,
+      slot: base.slot,
+      bonuses: makeBonuses(base, level, 'common'),
+      ...makeGear(base, level, 'common'),
+    };
+  }
+  return worn;
 }
 
 /** Higher is more worth keeping: rarity first, then item level. */
 export const itemScore = (i: Item): number => RARITY_RANK[i.rarity] * 1000 + i.itemLevel;
 
-/**
- * Puts an item in the bag. When the bag is full the lowest-scoring unfavorited item is dropped
- * (or the new item, if it is the worst). Returns what was thrown away, if anything.
- */
 /** The party's shared bag capacity: its own size when it has one, else the config default. */
 export function bagCapacity(p: { bagSize?: number }, cfg: { bagSize: number }): number {
   return p.bagSize ?? cfg.bagSize;
 }
 
-export function addToBag(bag: Item[], item: Item, capacity: number): { discarded: Item | null } {
-  if (bag.length < capacity) {
-    bag.push(item);
-    return { discarded: null };
-  }
-  let worst = -1;
-  for (let i = 0; i < bag.length; i++) {
-    const it = bag[i]!;
-    if (it.favorite) continue;
-    if (worst === -1 || itemScore(it) < itemScore(bag[worst]!)) worst = i;
-  }
-  if (worst === -1 || itemScore(bag[worst]!) >= itemScore(item)) return { discarded: item };
-  const [out] = bag.splice(worst, 1, item);
-  return { discarded: out! };
+/**
+ * Puts an item in the bag if there is room. Nothing is ever thrown away to make space: a full
+ * bag simply does not receive the item, and the caller decides what that means.
+ */
+export function addToBag(bag: Item[], item: Item, capacity: number): boolean {
+  if (bag.length >= capacity) return false;
+  bag.push(item);
+  return true;
 }

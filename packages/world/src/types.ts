@@ -1,4 +1,12 @@
-import type { AIRule, Attributes, CombatEvent, Outcome } from '@game/engine';
+import type {
+  AIRule,
+  Attributes,
+  CombatEvent,
+  ExtraDamage,
+  Outcome,
+  Resistances,
+  WeaponDef,
+} from '@game/engine';
 
 // ---------- world content ----------
 
@@ -115,6 +123,13 @@ export interface Member {
    * here by itself, and its items are safe from defeat losses and bag overflow.
    */
   bag: Item[];
+  /** This character's own gold. Missing on older saves (the party's gold is split on load). */
+  gold: number;
+  /**
+   * The user who plays this character. Missing means every player of the party controls it
+   * (older saves and solo parties); once set, only that user can spend its gold or move its items.
+   */
+  ownerId?: string;
   /** Attribute points the player has spent (on top of class, race and level growth). */
   alloc: Attributes;
   /** Unspent attribute points. */
@@ -127,7 +142,23 @@ export interface Member {
   ai: AIRule[];
 }
 
-export interface Item {
+export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
+
+/** What a worn item does in combat, beyond its attribute bonuses. All optional. */
+export interface GearStats {
+  /** Attribute points the wearer needs (base + spent points, not counting other gear). */
+  requires?: Partial<Attributes>;
+  /** Weapons: the kind (skills will ask for one), how many hands it takes, and its damage. */
+  kind?: WeaponKind;
+  hands?: 1 | 2;
+  weapon?: WeaponDef;
+  /** Weapons: extra damage added to every hit (a fire sword adds fire), resisted on its own. */
+  extra?: ExtraDamage[];
+  /** Armor: resistance points per damage type (they add up over everything worn). */
+  resist?: Resistances;
+}
+
+export interface Item extends GearStats {
   id: string;
   name: string;
   rarity: Rarity;
@@ -139,7 +170,7 @@ export interface Item {
   bonuses?: Partial<Attributes>;
 }
 
-export interface ShopItem {
+export interface ShopItem extends GearStats {
   id: string;
   name: string;
   slot: Slot;
@@ -240,13 +271,14 @@ export interface PartyState {
   counter: number;
   level: number;
   xp: number;
-  gold: number;
   pos: Hex;
   lastCity: string;
   members: Member[];
   bag: Item[];
   /** Shared bag capacity. Missing on older saves: SimConfig.bagSize applies. Raised by bag items. */
   bagSize?: number;
+  /** Quest rewards that did not fit yet. They move to the shared bag as soon as there is room. */
+  pendingItems?: Item[];
   orders: Order[];
   activity: Activity;
   /** When the current activity completes (ms), or null when the party is dead. */
@@ -326,4 +358,6 @@ export interface ClassDef {
   ai: AIRule[];
   /** The pattern attribute points follow when spent automatically (repeats). */
   pointOrder: Array<keyof Attributes>;
+  /** Item bases a new character of this class starts wearing (common, at the party's level). */
+  kit: string[];
 }

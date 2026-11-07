@@ -154,27 +154,11 @@ describe('bag', () => {
     favorite,
   });
 
-  it('adds until full, then replaces the lowest-scoring unfavorited item', () => {
+  it('adds until full, then takes nothing and never throws anything away', () => {
     const bag = [item('a', 'common', 5), item('b', 'common', 1), item('c', 'rare', 1)];
-    expect(addToBag(bag, item('d', 'common', 9), 4).discarded).toBeNull();
-    const { discarded } = addToBag(bag, item('e', 'uncommon', 1), 4);
-    expect(discarded?.id).toBe('b');
-    expect(bag.map((i) => i.id)).toContain('e');
-    expect(bag).toHaveLength(4);
-  });
-
-  it('throws away the new item when it is the worst', () => {
-    const bag = [item('a', 'rare', 5), item('b', 'rare', 6)];
-    const worst = item('z', 'common', 1);
-    expect(addToBag(bag, worst, 2).discarded).toBe(worst);
-    expect(bag.map((i) => i.id)).toEqual(['a', 'b']);
-  });
-
-  it('never discards favorites', () => {
-    const bag = [item('a', 'common', 1, true), item('b', 'common', 1, true)];
-    const next = item('n', 'epic', 50);
-    expect(addToBag(bag, next, 2).discarded).toBe(next);
-    expect(bag.every((i) => i.favorite)).toBe(true);
+    expect(addToBag(bag, item('d', 'common', 9), 4)).toBe(true);
+    expect(addToBag(bag, item('e', 'epic', 50), 4)).toBe(false);
+    expect(bag.map((i) => i.id)).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('ranks rarity above item level', () => {

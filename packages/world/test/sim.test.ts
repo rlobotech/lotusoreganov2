@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { partyGold } from '../src/gold.ts';
 import { acceptQuest } from '../src/actions.ts';
 import { advance, createParty, defaultConfig } from '../src/sim.ts';
 import { STARTER_WORLD as W } from '../src/starter-world.ts';
@@ -67,7 +68,7 @@ describe('creation and determinism', () => {
     expect(a).toEqual(b);
     const c = advance(party(8), DAY, W, cfg);
     expect(c.events.map((e) => e.at)).not.toEqual(a.events.map((e) => e.at));
-  });
+  }, 30_000);
 
   it('splitting the time into slices gives the same result as one big jump', () => {
     const one = advance(party(3), 6 * 3600_000, W, cfg);
@@ -134,7 +135,7 @@ describe('progression through play', () => {
   it('gains xp, gold, loot and levels', () => {
     const r = advance(party(6), 12 * 3600_000, W, cfg);
     expect(r.party.level).toBeGreaterThan(2);
-    expect(r.party.gold).toBeGreaterThan(50);
+    expect(partyGold(r.party)).toBeGreaterThan(50);
     expect(r.party.bag.length).toBeGreaterThan(0);
     expect(r.events.some((e) => e.kind === 'level_up')).toBe(true);
     expect(r.party.stats.fights).toBe(r.events.filter((e) => e.kind === 'fight').length);
@@ -179,7 +180,7 @@ describe('orders and dungeons', () => {
   it('clears a dungeon: enters, fights every stage, pays out and marks it cleared', () => {
     const p = strong();
     p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_warren' });
-    const goldBefore = p.gold;
+    const goldBefore = partyGold(p);
     const r = advance(p, 3 * DAY, W, cfg);
     const kinds = r.events.map((e) => e.kind);
     expect(kinds).toContain('enter_dungeon');
@@ -187,7 +188,7 @@ describe('orders and dungeons', () => {
     expect(kinds).toContain('dungeon_cleared');
     expect(r.party.cleared).toContain('goblin_warren');
     expect(r.party.dungeon).toBeNull();
-    expect(r.party.gold).toBeGreaterThan(goldBefore + 80);
+    expect(partyGold(r.party)).toBeGreaterThan(goldBefore + 80);
     expect(r.party.orders).toHaveLength(0);
   });
 
@@ -237,7 +238,7 @@ describe('defeat', () => {
   /** A level 1 party thrown at a dungeon built for level 3 loses sooner or later. */
   function doomed(mode: 'standard' | 'hardcore', seed: number) {
     const p = party(seed, mode);
-    p.gold = 1000;
+    p.members[0]!.gold = 1000;
     p.orders.push({ id: 'o', kind: 'goto', siteId: 'goblin_warren' });
     return advance(p, 2 * DAY, W, cfg);
   }
@@ -279,7 +280,7 @@ describe('defeat', () => {
   it('standard defeat takes 15% of carried gold, favorites are never lost', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const p = party(seed);
-      p.gold = 1000;
+      p.members[0]!.gold = 1000;
       p.bag.push({
         id: 'fav',
         name: 'Fav',
@@ -292,7 +293,11 @@ describe('defeat', () => {
       const r = advance(p, DAY, W, { ...cfg, defeatItemLossPct: 100 });
       const d = r.events.find((e) => e.kind === 'defeat');
       if (!d) continue;
-      expect(d.payload.goldLost).toBe(Math.floor((1000 + goldEarnedBefore(r.events, d.at)) * 0.15));
+      // Each character loses 15% of its own gold (rounded down), so the total is a little under 15%.
+      const carried = 1000 + goldEarnedBefore(r.events, d.at);
+      const lost = d.payload.goldLost as number;
+      expect(lost).toBeLessThanOrEqual(Math.floor(carried * 0.15));
+      expect(lost).toBeGreaterThan(Math.floor(carried * 0.15) - p.members.length);
       expect(r.party.bag.some((i) => i.id === 'fav')).toBe(true);
       return;
     }

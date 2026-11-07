@@ -1,4 +1,11 @@
-import type { AIRule, Attributes, UnitDef } from '@game/engine';
+import {
+  weaponRange,
+  type AIRule,
+  type Attributes,
+  type DamageType,
+  type UnitDef,
+} from '@game/engine';
+import { armorResist } from './progression.ts';
 
 export interface MonsterTemplate {
   id: string;
@@ -9,6 +16,10 @@ export interface MonsterTemplate {
   move: number;
   skills: string[];
   ai: AIRule[];
+  /** What its weapon deals (claws, bow, club...). */
+  weapon: DamageType;
+  /** Armor as shares of a full set of resistances; negative shares are weaknesses. */
+  armor?: Partial<Record<DamageType, number>>;
 }
 
 const a = (str: number, dex: number, int: number, vit: number, wis: number): Attributes => ({
@@ -29,6 +40,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
     move: 3,
     skills: ['attack'],
     ai: [{ skill: 'attack' }],
+    weapon: 'cut',
+    armor: { cut: 0.3, piercing: 0.2, light: -0.2 },
   },
   goblin_archer: {
     id: 'goblin_archer',
@@ -39,6 +52,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
     move: 3,
     skills: ['shoot'],
     ai: [{ skill: 'shoot', order: 'lowest_hp' }],
+    weapon: 'piercing',
+    armor: { piercing: 0.1 },
   },
   wolf: {
     id: 'wolf',
@@ -49,6 +64,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
     move: 4,
     skills: ['attack'],
     ai: [{ skill: 'attack', order: 'lowest_hp' }],
+    weapon: 'piercing',
+    armor: { cut: -0.2, fire: -0.3 },
   },
   orc_brute: {
     id: 'orc_brute',
@@ -59,6 +76,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
     move: 3,
     skills: ['attack', 'stun_bash'],
     ai: [{ skill: 'stun_bash' }, { skill: 'attack' }],
+    weapon: 'smash',
+    armor: { cut: 0.8, piercing: 0.6, smash: 0.6, dark: -0.2 },
   },
   skeleton: {
     id: 'skeleton',
@@ -69,6 +88,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
     move: 3,
     skills: ['attack'],
     ai: [{ skill: 'attack' }],
+    weapon: 'cut',
+    armor: { piercing: 1, cut: 0.6, smash: -0.5, dark: 1, light: -0.8, water: 0.4, fire: -0.2 },
   },
   goblin_king: {
     id: 'goblin_king',
@@ -83,6 +104,8 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
       { skill: 'power_strike' },
       { skill: 'attack' },
     ],
+    weapon: 'cut',
+    armor: { cut: 0.8, piercing: 0.8, smash: 0.5, fire: 0.2 },
   },
   bone_lich: {
     id: 'bone_lich',
@@ -97,11 +120,13 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
       { skill: 'heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 50 } },
       { skill: 'staff_bolt' },
     ],
+    weapon: 'smash',
+    armor: { dark: 1.2, piercing: 0.8, cut: 0.5, smash: 0, light: -0.8, fire: 0.2, water: 0.3 },
   },
 };
 
 /** Global difficulty knob for monsters, tuned with `pnpm --filter @game/world balance`. */
-export const MONSTER_POWER = 1.55;
+export const MONSTER_POWER = 1.3;
 
 export function monsterAttributes(t: MonsterTemplate, level: number): Attributes {
   const at = (k: keyof Attributes) =>
@@ -120,5 +145,7 @@ export function monsterUnit(t: MonsterTemplate, id: string, level: number): Unit
     skills: t.skills,
     ai: t.ai,
     sprite: t.sprite,
+    weapon: weaponRange(level, t.weapon),
+    resist: armorResist(t.armor ?? {}, level),
   };
 }

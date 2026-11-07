@@ -25,8 +25,14 @@ export function inBounds(g: Grid, x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < g.width && y < g.height;
 }
 
-export function manhattan(a: Point, b: Point): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+/** Distance in tiles with 8-direction movement: a diagonal step counts as one. */
+export function distance(a: Point, b: Point): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
+/** The 8 neighbours (and only them) are adjacent. A tile is not adjacent to itself. */
+export function adjacent(a: Point, b: Point): boolean {
+  return distance(a, b) === 1;
 }
 
 /**
@@ -65,6 +71,10 @@ const DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, 0],
   [1, 0],
   [0, 1],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
 ];
 
 export interface Reach {
@@ -73,7 +83,10 @@ export interface Reach {
   prev: Int32Array;
 }
 
-/** Breadth-first search over free tiles (4-directional). `occupied` tiles cannot be entered. */
+/**
+ * Breadth-first search over free tiles (8 directions, every step costs 1). `occupied` tiles cannot
+ * be entered. A diagonal step may not cut the corner of a blocked tile.
+ */
 export function reach(g: Grid, from: Point, occupied: ReadonlySet<number>): Reach {
   const n = g.width * g.height;
   const dist = new Int32Array(n).fill(-1);
@@ -92,6 +105,8 @@ export function reach(g: Grid, from: Point, occupied: ReadonlySet<number>): Reac
       const nx = cx + dx;
       const ny = cy + dy;
       if (!inBounds(g, nx, ny)) continue;
+      if (dx !== 0 && dy !== 0 && (g.blocked[cy * g.width + nx] || g.blocked[ny * g.width + cx]))
+        continue;
       const ni = ny * g.width + nx;
       if (dist[ni] !== -1 || g.blocked[ni] || occupied.has(ni)) continue;
       dist[ni] = dist[cur]! + 1;

@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { mineFirst } from '../members.ts';
   import { session } from '../session.svelte.ts';
 
   let { selected = $bindable() }: { selected: string } = $props();
-  const members = $derived(session.party?.members ?? []);
+  const members = $derived(mineFirst(session.party?.members ?? []));
 </script>
 
 <div class="chips" role="tablist" aria-label="Party member">

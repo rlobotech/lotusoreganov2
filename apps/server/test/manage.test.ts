@@ -100,7 +100,9 @@ describe('summary', () => {
     const m = party.members[0];
     expect(m.attributes.total.str).toBeGreaterThan(0);
     expect(m.attributes.base).toBeDefined();
-    expect(m.equipment).toEqual({});
+    expect(m.equipment.weapon.weapon.max).toBeGreaterThan(0);
+    expect(m.combat.weapon).toEqual(m.equipment.weapon.weapon);
+    expect(Object.keys(m.combat.resist).length).toBeGreaterThan(0);
     expect(m.skills).toContain('attack');
     expect(m.ai.length).toBeGreaterThan(0);
     expect(m.autoAlloc).toBe(true);
@@ -120,6 +122,7 @@ describe('gear and bag', () => {
     const cookie = await signUp();
     const id = await newParty(cookie);
     await patch(id, (s) => {
+      for (const m of s.members) m.equipment = {};
       s.bag.push(sword as never, { ...sword, id: 'sw2' } as never);
     });
     const base = `/parties/${id}`;
@@ -155,6 +158,7 @@ describe('gear and bag', () => {
     const cookie = await signUp();
     const id = await newParty(cookie);
     await patch(id, (s) => {
+      for (const m of s.members) m.equipment = {};
       s.bag.push(
         sword as never,
         { ...sword, id: 'sw2', rarity: 'epic' } as never,
@@ -298,7 +302,7 @@ describe('city', () => {
     await patch(id, (s) => {
       s.activity = { kind: 'town', startedAt: Date.now(), ticks: 60 };
       s.nextAt = Date.now() + 3600_000;
-      s.gold = gold;
+      s.members[0]!.gold = gold;
       s.visited = ['oakhaven', 'stonebridge'];
     });
   }
@@ -340,7 +344,11 @@ describe('city', () => {
       404,
     );
 
-    await patch(id, (s) => void (s.gold = 1));
+    // Solo parties spend the gold of every character, so empty them all first.
+    await patch(id, (s) => {
+      for (const m of s.members) m.gold = 0;
+      s.members[0]!.gold = 1;
+    });
     expect((await call(cookie, 'POST', `${base}/city/buy`, { stockId: stock.id })).statusCode).toBe(
       409,
     );
@@ -348,7 +356,7 @@ describe('city', () => {
       (await call(cookie, 'POST', `${base}/city/teleport`, { siteId: 'stonebridge' })).statusCode,
     ).toBe(409);
 
-    await patch(id, (s) => void (s.gold = 500));
+    await patch(id, (s) => void (s.members[0]!.gold = 500));
     const tp = await call(cookie, 'POST', `${base}/city/teleport`, { siteId: 'stonebridge' });
     expect(tp.statusCode).toBe(200);
     expect(tp.json().party.city.name).toBe('Stonebridge');
@@ -400,5 +408,72 @@ describe('older saved parties', () => {
     const d = memberDerived({ race: 'dwarf', cls: 'warrior' }, 1);
     expect(me.json().party.members[0].maxHp).toBe(d.maxHp);
     void world;
+  });
+});
+
+describe('gold and ownership', () => {
+  it('shows each character its own gold and who is yours', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    await patch(id, (s) => {
+      s.members[0]!.gold = 30;
+      s.members[1]!.gold = 12;
+    });
+    const p = (await call(cookie, 'GET', `/parties/${id}`)).json().party;
+    expect(p.members.map((m: { gold: number }) => m.gold)).toEqual([30, 12, 0, 0]);
+    expect(p.gold).toBe(42);
+    expect(p.spendableGold).toBe(42);
+    expect(p.members.every((m: { mine: boolean }) => m.mine)).toBe(true);
+    expect(p.pendingItems).toEqual([]);
+    // Creating the party gave every character to its creator.
+    const stored = await stateOf(id);
+    expect(stored.members.every((m) => m.ownerId)).toBe(true);
+  });
+
+  it('sends gold between characters', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    await patch(id, (s) => void (s.members[0]!.gold = 50));
+    const url = `/parties/${id}/gold/send`;
+    const ok = await call(cookie, 'POST', url, { fromId: 'm1', toId: 'm3', amount: 20 });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().party.members.map((m: { gold: number }) => m.gold)).toEqual([30, 0, 20, 0]);
+    const bad = (body: object) => call(cookie, 'POST', url, body).then((r) => r.statusCode);
+    expect(await bad({ fromId: 'm1', toId: 'm3', amount: 31 })).toBe(409);
+    expect(await bad({ fromId: 'm1', toId: 'zz', amount: 1 })).toBe(404);
+    expect(await bad({ fromId: 'm1', toId: 'm1', amount: 1 })).toBe(400);
+    expect(await bad({ fromId: 'm1', toId: 'm3', amount: 0 })).toBe(400);
+    expect(await bad({ fromId: 'm1', toId: 'm3', amount: 1.5 })).toBe(400);
+  });
+
+  it('lets only the owner of a character touch its gold, gear and bag', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    await patch(id, (s) => {
+      // Another player owns Lyra (m2) and her things.
+      s.members[1]!.ownerId = '00000000-0000-0000-0000-000000000000';
+      s.members[1]!.gold = 40;
+      s.members[1]!.bag.push({ ...sword, id: 'lyra_sw' } as never);
+      s.bag.push({ ...sword, id: 'shared_sw' } as never);
+    });
+    const p = (await call(cookie, 'GET', `/parties/${id}`)).json().party;
+    expect(p.members.map((m: { mine: boolean }) => m.mine)).toEqual([true, false, true, true]);
+    expect(p.spendableGold).toBe(0);
+
+    const post = (path: string, body: object) =>
+      call(cookie, 'POST', `/parties/${id}${path}`, body).then((r) => r.statusCode);
+    // Taking from or giving to her gear and bag is refused; the shared bag is open to everyone.
+    expect(await post('/gold/send', { fromId: 'm2', toId: 'm1', amount: 5 })).toBe(403);
+    expect(await post('/move', { itemId: 'lyra_sw', to: { kind: 'bag' } })).toBe(403);
+    expect(
+      await post('/move', { itemId: 'shared_sw', to: { kind: 'personal', memberId: 'm2' } }),
+    ).toBe(403);
+    expect(await post('/equip', { memberId: 'm2', itemId: 'shared_sw' })).toBe(403);
+    expect(await post('/members/m2/allocate', { alloc: { str: 1 } })).toBe(403);
+    // Giving her gold and moving shared items among your own characters still works.
+    await patch(id, (s) => void (s.members[0]!.gold = 10));
+    expect(await post('/gold/send', { fromId: 'm1', toId: 'm2', amount: 5 })).toBe(200);
+    expect(await post('/equip', { memberId: 'm1', itemId: 'shared_sw' })).toBe(200);
+    expect((await stateOf(id)).members[1]!.gold).toBe(45);
   });
 });

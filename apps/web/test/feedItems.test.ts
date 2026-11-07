@@ -149,4 +149,25 @@ describe('buildFeedItems', () => {
       expect(titles).toEqual(['Lucky', 'Costly']);
     });
   });
+
+  it('notes a full bag on the fight and in a collapsed summary', () => {
+    const one = buildFeedItems([
+      win({ missed: ['Rusty Sword'] }),
+      entry('bag_full', { missed: ['Rusty Sword'] }),
+    ]);
+    expect(one[0]).toMatchObject({ kind: 'fight' });
+    expect((one[0] as { subtitle: string }).subtitle).toContain('bag full');
+    expect(one[1]).toMatchObject({ kind: 'card' });
+    expect((one[1] as { lines: string[] }).lines[0]).toContain('bag is full');
+
+    const many = Array.from({ length: COLLAPSE_ABOVE + 3 }, () => [
+      win({ missed: ['Worn Boots', 'Copper Ring'] }),
+      entry('bag_full', { missed: ['Worn Boots', 'Copper Ring'] }),
+    ]).flat();
+    const cards = buildFeedItems(many);
+    expect(cards).toHaveLength(1);
+    expect((cards[0] as { lines: string[] }).lines[1]).toContain(
+      `${(COLLAPSE_ABOVE + 3) * 2} left behind (bag full)`,
+    );
+  });
 });

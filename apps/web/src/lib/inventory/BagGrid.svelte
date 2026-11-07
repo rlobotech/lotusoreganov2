@@ -2,7 +2,7 @@
   import type { ItemInfo } from '@game/shared';
   import { useDnd } from './dnd.svelte.ts';
   import ItemSlot from './ItemSlot.svelte';
-  import { canDrop, encodeTarget, samePlace, type ItemPlace } from './itemUi.ts';
+  import { encodeTarget, samePlace, type ItemPlace } from './itemUi.ts';
 
   let {
     items,
@@ -25,7 +25,9 @@
   // Items beyond the capacity (it can shrink) still show, so nothing is ever hidden.
   const cells = $derived(Math.max(capacity, items.length));
   const valid = $derived(
-    !!dnd.dragging && canDrop(dnd.dragging.item, place) && !samePlace(dnd.dragging.from, place),
+    !!dnd.dragging &&
+      dnd.canDropOn(dnd.dragging.item, place) &&
+      !samePlace(dnd.dragging.from, place),
   );
   const hot = $derived(valid && !!dnd.over && encodeTarget(dnd.over) === encodeTarget(place));
   const full = $derived(items.length >= capacity);
@@ -47,16 +49,16 @@
 
 <style>
   .bag {
-    padding: 6px;
-    border: 1px solid transparent;
+    padding: 0;
     border-radius: 6px;
     min-width: 0;
   }
+  /* Highlights are shadows, not borders, so they never change the width the slots line up in. */
   .valid {
-    border-color: #c9a24a66;
+    box-shadow: 0 0 0 1px #c9a24a66;
   }
   .hot {
-    border-color: var(--gold-bright);
+    box-shadow: 0 0 0 1px var(--gold-bright);
     background: #2a241222;
   }
   .title {

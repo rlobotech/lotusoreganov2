@@ -1,3 +1,4 @@
+import { partyGold } from '../gold.ts';
 import { advance, createParty, defaultConfig } from '../sim.ts';
 import { formatClock, formatFeedEvent } from '../format.ts';
 import { STARTER_WORLD } from '../starter-world.ts';
@@ -41,6 +42,6 @@ for (let t = start; t <= end; t += 600_000) {
 }
 console.log(lines.join('\n'));
 console.log(
-  `\nAfter ${hours}h: level ${party.level} (${party.xp} xp), ${party.gold} gold, ${party.bag.length} items, ` +
+  `\nAfter ${hours}h: level ${party.level} (${party.xp} xp), ${partyGold(party)} gold, ${party.bag.length} items, ` +
     `${party.stats.fights} fights (${party.stats.wins}W ${party.stats.defeats}L ${party.stats.draws}D), status ${party.status}`,
 );

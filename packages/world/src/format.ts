@@ -24,10 +24,14 @@ export function formatFeedEvent(e: FeedEvent): string {
       if (p.gold) bits.push(`+${p.gold} gold`);
       if (p.loot?.length)
         bits.push(`loot: ${p.loot.map((i: { name: string }) => i.name).join(', ')}`);
-      if (p.discarded?.length) bits.push(`discarded: ${p.discarded.join(', ')}`);
+      if (p.missed?.length) bits.push(`left behind (bag full): ${p.missed.join(', ')}`);
       if (p.fallen?.length) bits.push(`fallen: ${p.fallen.join(', ')}`);
       return bits.join(' | ');
     }
+    case 'bag_full':
+      return `The bag is full: ${(p.missed as string[]).join(', ')} could not be picked up.`;
+    case 'items_delivered':
+      return `Delivered to the bag: ${(p.items as string[]).join(', ')}.`;
     case 'level_up':
       return `The party reached level ${p.level}!`;
     case 'rest':
@@ -47,7 +51,7 @@ export function formatFeedEvent(e: FeedEvent): string {
       return `DEFEATED. Back at ${p.city}, lost ${p.goldLost} gold${lost}.`;
     }
     case 'quest_completed': {
-      const item = p.item ? `, ${p.item}` : '';
+      const item = p.item ? `, ${p.item}${p.waiting ? ' (waiting for bag space)' : ''}` : '';
       return `Quest complete: ${p.name}! +${p.gold} gold, +${p.xp} xp${item}.`;
     }
     case 'teleport':

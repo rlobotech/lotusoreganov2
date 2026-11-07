@@ -12,6 +12,7 @@ import {
   moveOrderSchema,
   seenSchema,
   sellSchema,
+  sendGoldSchema,
   teleportSchema,
   unequipSchema,
 } from '@game/shared';
@@ -32,6 +33,7 @@ import {
   resetMemberAi,
   resetPoints,
   sellItems,
+  sendGold,
   setAutoAlloc,
   setFavorite,
   setMemberAi,
@@ -62,6 +64,7 @@ const idParam = z.object({ id: z.uuid() });
 
 /** Rule problems map to 4xx: missing things are 404, malformed input 400, the rest conflicts. */
 function statusFor(code: string): number {
+  if (code === 'not_yours') return 403;
   if (code.startsWith('no_') && code !== 'no_gold' && code !== 'no_destination') return 404;
   if (code.startsWith('bad_')) return 400;
   return 409;
@@ -69,6 +72,13 @@ function statusFor(code: string): number {
 
 export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Deps): Promise<void> {
   const auth = authenticate(pool);
+
+  /** Loads a saved party. Characters nobody owns yet belong to the party's owner. */
+  function claimMembers(state: PartyState, userId: string): PartyState {
+    normalizeParty(state, world);
+    for (const m of state.members) m.ownerId ??= userId;
+    return state;
+  }
 
   /** The party must exist and belong to the caller; anyone else gets a 404 (no existence leak). */
   async function ownedParty(req: FastifyRequest): Promise<{ id: string; state: PartyState }> {
@@ -79,7 +89,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
     );
     const row = res.rows[0];
     if (!row) throw new HttpError(404, 'not_found', 'Party not found');
-    normalizeParty(row.state, world);
+    claimMembers(row.state, req.user!.id);
     return row;
   }
 
@@ -102,7 +112,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
       );
       const row = res.rows[0];
       if (!row) throw new HttpError(404, 'not_found', 'Party not found');
-      const state = normalizeParty(row.state, world);
+      const state = claimMembers(row.state, req.user!.id);
       const result = fn(state) ?? { ok: true as const };
       if (!result.ok) throw new HttpError(statusFor(result.code), result.code, result.error);
       await client.query(
@@ -133,7 +143,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   /** Runs an action and answers with the fresh party summary. */
   async function act(req: FastifyRequest, fn: (s: PartyState) => ActionResult | void) {
     const state = await mutateParty(req, fn);
-    return { party: summarize(state, world) };
+    return { party: summarize(state, world, req.user!.id) };
   }
 
   const memberParam = z.object({ id: z.uuid(), memberId: z.string().min(1).max(40) });
@@ -152,6 +162,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
       seed: randomInt(1, 2 ** 31),
       now: Date.now(),
       world,
+      ownerId: req.user!.id,
     });
     try {
       await pool.query(
@@ -173,7 +184,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
       }
       throw err;
     }
-    return reply.code(201).send({ party: summarize(state, world) });
+    return reply.code(201).send({ party: summarize(state, world, req.user!.id) });
   });
 
   app.get('/parties/me', { preHandler: auth }, async (req) => {
@@ -182,12 +193,14 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
       [req.user!.id],
     );
     const row = res.rows[0];
-    return { party: row ? summarize(normalizeParty(row.state, world), world) : null };
+    return {
+      party: row ? summarize(claimMembers(row.state, req.user!.id), world, req.user!.id) : null,
+    };
   });
 
   app.get('/parties/:id', { preHandler: auth }, async (req) => {
     const { state } = await ownedParty(req);
-    return { party: summarize(state, world) };
+    return { party: summarize(state, world, req.user!.id) };
   });
 
   // ---- feed ("while you were away") ----
@@ -333,17 +346,17 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.post('/parties/:id/equip', { preHandler: auth }, async (req) => {
     const { memberId, itemId } = equipSchema.parse(req.body);
-    return act(req, (s) => equipItem(s, memberId, itemId));
+    return act(req, (s) => equipItem(s, memberId, itemId, req.user!.id));
   });
 
   app.post('/parties/:id/unequip', { preHandler: auth }, async (req) => {
     const { memberId, slot } = unequipSchema.parse(req.body);
-    return act(req, (s) => unequipItem(s, memberId, slot, cfg));
+    return act(req, (s) => unequipItem(s, memberId, slot, cfg, req.user!.id));
   });
 
   app.post('/parties/:id/move', { preHandler: auth }, async (req) => {
     const { itemId, to } = moveItemSchema.parse(req.body);
-    return act(req, (s) => moveItem(s, itemId, to, cfg));
+    return act(req, (s) => moveItem(s, itemId, to, cfg, req.user!.id));
   });
 
   app.post('/parties/:id/sort-bag', { preHandler: auth }, async (req) => {
@@ -353,12 +366,12 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/items/:itemId/favorite', { preHandler: auth }, async (req) => {
     const { itemId } = itemParam.parse(req.params);
     const { value } = favoriteSchema.parse(req.body);
-    return act(req, (s) => setFavorite(s, itemId, value));
+    return act(req, (s) => setFavorite(s, itemId, value, req.user!.id));
   });
 
   app.delete('/parties/:id/items/:itemId', { preHandler: auth }, async (req) => {
     const { itemId } = itemParam.parse(req.params);
-    return act(req, (s) => discardItem(s, itemId));
+    return act(req, (s) => discardItem(s, itemId, req.user!.id));
   });
 
   // ---- members: attribute points and combat AI ----
@@ -366,29 +379,29 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/members/:memberId/allocate', { preHandler: auth }, async (req) => {
     const { memberId } = memberParam.parse(req.params);
     const { alloc } = allocSchema.parse(req.body);
-    return act(req, (s) => allocatePoints(s, memberId, alloc));
+    return act(req, (s) => allocatePoints(s, memberId, alloc, req.user!.id));
   });
 
   app.post('/parties/:id/members/:memberId/auto-alloc', { preHandler: auth }, async (req) => {
     const { memberId } = memberParam.parse(req.params);
     const { auto } = autoAllocSchema.parse(req.body);
-    return act(req, (s) => setAutoAlloc(s, memberId, auto));
+    return act(req, (s) => setAutoAlloc(s, memberId, auto, req.user!.id));
   });
 
   app.post('/parties/:id/members/:memberId/reset-points', { preHandler: auth }, async (req) => {
     const { memberId } = memberParam.parse(req.params);
-    return act(req, (s) => resetPoints(s, memberId));
+    return act(req, (s) => resetPoints(s, memberId, req.user!.id));
   });
 
   app.put('/parties/:id/members/:memberId/ai', { preHandler: auth }, async (req) => {
     const { memberId } = memberParam.parse(req.params);
     const { rules } = aiSchema.parse(req.body);
-    return act(req, (s) => setMemberAi(s, memberId, rules));
+    return act(req, (s) => setMemberAi(s, memberId, rules, req.user!.id));
   });
 
   app.post('/parties/:id/members/:memberId/ai/reset', { preHandler: auth }, async (req) => {
     const { memberId } = memberParam.parse(req.params);
-    return act(req, (s) => resetMemberAi(s, memberId));
+    return act(req, (s) => resetMemberAi(s, memberId, req.user!.id));
   });
 
   // ---- city (only while the party stands in one) ----
@@ -406,17 +419,22 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.post('/parties/:id/city/sell', { preHandler: auth }, async (req) => {
     const { itemIds } = sellSchema.parse(req.body);
-    return act(req, (s) => sellItems(s, world, itemIds));
+    return act(req, (s) => sellItems(s, world, itemIds, req.user!.id));
   });
 
   app.post('/parties/:id/city/buy', { preHandler: auth }, async (req) => {
     const { stockId } = buySchema.parse(req.body);
-    return act(req, (s) => buyItem(s, world, stockId, cfg));
+    return act(req, (s) => buyItem(s, world, stockId, cfg, req.user!.id));
   });
 
   app.post('/parties/:id/city/teleport', { preHandler: auth }, async (req) => {
     const { siteId } = teleportSchema.parse(req.body);
-    return act(req, (s) => teleport(s, world, cfg, siteId, Date.now()));
+    return act(req, (s) => teleport(s, world, cfg, siteId, Date.now(), req.user!.id));
+  });
+
+  app.post('/parties/:id/gold/send', { preHandler: auth }, async (req) => {
+    const { fromId, toId, amount } = sendGoldSchema.parse(req.body);
+    return act(req, (s) => sendGold(s, fromId, toId, amount, req.user!.id));
   });
 
   app.post('/parties/:id/town/leave', { preHandler: auth }, async (req) => {

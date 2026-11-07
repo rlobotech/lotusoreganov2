@@ -1,16 +1,21 @@
+import { resistPct, type DamageType } from '@game/engine';
 import type { OrderInfo, PartySummary, QuestInfo, SkillInfo, WorldInfo } from '@game/shared';
 import {
   activeQuest,
+  canControl,
   DEFAULT_BAG_SIZE,
   memberBreakdown,
   memberDerived,
+  memberGear,
   MONSTERS,
   objectiveTarget,
+  partyGold,
   PERSONAL_BAG_SIZE,
   questAvailability,
   questTargetSite,
   shopItem,
   SKILLS,
+  spendableGold,
   usableCity,
   xpToNext,
   type PartyState,
@@ -80,7 +85,7 @@ export function orderInfo(state: PartyState, world: WorldDef): OrderInfo[] {
 }
 
 /** What the client sees of a party. Deliberately leaves out a running fight's result. */
-export function summarize(state: PartyState, world: WorldDef): PartySummary {
+export function summarize(state: PartyState, world: WorldDef, viewer?: string): PartySummary {
   const a = state.activity;
   let label = 'Idle';
   if (a.kind === 'travel') {
@@ -100,11 +105,13 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
     level: state.level,
     xp: state.xp,
     xpToNext: xpToNext(state.level),
-    gold: state.gold,
+    gold: partyGold(state),
+    spendableGold: spendableGold(state, viewer),
     pos: state.pos,
     lastCity: state.lastCity,
     members: state.members.map((m) => {
       const d = memberDerived(m, state.level);
+      const gear = memberGear(m);
       return {
         id: m.id,
         name: m.name,
@@ -117,22 +124,37 @@ export function summarize(state: PartyState, world: WorldDef): PartySummary {
         maxMana: d.maxMana,
         attributes: memberBreakdown(m, state.level),
         derived: {
-          atk: d.atk,
-          magic: d.magic,
-          def: d.def,
-          res: d.res,
           speed: d.speed,
           move: d.move,
+          accuracy: Math.round(d.accuracy),
+          evasion: Math.round(d.evasion),
+          crit: Math.round(d.crit * 10) / 10,
+        },
+        combat: {
+          weapon: gear.weapon ?? null,
+          extra: gear.extra,
+          resist: Object.fromEntries(
+            Object.entries(gear.resist).map(([type, points]) => [
+              type,
+              {
+                points,
+                pct: Math.round(resistPct(points, state.level) * 100),
+              },
+            ]),
+          ) as Partial<Record<DamageType, { points: number; pct: number }>>,
         },
         points: m.points,
         autoAlloc: m.autoAlloc,
         equipment: m.equipment,
         bag: m.bag,
+        gold: m.gold,
+        mine: canControl(m, viewer),
         skills: m.skills,
         ai: m.ai,
       };
     }),
     bag: state.bag,
+    pendingItems: state.pendingItems ?? [],
     bagSize: state.bagSize ?? DEFAULT_BAG_SIZE,
     personalBagSize: PERSONAL_BAG_SIZE,
     orders: orderInfo(state, world),
@@ -164,13 +186,17 @@ export function skillCatalog(): SkillInfo[] {
     id: s.id,
     name: s.name,
     kind: s.kind,
-    damageType: s.damageType,
+    source: s.source,
+    damageType: s.damageType ?? null,
+    attr: s.attr,
     power: s.power,
     range: s.range,
     manaCost: s.manaCost,
     cooldown: s.cooldown,
     side: s.side,
     ...(s.radius ? { radius: s.radius } : {}),
+    ...(s.retreat ? { retreat: s.retreat } : {}),
+    ...(s.free ? { free: true } : {}),
     ...(s.status
       ? { status: { id: s.status.id, kind: s.status.kind, duration: s.status.duration } }
       : {}),

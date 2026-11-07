@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CityInfo } from '@game/shared';
   import { api, ApiError } from '../api.ts';
+  import { gearLines } from '../inventory/itemUi.ts';
   import { fmtBonuses, SLOT_LABELS } from '../labels.ts';
   import { manage, session } from '../session.svelte.ts';
 
@@ -20,7 +21,7 @@
 
   // Reload whenever gold or the bag changes (after buying, selling, teleporting).
   $effect(() => {
-    void party.gold;
+    void party.spendableGold;
     void party.bag.length;
     void party.city?.id;
     load();
@@ -31,16 +32,23 @@
     await load();
   }
 
-  const sellable = $derived(party.bag.filter((i) => !i.favorite));
+  // Shared bag items and the personal bags of your own characters can be sold.
+  const sellable = $derived(
+    [...party.bag, ...party.members.filter((m) => m.mine).flatMap((m) => m.bag)].filter(
+      (i) => !i.favorite,
+    ),
+  );
   const chosen = $derived(sellable.filter((i) => selected[i.id]));
   const total = $derived(chosen.reduce((s, i) => s + i.value, 0));
-  const bagFull = $derived(party.bag.length >= 40);
+  const bagFull = $derived(party.bag.length >= party.bagSize);
 </script>
 
 {#if party.city && info}
   <div class="row">
     <h3>{info.city.name}</h3>
-    <span class="good">{party.gold} gold</span>
+    <span class="good" title="Gold of the characters you control">
+      Your gold: {party.spendableGold}
+    </span>
   </div>
   {#if error}<p class="bad">{error}</p>{/if}
 
@@ -59,7 +67,7 @@
       <div class="row">
         <span>{t.name}</span>
         <button
-          disabled={party.gold < t.cost}
+          disabled={party.spendableGold < t.cost}
           onclick={() => run(() => api.teleport(party.id, t.siteId))}
         >
           {t.cost} gold
@@ -74,6 +82,7 @@
 
   <div class="card">
     <div class="label">Sell</div>
+    <div class="muted small">The money is shared evenly by every character.</div>
     {#each sellable as item (item.id)}
       <label class="row sell">
         <span
@@ -113,9 +122,10 @@
           <div class="muted small">
             {SLOT_LABELS[s.slot]} · L{s.itemLevel} · {fmtBonuses(s.bonuses)}
           </div>
+          {#each gearLines(s) as line (line)}<div class="muted small">{line}</div>{/each}
         </div>
         <button
-          disabled={party.gold < s.price || bagFull}
+          disabled={party.spendableGold < s.price || bagFull}
           onclick={() => run(() => api.buy(party.id, s.id))}
         >
           {s.price} gold

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasLineOfSight, makeGrid, pathTo, reach } from '../src/grid.ts';
+import { adjacent, distance, hasLineOfSight, makeGrid, pathTo, reach } from '../src/grid.ts';
 import { openArena } from './helpers.ts';
 
 describe('line of sight', () => {
@@ -28,7 +28,7 @@ describe('line of sight', () => {
 });
 
 describe('reach and paths', () => {
-  it('finds shortest 4-directional paths around obstacles', () => {
+  it('finds shortest 8-direction paths around obstacles, never cutting a blocked corner', () => {
     const g = makeGrid(
       openArena(5, 3, [
         { x: 2, y: 0 },
@@ -37,9 +37,9 @@ describe('reach and paths', () => {
     );
     const r = reach(g, { x: 0, y: 0 }, new Set());
     const target = 0 * 5 + 4;
-    expect(r.dist[target]).toBe(8);
+    expect(r.dist[target]).toBe(6);
     const path = pathTo(g, r, target);
-    expect(path).toHaveLength(8);
+    expect(path).toHaveLength(6);
     expect(path[path.length - 1]).toEqual({ x: 4, y: 0 });
   });
 
@@ -47,5 +47,23 @@ describe('reach and paths', () => {
     const g = makeGrid(openArena(3, 1));
     const r = reach(g, { x: 0, y: 0 }, new Set([1]));
     expect(r.dist[2]).toBe(-1);
+  });
+});
+
+describe('8-direction geometry', () => {
+  it('counts a diagonal step as one tile and the 8 neighbours as adjacent', () => {
+    expect(distance({ x: 0, y: 0 }, { x: 3, y: 2 })).toBe(3);
+    expect(adjacent({ x: 2, y: 2 }, { x: 3, y: 3 })).toBe(true);
+    expect(adjacent({ x: 2, y: 2 }, { x: 2, y: 2 })).toBe(false);
+    expect(adjacent({ x: 2, y: 2 }, { x: 4, y: 2 })).toBe(false);
+    const r = reach(makeGrid(openArena(5, 5)), { x: 0, y: 0 }, new Set());
+    expect(r.dist[4 * 5 + 4]).toBe(4);
+  });
+
+  it('does not squeeze a diagonal step between two blocked tiles or past one', () => {
+    const g = makeGrid(openArena(3, 3, [{ x: 1, y: 0 }]));
+    const r = reach(g, { x: 0, y: 0 }, new Set());
+    // (0,0) to (1,1) would cut the corner of the blocked (1,0).
+    expect(r.dist[1 * 3 + 1]).toBe(2);
   });
 });

@@ -27,18 +27,23 @@ export function formatLog(events: CombatEvent[]): string[] {
         break;
       case 'move': {
         const end = e.path[e.path.length - 1]!;
-        lines.push(`${name(e.unit)} moves ${e.path.length} to ${end.x},${end.y}`);
+        lines.push(
+          `${name(e.unit)} ${e.retreat ? 'steps back' : 'moves'} ${e.path.length} to ${end.x},${end.y}`,
+        );
         break;
       }
       case 'skill':
-        lines.push(`${name(e.unit)} uses ${e.skill} on ${name(e.target)}`);
+        lines.push(
+          `${name(e.unit)} ${e.reaction ? 'strikes as a reaction with' : 'uses'} ${e.skill} on ${name(e.target)}`,
+        );
         break;
       case 'miss':
-        lines.push(`  ${name(e.target)} dodges ${e.skill}`);
+        lines.push(`  ${name(e.target)} dodges ${e.skill} (${e.chance}% to hit)`);
         break;
       case 'damage':
         lines.push(
-          `  ${name(e.target)} takes ${e.amount}${e.crit ? ' (crit)' : ''} from ${e.skill} -> HP ${e.hp}`,
+          `  ${name(e.target)} takes ${e.amount} ${e.type}${e.crit ? ' (crit)' : ''}` +
+            `${e.resist ? ` (${e.resist}% resisted)` : ''} from ${e.skill}${e.extra ? ' (extra)' : ''} -> HP ${e.hp}`,
         );
         break;
       case 'heal':

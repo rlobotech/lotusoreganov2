@@ -104,6 +104,12 @@ export const api = {
       | { kind: 'personal'; memberId: string }
       | { kind: 'equip'; memberId: string; slot?: SlotName },
   ) => request<{ party: PartySummary }>('POST', `/parties/${partyId}/move`, { itemId, to }),
+  sendGold: (partyId: string, fromId: string, toId: string, amount: number) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/gold/send`, {
+      fromId,
+      toId,
+      amount,
+    }),
   sortBag: (partyId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/sort-bag`),
   favorite: (partyId: string, itemId: string, value: boolean) =>

@@ -1,4 +1,4 @@
-import { createRng, runCombat, type Rng, type UnitDef } from '@game/engine';
+import { createRng, runCombat, weaponRange, type Rng, type UnitDef } from '@game/engine';
 import { ARENAS } from './arenas.ts';
 import {
   findPath,
@@ -24,6 +24,7 @@ import {
 } from './quests.ts';
 import {
   addXp,
+  memberGear,
   CLASSES,
   createMember,
   grantPoints,
@@ -34,6 +35,7 @@ import {
   normalizeMember,
   SKILLS,
 } from './progression.ts';
+import { partyGold, splitGold } from './gold.ts';
 import { DEFAULT_BAG_SIZE } from './types.ts';
 import type {
   Activity,
@@ -77,6 +79,12 @@ export function normalizeParty(p: PartyState, world: WorldDef): PartyState {
   if (!p.visited.includes(p.lastCity)) p.visited.push(p.lastCity);
   p.quests ??= { active: [], completed: [] };
   for (const m of p.members) normalizeMember(m);
+  // Gold used to be one pool for the party: share it evenly among the characters.
+  const legacy = (p as { gold?: number }).gold;
+  if (legacy !== undefined) {
+    splitGold(p.members, legacy);
+    delete (p as { gold?: number }).gold;
+  }
   return p;
 }
 
@@ -88,6 +96,8 @@ export interface CreatePartyOptions {
   seed: number;
   now: number;
   world: WorldDef;
+  /** The user who plays every character at the start. */
+  ownerId?: string;
 }
 
 export function createParty(o: CreatePartyOptions): PartyState {
@@ -105,10 +115,13 @@ export function createParty(o: CreatePartyOptions): PartyState {
     counter: 0,
     level: 1,
     xp: 0,
-    gold: 0,
     pos: { col: city.col, row: city.row },
     lastCity: city.id,
-    members: o.members.map((t, i) => createMember(i, t, 1)),
+    members: o.members.map((t, i) => {
+      const m = createMember(i, t, 1);
+      if (o.ownerId !== undefined) m.ownerId = o.ownerId;
+      return m;
+    }),
     bag: [],
     orders: [],
     activity: { kind: 'start' },
@@ -163,6 +176,7 @@ export function hpFraction(p: PartyState): number {
 
 function memberUnit(p: PartyState, m: Member): UnitDef {
   const cls = CLASSES[m.cls];
+  const gear = memberGear(m);
   return {
     id: m.id,
     name: m.name,
@@ -173,6 +187,9 @@ function memberUnit(p: PartyState, m: Member): UnitDef {
     skills: m.skills,
     ai: m.ai,
     sprite: `${m.race}_${m.cls}`,
+    weapon: gear.weapon ?? weaponRange(p.level, 'smash', 0.5),
+    extraDamage: gear.extra,
+    resist: gear.resist,
     hp: m.hp,
     mana: m.mana,
   };
@@ -226,20 +243,23 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
 
   if (r.outcome === 'victory') {
     p.stats.wins += 1;
-    p.gold += r.gold;
-    const discarded: string[] = [];
+    const alive = p.members.filter((m) => m.alive);
+    splitGold(alive.length ? alive : p.members, r.gold);
+    // A full bag takes nothing: loot that does not fit stays behind.
+    const picked: Item[] = [];
+    const missed: string[] = [];
     for (const item of r.loot) {
       if (item.rarity === 'epic') pinned = true;
-      const { discarded: out } = addToBag(p.bag, item, bagCapacity(p, ctx.cfg));
-      if (out) discarded.push(out.name);
+      if (addToBag(p.bag, item, bagCapacity(p, ctx.cfg))) picked.push(item);
+      else missed.push(item.name);
     }
     levelsGained = addXp(p, r.xp);
     grantLevelPoints(ctx, levelsGained);
     recordKills(p, ctx.world, r.kills ?? {});
     payload.xp = r.xp;
     payload.gold = r.gold;
-    payload.loot = r.loot.map((i) => ({ name: i.name, rarity: i.rarity, itemLevel: i.itemLevel }));
-    if (discarded.length) payload.discarded = discarded;
+    payload.loot = picked.map((i) => ({ name: i.name, rarity: i.rarity, itemLevel: i.itemLevel }));
+    if (missed.length) payload.missed = missed;
   } else if (r.outcome === 'draw') {
     p.stats.draws += 1;
     p.forcedRest = true;
@@ -256,6 +276,7 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
     events: r.events,
   });
   emit(ctx, 'fight', payload, replayKey);
+  if (Array.isArray(payload.missed)) emit(ctx, 'bag_full', { missed: payload.missed });
   if (levelsGained > 0) emit(ctx, 'level_up', { level: p.level, gained: levelsGained });
 
   if (r.outcome === 'defeat') return handleDefeat(ctx);
@@ -285,27 +306,29 @@ function settleQuests(ctx: Ctx) {
     p.quests.active = p.quests.active.filter((q) => q.id !== def.id);
     if (!p.quests.completed.includes(def.id)) p.quests.completed.push(def.id);
     p.orders = p.orders.filter((o) => !(o.kind === 'quest' && o.questId === def.id));
-    p.gold += def.reward.gold;
+    splitGold(p.members, def.reward.gold);
     const gained = addXp(p, def.reward.xp);
     grantLevelPoints(ctx, gained);
     let itemName: string | undefined;
+    let waiting = false;
     if (def.reward.item) {
       const s = shopItem(def.reward.item.base, def.reward.item.itemLevel, def.reward.item.rarity);
       itemName = s.name;
-      addToBag(
-        p.bag,
-        {
-          id: `q_${def.id}_${p.stats.fights}_${ctx.at}`,
-          name: s.name,
-          rarity: s.rarity,
-          itemLevel: s.itemLevel,
-          value: s.value,
-          favorite: true,
-          slot: s.slot,
-          bonuses: { ...s.bonuses },
-        },
-        bagCapacity(p, ctx.cfg),
-      );
+      const reward: Item = {
+        id: `q_${def.id}_${p.stats.fights}_${ctx.at}`,
+        name: s.name,
+        rarity: s.rarity,
+        itemLevel: s.itemLevel,
+        value: s.value,
+        favorite: true,
+        slot: s.slot,
+        bonuses: { ...s.bonuses },
+      };
+      // Quest items are never lost: with no room they wait and arrive when a slot frees up.
+      if (!addToBag(p.bag, reward, bagCapacity(p, ctx.cfg))) {
+        (p.pendingItems ??= []).push(reward);
+        waiting = true;
+      }
     }
     emit(ctx, 'quest_completed', {
       questId: def.id,
@@ -313,9 +336,22 @@ function settleQuests(ctx: Ctx) {
       gold: def.reward.gold,
       xp: def.reward.xp,
       ...(itemName ? { item: itemName } : {}),
+      ...(waiting ? { waiting: true } : {}),
     });
     if (gained > 0) emit(ctx, 'level_up', { level: p.level, gained });
   }
+}
+
+/** Items that were waiting for room (quest rewards) move to the shared bag as space appears. */
+function deliverPending(ctx: Ctx) {
+  const p = ctx.party;
+  if (!p.pendingItems?.length) return;
+  const delivered: string[] = [];
+  while (p.pendingItems.length && addToBag(p.bag, p.pendingItems[0]!, bagCapacity(p, ctx.cfg))) {
+    delivered.push(p.pendingItems.shift()!.name);
+  }
+  if (p.pendingItems.length === 0) delete p.pendingItems;
+  if (delivered.length) emit(ctx, 'items_delivered', { items: delivered });
 }
 
 function advanceDungeon(ctx: Ctx) {
@@ -333,7 +369,7 @@ function advanceDungeon(ctx: Ctx) {
     });
     return;
   }
-  p.gold += def.rewardGold;
+  splitGold(p.members, def.rewardGold);
   const levelsGained = addXp(p, def.rewardXp);
   grantLevelPoints(ctx, levelsGained);
   p.cleared.push(site.id);
@@ -358,11 +394,16 @@ function handleDefeat(ctx: Ctx) {
     p.status = 'dead';
     p.nextAt = null;
     p.activity = { kind: 'dead' };
-    emit(ctx, 'party_lost', { name: p.name, level: p.level, gold: p.gold });
+    emit(ctx, 'party_lost', { name: p.name, level: p.level, gold: partyGold(p) });
     return;
   }
-  const goldLost = Math.floor((p.gold * ctx.cfg.defeatGoldLossPct) / 100);
-  p.gold -= goldLost;
+  // Every character loses a share of the gold it carries.
+  let goldLost = 0;
+  for (const m of p.members) {
+    const lose = Math.floor((m.gold * ctx.cfg.defeatGoldLossPct) / 100);
+    m.gold -= lose;
+    goldLost += lose;
+  }
   const lost: Item[] = [];
   p.bag = p.bag.filter((item) => {
     if (item.favorite || !ctx.rng.chance(ctx.cfg.defeatItemLossPct)) return true;
@@ -760,6 +801,7 @@ export function advance(
     steps += 1;
     const ctx: Ctx = { party, world, cfg, rng: stepRng(party), at: party.nextAt, events, replays };
     party.counter += 1;
+    deliverPending(ctx);
     const rescheduled = completeActivity(ctx);
     if (!rescheduled && party.status === 'active') decide(ctx);
   }

@@ -13,7 +13,7 @@
   const world = $derived(session.world!);
 
   let selected = $state<string | null>(null);
-  let menu = $state<'character' | 'city' | 'quests' | null>(null);
+  let menu = $state<'inventory' | 'city' | 'quests' | null>(null);
   const unspent = $derived(party.members.reduce((s, m) => s + m.points, 0));
   let now = $state(Date.now());
   let hasNew = $state(false);
@@ -108,14 +108,21 @@
           <h2>{party.name}</h2>
           {#if party.mode === 'hardcore'}<span class="badge">Hardcore</span>{/if}
         </div>
-        <div class="muted">Level {party.level} · {party.gold} gold · {party.stats.wins} wins</div>
+        <div class="muted">
+          Level {party.level} · {party.gold} gold in all · {party.stats.wins} wins
+        </div>
+        {#if party.bag.length >= party.bagSize}
+          <div class="warn small">
+            The shared bag is full: no new loot is picked up. Sell, discard or send items away.
+          </div>
+        {/if}
         <div class="bar">
           <div class="fill xp" style="width:{pct(party.xp, party.xpToNext)}"></div>
         </div>
         <div class="muted small">{party.xp} / {party.xpToNext} xp</div>
       </div>
 
-      <button class="primary" onclick={() => (menu = 'character')}>
+      <button class="primary" onclick={() => (menu = 'inventory')}>
         Manage party
         {#if unspent > 0}<span class="dot">{unspent} points</span>{/if}
       </button>
@@ -281,6 +288,9 @@
 {/if}
 
 <style>
+  .warn {
+    color: #e08a4a;
+  }
   .home {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;

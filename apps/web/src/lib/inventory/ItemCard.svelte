@@ -3,7 +3,7 @@
   import type { Snippet } from 'svelte';
   import { ATTR_LABELS, cap, SLOT_LABELS } from '../labels.ts';
   import ItemIcon from './ItemIcon.svelte';
-  import { compareItems } from './itemUi.ts';
+  import { compareItems, gearLines } from './itemUi.ts';
 
   let {
     item,
@@ -20,6 +20,7 @@
   } = $props();
 
   const lines = $derived(compareItems(item, worn));
+  const combat = $derived(gearLines(item));
   const total = $derived(lines.reduce((s, l) => s + (l.diff ?? 0), 0));
 </script>
 
@@ -33,6 +34,12 @@
       </div>
     </div>
   </div>
+
+  {#if combat.length}
+    <ul class="gear">
+      {#each combat as line (line)}<li>{line}</li>{/each}
+    </ul>
+  {/if}
 
   {#if lines.length}
     <ul class="stats">
@@ -93,6 +100,15 @@
     display: flex;
     justify-content: space-between;
     gap: 16px;
+  }
+  .gear {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.85em;
   }
   .up {
     color: var(--green);

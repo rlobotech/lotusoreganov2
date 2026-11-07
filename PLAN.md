@@ -66,7 +66,7 @@ Key principle: **engine is pure and deterministic** (seeded RNG, no Date/Math.ra
   - Party returns to the **last visited city**, rests there, then resumes (the order queue is kept, a dungeon in progress resets).
 - **Hardcore:** full-party defeat ends the party permanently. Characters are archived to a graveyard and the final stats go on the hardcore leaderboard; players can start a new hardcore party. Gold/item loss rules do not matter there.
 - **PvP defeat:** loser does not return to a city; it stops and rests where it is (no gold/item loss), as per README.
-- **Loot:** each monster/boss has a loot table (item level scales with monster level, rarity weights, chance for gold). Rolls use the fight's seeded RNG so loot is reproducible from the log. Items drop into the party bag (40 slots) or the character's bag; when full, the lowest item level/rarity unfavorited item is discarded (README rule). Show a "discarded" line in the feed so players understand what happened.
+- **Loot:** each monster/boss has a loot table (item level scales with monster level, rarity weights, chance for gold). Rolls use the fight's seeded RNG so loot is reproducible from the log. Items drop into the party bag (40 slots) or the character's bag; when full, nothing more is picked up and a "bag full" line shows in the feed (changed in 3c: there is no automatic discard).
 - **Tuning data:** loss percentages, item loss chance, loot weights and bank rules live in content/config files, not in code.
 
 ### Combat and replays
@@ -164,12 +164,104 @@ Goal: replace the list-style Character/Bag/Party tabs with a Baldur's Gate style
 1. **(done) World (`packages/world`):** `Member.bag` (personal, max `personalBagSize` = 5), actions to move items shared <-> personal <-> equipment <-> other members' equipment, personal items excluded from defeat item loss and from overflow replacement, `normalizeParty` backfills `bag: []`. Make `bagSize` a party field set when created (base 40) so the bag item below can raise it. Tests.
 2. **(done) Server (`apps/server`):** endpoints for move/equip between containers (reuse the `mutateParty` lock), owner check for personal bags (user to member mapping, solo owns all), summary and shared types updated. Tests.
 3. **(done) Web foundation:** `ItemIcon` (sprite or placeholder), `ItemCard` (details and comparison), pointer-based drag and drop helper with tap fallback, `Slot` and `BagGrid` components.
-4. **Inventory screen:** team strip, character panels with slots and silhouette, personal bag, shared bag, sort, phone swipe layout.
-5. **Attributes and Spellbook tabs:** move point spending and the stat breakdown out of the old Character tab; add the team comparison table; spellbook list. Retire the old Character, Party and Bag tabs.
+4. **(done) Inventory screen:** team strip, character panels with slots and silhouette, personal bag, shared bag, sort, phone swipe layout.
+5. **(done) Attributes and Spellbook tabs:** move point spending and the stat breakdown out of the old Character tab; add the team comparison table; spellbook list. Retire the old Character, Party and Bag tabs.
 6. **Verify:** tests, then check in the browser at phone and desktop sizes (drag with mouse, tap flow on phone).
 
 ### Not in this revamp
 Group accessories and bag items (see backlog), real item sprites, extra slots (gloves, cloak, belt, amulet, second ring) which need new bases, loot tables and balance.
+
+## 3c. Inventory polish, per-character gold, carrier pet (planned, decided with the user)
+
+### Decisions
+- **Level is the party's:** the inventory shows only name, race and class per character (no level, no stats). Attributes live in the Attributes tab.
+- **Gold is per character**, shown to the right of the name on each panel. Battle, quest and sale gold is split evenly among living members (remainder to the first). Existing party gold is split evenly on migration. Defeat gold loss applies to each member's own gold.
+  - Solo (one player owns every character): buying draws from all characters' gold, richest first. Multiplayer: only your own characters' gold.
+  - A player can send gold to any character in the party.
+- **Multiplayer rules, modelled now:** `Member.ownerId` (every member belongs to the party owner today). Your characters are always listed first; you can look at the others but only move items, spend or send gold for your own. Enforced on the server.
+- **No automatic discard:** when the shared bag is full, new loot is not picked up (nothing goes to personal bags either) and a "bag full" event is logged. Players must discard, sell in a city (standing on a city hex or any hex next to one), or send the carrier pet. Quest items (and later unique items) are never lost: gold and XP are paid at once and the item waits in `pendingItems` until the shared bag has room, then arrives by itself (event `items_delivered`). Random loot that does not fit is lost.
+- **Layout (1080p, no page scroll):** the Inventory screen fits the window; only the shared bag scrolls vertically and it takes all the leftover space. Character panels are narrower so the personal bag lines up with both sides of the figure. The team strip shows portraits only and fits the width without a sideways scrollbar.
+- **Tab "Caravan"** (group accessories): mount, carrier pet, extra bag, improved tent and similar. Phase B.
+
+### Phase A (steps)
+1. **(done) World:** `Member.gold`, remove `PartyState.gold` (migration in `normalizeParty`), even split in loot/quest/defeat, `Member.ownerId`, no auto-discard when the bag is full (event `bag_full`), `sendGold(from, to, amount)`, spend helpers (solo vs multiplayer) used by buy, upgrade and the rest. Tests.
+2. **(done) Server and API:** `POST /parties/:id/send-gold`, owner checks on moves, gold, sell and buy, summary exposes per-member gold and `ownerId`/`mine`. Tests.
+3. **(done) Web inventory layout:** drop level and stats from panels, gold beside the name, narrower panels with personal bag aligned, portrait-only team strip filling the width, full-height layout where only the shared bag scrolls, own characters first, others disabled. Send-gold dialog.
+4. **(done) Other screens:** City and Attributes tabs use per-character gold, bag-full message in the log and party home. Verify at 1080p and phone sizes.
+
+### Phase B (steps, details to confirm before starting)
+5. **Caravan tab and accessory items:** slots for mount, pet, bag item, tent; items with tiers and special attributes; obtained as reward, drop or purchase.
+6. **Bag item:** raises `party.bagSize` by its tier.
+7. **Mount:** faster world map movement and optional extra bag slots.
+8. **Tent:** faster healing.
+9. **Carrier pet:** own bag; any player sends it to the nearest city with items to sell and a shopping list. While it travels, the party cannot buy or sell (the city actions are blocked). It sells, buys what was asked, returns, and its goods go to the shared bag as space allows (otherwise it waits holding them until someone frees space). If the party is defeated while the pet is out, the pet is teleported to the city where the party respawns and delivers when there is space. Stats: speed, bag size, discount, special abilities.
+10. **Verify:** tests and browser check.
+
+### Phase B decisions (from the user)
+- **Pet shopping:** the pet shows the same shop as the city. Each item picked is paid from the gold of the characters you could spend from (solo: all; multiplayer: yours), and also from the sale proceeds: the proceeds are split evenly among all members (rounded down), and each player's share can pay for that player's purchases.
+- **Accessories are items:** every accessory (mount, pet, bag item, tent) is a rare item at its core. It lives in a shared bag slot, can be sold, sometimes bought (mostly earned from quests), and equipped or swapped. They are shown in the Caravan tab, not in the inventory grid view, for now (they still take a shared bag slot while not equipped).
+- **Sale rate:** items sell for 20% of their buying value by default. A pet only adds to it: first tier +0%, then +5%, +10% and so on, up to +30% at the top (50% total). Special abilities are per pet, for example: may find an item on the way back, a speed burst for x ticks on reaching the city, and more later.
+- **Sale money** goes to every member, shared evenly, rounded down (the remainder stays with the first member).
+
+### Draft tier tables (to confirm or change)
+Five tiers per accessory; values are starting points to balance later.
+
+| Tier | Pet sale rate | Pet bag | Pet speed | Mount world speed | Bag item (shared bag) | Tent healing |
+|---|---|---|---|---|---|---|
+| 1 | 20% (+0) | 10 | x1.0 | +10% | +5 slots | +25% |
+| 2 | 25% (+5) | 15 | x1.1 | +20% | +10 | +50% |
+| 3 | 30% (+10) | 20 | x1.25 | +30% | +15 | +75% |
+| 4 | 40% (+20) | 30 | x1.5 | +40% | +20 | +100% |
+| 5 | 50% (+30) | 40 | x2.0 | +50% | +30 | +150% |
+
+Pet abilities start at tier 3 (one ability), tier 5 has two. Mounts may also add personal or shared bag slots at higher tiers.
+
+## 3d. Combat rebuild (planned, decided with the user)
+
+Goal: a combat system that mixes Baldur's Gate 3 (action economy, opportunity attacks, weapons and spells with requirements, school feel) with Divinity: Original Sin 2 (damage types, resistances, big readable numbers), able to scale from level 1 to level 100. This replaces the "Unit turn", AC-less stat formulas and gambit rules of "Combat rules (decided)" and the skill/class part of M1-M4. It is built in 6 phases, each one verified and confirmed before the next starts.
+
+### Decisions
+- **Saves:** the game is pre-release, so all parties, replays and feed history are reset when the rebuild lands (no migration code). `LOG_FORMAT_VERSION` goes to 2 and `ENGINE_VERSION` to 1.0.
+- **Hit and damage:** a hit chance (accuracy vs evasion, shown in the UI) and a damage range, not dice. Crits stay. No armor class and no armor/magic-armor layers: protection is resistances.
+- **Turn:** rounds, units act in speed order (as now). Each unit has a **movement action** (move up to `Move` tiles, may be split before and after the combat action) and a **combat action** (one skill, weapon attack or item), plus **one reaction per round** used for opportunity attacks. Some skills are free (cost no action) or grant extra movement or a retreat.
+- **Grid:** 8 directions. Adjacent means any of the 8 neighbours, a diagonal step costs 1, range is measured in tiles (Chebyshev), line of sight stays supercover. Leaving a tile adjacent to an enemy that has its reaction, is not stunned and has a melee attack provokes an opportunity attack (a normal weapon attack). Retreat/disengage skills do not provoke.
+- **Damage types (10):** physical: piercing, smash, cut, blood (the user's list had "cut?" and blood; confirm blood vs a magic type when we get to skills). Magical: fire, water (water and ice), electric, earth (earth and poison), dark, light.
+- **Resistances come from armor** (and some skills, statuses, monsters). Each armor piece gives resistance points by type, depending on its base (plate: cut/piercing/smash, robe: magical types). Resistance percent = points / (points + K(level)), capped (start at 75%), negative values allowed (vulnerability). One curve table, so level 1 and level 100 both feel meaningful without a hard wall.
+- **Hit chance:** a ratio of accuracy to evasion, tuned so equal accuracy and evasion at the same level hits about 85%, never below 5% or above 95%. Spells hit automatically unless tagged as dodgeable projectiles; they are mitigated by resistance. Numbers live in the curve table.
+- **Damage:** `weapon or spell base (scales with level and item level) x skill multiplier x (1 + attribute bonus) x roll in the skill range x crit`, then reduced by the target's resistance for that type. Items can add **extra damage entries** (a fire sword adds fire damage), each resisted on its own.
+- **Scaling targets (checked by tests):** level 1 about 50 HP, level 100 about 5,000 to 10,000 HP depending on the class; hits at level 1 around 5-15, at level 100 in the hundreds to low thousands. Attributes, level and item level all feed one `scaling` table.
+- **Attributes (BG3 flavour):** Strength raises sword, axe, hammer and heavy melee damage. Dexterity raises dagger, bow and crossbow damage plus accuracy, evasion, speed and crit. Intelligence raises arcane schools (fire, water, electric, earth). Wisdom raises divine/healing and light, mana regeneration and spirit effects. Vitality raises health and physical resilience. Each school names its primary attribute, so adding schools is data.
+- **Classes in this version:** warrior, mage, priest, ranger, and a new **rogue** (more movement, dagger and bow, retreat skills). Warlock, shaman and monk stay in the art doc for later.
+- **Items:** slots: main hand (one-handed or two-handed), off hand (shield, tome, one-handed), helmet, body, feet, ring, charm, with room for gloves, cloak, belt, amulet later. Items have requirements (level, attributes), give attributes and resistances, weapons have a damage range, damage type, school and range. Replaces the 7-slot model and the old `defense` bonuses.
+- **Schools and learning:** every skill belongs to a school (sword, axe, hammer, dagger, bow, fire, water, electric, earth, dark, light to start). Each character has a level per school that grows from **school XP gained by using that school's skills**. A class gives starting schools, starting points and starting skills, but **any character can learn any school**. A skill unlocks at a school level and may also need a prerequisite skill used N times. Most weapon skills **need the right weapon equipped** to be used and to earn school XP (a mage can know a dagger skill but only progresses it holding a dagger). **Books** teach a skill: common books teach basic skills of any school, rare books can teach any skill but still need a minimum school level.
+- **AI rules (rebuilt):** each rule is `target` (self, enemy, ally), `target condition` (none, closest enemy, farthest enemy, most crowded enemy, closest ally, farthest ally, ally with most strength, ally with least armor, lowest health, ...), `special conditions` (none, own health below/above X%, enemy at full health, enemy has status X, ...) and `action` (skill, item, weapon attack). **Movement is its own node** that can be linked to a rule to run before or after its action (move toward the target, keep a preferred range, retreat). Defaults: ranged and caster classes try to step back from close enemies, weighing the opportunity attacks it would provoke, and prefer a retreat skill (for example "if an enemy is adjacent, use a skill that retreats and damages") when they have one. Fallback is a weapon attack.
+- **Character sheet (Attributes tab):** your characters first, a strip on top to choose one (like the inventory). The sheet has the main details on the left and the sprite on the right; further sections run down both sides and scroll, with the sprite and key info pinned on top while scrolling. Sections: attributes with sources, combat stats (health, mana, movement, initiative, accuracy, evasion, crit), the 10 resistances, school levels, skills, active conditions.
+
+### Phases
+1. **(done) Combat core (`packages/engine`):** unit state with movement and action economy, reaction and opportunity attacks, 8-direction grid and pathing, damage types and resistances, hit chance, damage ranges, extra damage entries, the `scaling` curve table, new event log (format 2) and the replay viewer updated to match (splits move/act, shows hit chance, damage type colours, opportunity attacks). Old AI is adapted just enough to run until phase 3. Tests for every rule and for the level 1 and 100 targets.
+2. **(done) Items and gear (`packages/world`, shared, web):** new slots and hand types, requirements, resistances and attributes on items, weapons with damage range/type/school, extra damage affixes, loot and shop rebuilt, rarity scaling to level 100, inventory screen updated (two-handed handling, requirement checks, resistance lines in the item card).
+3. **AI rules and editor:** the new rule model, movement nodes linked to rules, kiting and retreat defaults weighing opportunity attacks, validation, and the AI tab rebuilt with the new conditions.
+4. **Schools, skills, learning, classes:** school data and levels, school XP, weapon requirements, prerequisite and book learning, skill catalogue for the starting schools, the five classes with starting schools and skills, monsters rebuilt with attributes, resistances and weapons.
+5. **Character sheet UI:** the Attributes tab described above, Spellbook updated to schools and unlock progress.
+6. **Content and balance:** the level 1 to 100 curve for characters and monsters, zone and dungeon levels, loot tables, a balance simulator report (time to level, survival per level, damage per level), and tuning.
+
+### Phase 1 notes (what exists now)
+- Engine: `scaling.ts` holds every level-dependent number (`SCALING`: HP, damage growth, attribute bonus, resistance curve, hit chance). `SkillDef` now has `source` (weapon or spell), `attr`, optional `damageType`, `dodgeable`, `free` and `retreat`. `UnitDef` has `weapon`, `extraDamage` and `resist`.
+- Turn: movement pool (`movesLeft`), one action, one reaction per round. Free skills chain. Walks are logged in pieces and split where an opportunity attack interrupts. Retreat skills disengage for free. Ranged units pick standing tiles by safety versus the opportunity attacks on the way, and step back after shooting when worthwhile (`ai.ts` constants `SAFETY_WEIGHT`, `THREAT_WEIGHT`).
+- Log format 2 (engine 1.0.0): `damage` carries `type`, `resist`, `chance`, `extra`; `miss` carries `chance`; `skill` can be a `reaction`; `move` can be a `retreat`. Old replays expire.
+- World: classes and monsters get a placeholder weapon type and armor shares (`armorResist`) until phase 2 puts resistances on items. Monster power retuned to 1.3; real tuning is phase 6. The character summary now reports accuracy, evasion, crit, speed and move instead of attack/defense.
+- Viewer: damage numbers are coloured by type with the resisted share, misses show the hit chance, opportunity attacks are labelled.
+
+### Phase 2 notes (what exists now)
+- Items (`packages/world/src/loot.ts`): `Item` and `ShopItem` carry `GearStats`: `requires` (attributes), `kind` (sword, dagger, axe, mace, hammer, staff, bow), `hands` (1 or 2), `weapon` (type, min, max), `extra` (extra damage entries) and `resist` (points per damage type). Bases (`BASES`) declare weapon quality or the armor types and share of a full set (body 0.4, off hand 0.25, head 0.2, feet 0.15); a full set gives about `armorPoints(level)` points of each type it covers. Rarity multiplies damage and resistances (1, 1.1, 1.25, 1.45). Rare and epic weapon drops roll one elemental extra-damage entry (20% or 35% of the weapon's damage) and are named after it ("Flaming ..."). Shop items are deterministic, without extra damage.
+- Requirements: 40% of the item level in the base's attribute (heavy armor and weapons only), checked against base plus spent points, never against other gear. Two-handed weapons need a free off hand and an off hand needs a one-handed weapon. Swaps between two characters check both sides. Error codes `requirements` and `two_handed`.
+- Characters: class `kit` (item base names) is worn from the start, so there is no class armor or weapon placeholder any more. Unarmed members hit as a half-quality smash weapon. `memberGear` sums the worn weapon, extra damage and resistances for the fight; monsters still use their template shares.
+- UI and API: `MemberInfo.combat` (weapon, extra, resistances as points and percent), item cards and shop entries list damage, hands, resistances and requirements, the Attributes tab has a weapon and resistances section.
+- Balance after gear: a 24 hour demo run loses about 10% of fights at levels 1 to 8 (was about 20% with the placeholders). Real tuning is phase 6.
+- Not done yet: the inventory could grey out gear the character cannot wear (the server refuses it with a message), items have no school (phase 4), and drops have no level requirement.
+
+### Open for later (the user will add details)
+Skill slots and how many skills a character can use in the AI at once, status and condition catalogue, summons and pets in combat, dual wielding, ammunition, skill upgrades past school level, the blood damage type, extra slots, boss mechanics, stealth and surprise, and any BG3 features not named above.
 
 ## 4. Milestones
 
