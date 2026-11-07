@@ -7,6 +7,7 @@ import type {
   Rarity,
   ShopItem,
   SiteDef,
+  Terrain,
   ZoneDef,
 } from './types.ts';
 
@@ -29,6 +30,8 @@ export interface Tier {
   dungeon: string;
   bossDungeon: string;
   arena: string;
+  /** The ground the region's pack (its second monster) lives on; the other encounters roam. */
+  lairs: Terrain[];
   /** Front-line, second and third monster of the region, its boss and the boss's court. */
   monsters: [string, string, string];
   boss: string;
@@ -44,6 +47,7 @@ export interface Tier {
 export const TIERS: Tier[] = [
   {
     id: 'southern_fen',
+    lairs: ['swamp', 'forest'],
     tiers: [3, 3],
     name: 'Southern Fen',
     minLevel: 21,
@@ -58,6 +62,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'northern_woods',
+    lairs: ['forest'],
     tiers: [3, 4],
     name: 'Northern Woods',
     minLevel: 36,
@@ -72,6 +77,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'western_highlands',
+    lairs: ['hills', 'plains'],
     tiers: [4, 4],
     name: 'Western Highlands',
     minLevel: 46,
@@ -86,6 +92,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'frozen_north',
+    lairs: ['snow', 'ice'],
     tiers: [4, 4],
     name: 'Frozen North',
     minLevel: 56,
@@ -100,6 +107,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'sand_wastes',
+    lairs: ['desert', 'savanna'],
     tiers: [4, 5],
     name: 'Sand Wastes',
     minLevel: 66,
@@ -114,6 +122,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'southwest_coast',
+    lairs: ['forest', 'swamp'],
     tiers: [5, 5],
     name: 'Southwest Coast',
     minLevel: 76,
@@ -128,6 +137,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'ashen_volcano',
+    lairs: ['ashlands', 'hills'],
     tiers: [5, 5],
     name: 'Ashen Volcano',
     minLevel: 86,
@@ -223,6 +233,7 @@ export function highContent(
       [{ template: m2, min: 2, max: 3 }],
       2,
     );
+    packB.biomes = t.lairs;
     const packC = enc(
       `${t.id}_mixed`,
       `${t.name} warband`,

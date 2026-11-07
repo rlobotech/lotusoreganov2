@@ -52,6 +52,11 @@ export interface EncounterDef {
   arena: string;
   monsters: MonsterSpawn[];
   weight: number;
+  /**
+   * The ground this encounter lives on. On those biomes its weight is multiplied (see
+   * `encounterWeight`); on other ground it is rare. Without it the encounter suits any ground.
+   */
+  biomes?: Terrain[];
 }
 
 export interface ZoneDef {

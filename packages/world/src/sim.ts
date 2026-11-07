@@ -8,9 +8,11 @@ import {
   findPath,
   hexDistance,
   inWorld,
-  isPassable,
   sameHex,
+  shortestPaths,
   siteAt,
+  terrainAt,
+  tileIndex,
   zoneAt,
   type PathStep,
 } from './hex.ts';
@@ -52,7 +54,9 @@ import type {
   PartyState,
   ReplayOut,
   SimConfig,
+  Terrain,
   WorldDef,
+  ZoneDef,
 } from './types.ts';
 
 export function defaultConfig(tickMs = 60_000): SimConfig {
@@ -208,11 +212,20 @@ export function memberUnit(p: PartyState, m: Member): UnitDef {
   };
 }
 
-function pickWeighted(rng: Rng, list: EncounterDef[]): EncounterDef {
-  const total = list.reduce((s, e) => s + e.weight, 0);
+/** An encounter lives on some ground: much likelier there, rare elsewhere. */
+export const AT_HOME = 3;
+export const AWAY = 0.15;
+export function encounterWeight(e: EncounterDef, biome: Terrain): number {
+  if (!e.biomes || e.biomes.length === 0) return e.weight;
+  return e.weight * (e.biomes.includes(biome) ? AT_HOME : AWAY);
+}
+
+export function pickEncounter(rng: Rng, list: EncounterDef[], biome: Terrain): EncounterDef {
+  const weights = list.map((e) => encounterWeight(e, biome));
+  const total = weights.reduce((s, w) => s + w, 0);
   let r = rng.next() * total;
-  for (const e of list) {
-    r -= e.weight;
+  for (const [i, e] of list.entries()) {
+    r -= weights[i]!;
     if (r < 0) return e;
   }
   return list[list.length - 1]!;
@@ -647,7 +660,7 @@ function startWildFight(ctx: Ctx, template?: string) {
     const wanted = pool.filter((e) => e.monsters.some((m) => m.template === template));
     if (wanted.length > 0) pool = wanted;
   }
-  const encounter = pickWeighted(ctx.rng, pool);
+  const encounter = pickEncounter(ctx.rng, pool, terrainAt(ctx.world, p.pos));
   const level = clamp(p.level + ctx.rng.int(-1, 1), zone.minLevel, zone.maxLevel);
   // Hunting far below your level pays less, nudging players onward.
   const xpMult = Math.max(0.1, 1 - 0.15 * Math.max(0, p.level - zone.maxLevel));
@@ -661,35 +674,57 @@ function startWildFight(ctx: Ctx, template?: string) {
   });
 }
 
-/** A nearby wild hex whose zone suits the party's level, reachable at the least travel time. */
+/** The encounters of a zone that a hunt is after: those with the monster, or all of them. */
+function huntPool(zone: ZoneDef, template?: string): EncounterDef[] {
+  if (!template) return zone.encounters;
+  const wanted = zone.encounters.filter((e) => e.monsters.some((m) => m.template === template));
+  return wanted.length > 0 ? wanted : zone.encounters;
+}
+
+/** How much of a pool lives on this ground (1 = all of it, 0 = none; untagged lives anywhere). */
+export function homeShare(pool: EncounterDef[], biome: Terrain): number {
+  const total = pool.reduce((s, e) => s + e.weight, 0);
+  if (total === 0) return 1;
+  const home = pool
+    .filter((e) => !e.biomes || e.biomes.length === 0 || e.biomes.includes(biome))
+    .reduce((s, e) => s + e.weight, 0);
+  return home / total;
+}
+
+/**
+ * A nearby wild hex whose zone suits the party's level, reachable at the least travel time. Ground
+ * the zone's monsters do not live on costs extra (much more when hunting one monster), so the
+ * party stops where what it hunts is found.
+ */
 export function findHuntingSpot(
   world: WorldDef,
   from: Hex,
   level: number,
   cleared: readonly string[],
   ticksPerHex: number,
-  opts: { zones?: string[]; maxDistance?: number } = {},
+  opts: { zones?: string[]; maxDistance?: number; template?: string } = {},
 ): { hex: Hex; path: PathStep[] } | null {
-  let best: { hex: Hex; path: PathStep[]; score: number } | null = null;
+  const tree = shortestPaths(world, from, cleared, ticksPerHex);
+  let best: { hex: Hex; score: number } | null = null;
   const maxDistance = opts.maxDistance ?? 5;
   for (let row = 0; row < world.height; row++) {
     for (let col = 0; col < world.width; col++) {
       const hex = { col, row };
       if (hexDistance(from, hex) > maxDistance || sameHex(from, hex)) continue;
-      if (!isPassable(world, hex, cleared) || siteAt(world, hex)) continue;
+      const ticks = tree.dist[tileIndex(world, hex)]!;
+      if (ticks === Infinity || siteAt(world, hex)) continue;
       const zone = world.zones[zoneAt(world, hex)]!;
       if (opts.zones && !opts.zones.includes(zone.id)) continue;
-      const path = findPath(world, from, hex, cleared, ticksPerHex);
-      if (!path) continue;
-      const ticks = path.reduce((s, st) => s + st.ticks, 0);
+      const away = 1 - homeShare(huntPool(zone, opts.template), terrainAt(world, hex));
       const score =
         ticks +
         20 * Math.max(0, zone.minLevel - 1 - level) +
-        5 * Math.max(0, level - zone.maxLevel);
-      if (!best || score < best.score) best = { hex, path, score };
+        5 * Math.max(0, level - zone.maxLevel) +
+        (opts.template ? 40 : 6) * away;
+      if (!best || score < best.score) best = { hex, score };
     }
   }
-  return best ? { hex: best.hex, path: best.path } : null;
+  return best ? { hex: best.hex, path: tree.pathTo(best.hex)! } : null;
 }
 
 function startHunting(ctx: Ctx) {
@@ -711,12 +746,34 @@ function huntFor(ctx: Ctx, template: string, drop: Drop): OrderResult {
   if (zones.length === 0) return drop('unreachable');
   const inZone = !siteAt(ctx.world, p.pos) && zones.includes(zoneAt(ctx.world, p.pos));
   if (inZone) {
+    // In the right region, but the monster may live on other ground: move there if it is near.
+    const zone = ctx.world.zones[zoneAt(ctx.world, p.pos)]!;
+    const fits = homeShare(huntPool(zone, template), terrainAt(ctx.world, p.pos));
+    if (fits < 0.5) {
+      const near = findHuntingSpot(
+        ctx.world,
+        p.pos,
+        p.level,
+        p.cleared,
+        ctx.cfg.travelTicksPerHex,
+        {
+          zones: [zone.id],
+          maxDistance: 10,
+          template,
+        },
+      );
+      if (near && homeShare(huntPool(zone, template), terrainAt(ctx.world, near.hex)) > fits) {
+        startTravel(ctx, near.path, null);
+        return 'started';
+      }
+    }
     startWildFight(ctx, template);
     return 'started';
   }
   const spot = findHuntingSpot(ctx.world, p.pos, p.level, p.cleared, ctx.cfg.travelTicksPerHex, {
     zones,
     maxDistance: 40,
+    template,
   });
   if (!spot) return drop('unreachable');
   startTravel(ctx, spot.path, null);

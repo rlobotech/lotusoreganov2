@@ -63,6 +63,7 @@ const wolfPack = enc({
   arena: 'forest',
   monsters: [{ template: 'wolf', min: 3, max: 4 }],
   weight: 2,
+  biomes: ['forest', 'hills'],
 });
 const orcPatrol = enc({
   id: 'orc_patrol',
@@ -80,6 +81,7 @@ const boneWalkers = enc({
   arena: 'crypt',
   monsters: [{ template: 'skeleton', min: 3, max: 4 }],
   weight: 2,
+  biomes: ['hills', 'ashlands', 'swamp', 'desert'],
 });
 const keepGuards = enc({
   id: 'keep_guards',

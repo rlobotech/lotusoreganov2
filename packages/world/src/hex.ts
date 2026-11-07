@@ -160,6 +160,58 @@ class MinHeap {
   }
 }
 
+/** Every hex's cheapest travel time from one hex, found with one search. */
+export interface PathTree {
+  /** Travel ticks from the start to each hex (row-major), Infinity if unreachable. */
+  dist: Float64Array;
+  /** The route to a hex (excluding the start), or null if it cannot be reached. */
+  pathTo(to: Hex): PathStep[] | null;
+}
+
+export function shortestPaths(
+  w: WorldDef,
+  from: Hex,
+  cleared: readonly string[],
+  ticksPerHex: number,
+): PathTree {
+  const n = w.width * w.height;
+  const dist = new Float64Array(n).fill(Infinity);
+  const prev = new Int32Array(n).fill(-1);
+  const start = tileIndex(w, from);
+  const heap = new MinHeap();
+  dist[start] = 0;
+  heap.push(0, start);
+  while (heap.size > 0) {
+    const { key, val: cur } = heap.pop();
+    if (key > dist[cur]!) continue;
+    const here = { col: cur % w.width, row: Math.floor(cur / w.width) };
+    for (const nb of neighbors(w, here)) {
+      if (!isPassable(w, nb, cleared)) continue;
+      const ni = tileIndex(w, nb);
+      const d = key + travelTicks(w, nb, ticksPerHex);
+      if (d < dist[ni]!) {
+        dist[ni] = d;
+        prev[ni] = cur;
+        heap.push(d, ni);
+      }
+    }
+  }
+  return {
+    dist,
+    pathTo(to) {
+      const goal = tileIndex(w, to);
+      if (goal === start) return [];
+      if (dist[goal] === Infinity) return null;
+      const path: PathStep[] = [];
+      for (let cur = goal; cur !== start; cur = prev[cur]!) {
+        const hex = { col: cur % w.width, row: Math.floor(cur / w.width) };
+        path.push({ ...hex, ticks: travelTicks(w, hex, ticksPerHex) });
+      }
+      return path.reverse();
+    },
+  };
+}
+
 /** Cheapest route (Dijkstra with a binary heap, cost = travel ticks). Excludes the start; null if unreachable. */
 export function findPath(
   w: WorldDef,

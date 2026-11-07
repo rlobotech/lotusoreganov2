@@ -1,6 +1,6 @@
 # World map rebuild
 
-Status: in progress (phases 1 to 4 done, phase 5 next)
+Status: in progress (phases 1 to 5 done, phase 6 next)
 
 
 Goal: replace the 14x60 strip with an organic continent of about 40x40 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
@@ -78,6 +78,14 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - **Balance:** `balance:encounters --own` shows 0 to 20% defeats for every encounter and every region; boss final stages are 0 to 37% (Goblin King 37%, the rest 0 to 17%). The boss court is now one front-liner and one caster/archer. The Death Knight was far too hard (57 to 95% defeats) and is now a plain knight-family monster, now only 3%: it, the Volcano (very easy, 10% of health lost) and the Southern Fen boss (0%) want a pass with real play.
 - **Reset:** migration `0003_reset_for_continent.sql` deletes all parties (the map and sites changed).
 - **Not done here (phase 6):** the map view on a phone (the whole 40x40 map is shown at once, about 0.5x on desktop), fog for locked regions; (phase 5): biome travel costs in the sim, biome-aware encounters.
+
+### Phase 5 notes (what exists now)
+- **Travel cost by biome** was already in the sim from phase 1 (every step costs `stepCost(biome, overlay)` times the base travel time, and the mount's speed multiplies on top, so a mount helps most on slow ground); nothing more was needed there. The tent only shortens rests and does not depend on ground.
+- **Encounters have a ground:** `EncounterDef.biomes` (optional). `encounterWeight`: untagged encounters keep their weight; tagged ones count x3 (`AT_HOME`) on their ground and x0.15 (`AWAY`, wanderers) elsewhere. `pickEncounter` uses the biome of the hex the party stands on. Tags: wolves on forest and hills, the bone walkers on hills, ash, swamp and desert; goblins and orcs roam; in every high region the pack (the second monster) lives on the region's `lairs` ground (fen: swamp and forest; woods: forest; highlands: hills and plains; frozen north: snow and ice; sand wastes: desert and savanna; southwest coast: forest and swamp; volcano: ash and hills).
+- **Hunting spots** (`findHuntingSpot`) now use one path search for the whole map (`shortestPaths` in `hex.ts`, 1,600 hexes made one search per candidate too slow), and add a price in ticks for ground the region's monsters do not live on (6 ticks times the share that is away; 40 when hunting one monster for a quest). A quest hunt inside the right region walks up to 10 hexes to the right ground when it is standing on the wrong ground.
+- **Data tests:** every tagged encounter has walkable ground of its biome in its region, and every region has at least one untagged encounter (no ground is ever empty).
+- **Not changed:** `balance:encounters` plays each encounter on its own, so ground does not change its numbers.
+- Tests: `biome.test.ts` (weights, home share, one search equals the single-target search, hunting spot choice by ground, data checks, wolves met in forest far more than on plains).
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).
