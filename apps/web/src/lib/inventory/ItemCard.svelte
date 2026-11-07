@@ -2,6 +2,7 @@
   import type { ItemInfo } from '@game/shared';
   import type { Snippet } from 'svelte';
   import { ATTR_LABELS, cap, SLOT_LABELS } from '../labels.ts';
+  import { session } from '../session.svelte.ts';
   import ItemIcon from './ItemIcon.svelte';
   import { compareItems, gearLines } from './itemUi.ts';
 
@@ -34,6 +35,12 @@
       </div>
     </div>
   </div>
+
+  {#if item.teaches}
+    <p class="small">
+      Teaches {session.skills.find((s) => s.id === item.teaches)?.name ?? item.teaches}.
+    </p>
+  {/if}
 
   {#if combat.length}
     <ul class="gear">

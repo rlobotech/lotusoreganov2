@@ -81,6 +81,9 @@ export type StatusDef =
   /** Skips the unit's next `duration` turns (counted in turns, not rounds). */
   | { id: string; kind: 'stun'; duration: number };
 
+/** What a weapon is. Skills can ask for one of several kinds. */
+export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
+
 export interface SkillDef {
   id: string;
   name: string;
@@ -115,6 +118,14 @@ export interface SkillDef {
   retreat?: number;
   /** Name of the visual effect the client plays. */
   vfx?: string;
+  /** The unit must wear one of these kinds of weapon to use the skill. Absent: any (or none). */
+  weapons?: WeaponKind[];
+  /** The school the skill belongs to (data for the world: learning and school levels). */
+  school?: string;
+  /** How a character learns it by training: school level, and optionally another skill used N times. */
+  unlock?: { level: number; skill?: string; uses?: number };
+  /** Cannot be learned by training, only from a book. */
+  bookOnly?: boolean;
 }
 
 /** How a rule picks among the valid targets (the first one wins). */
@@ -219,6 +230,8 @@ export interface UnitDef {
   sprite?: string;
   /** The weapon behind weapon skills. Default: a plain weapon of the unit's level that smashes. */
   weapon?: WeaponDef;
+  /** The kind of weapon held, for skills that need one. Units without a kind hold none. */
+  weaponKind?: WeaponKind;
   extraDamage?: ExtraDamage[];
   /** Resistance points from armor and the like. */
   resist?: Resistances;

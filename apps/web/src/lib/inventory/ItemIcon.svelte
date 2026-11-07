@@ -28,7 +28,7 @@
     />
   {:else}
     <span class="placeholder">
-      <span class="glyph">{item.slot ? SLOT_GLYPHS[item.slot] : '?'}</span>
+      <span class="glyph">{item.slot ? SLOT_GLYPHS[item.slot] : item.teaches ? 'B' : '?'}</span>
       <span class="lvl">{item.itemLevel}</span>
     </span>
   {/if}

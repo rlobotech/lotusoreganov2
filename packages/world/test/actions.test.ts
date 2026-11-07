@@ -140,13 +140,14 @@ describe('gear', () => {
     expect(discardItem(p, 's1')).toMatchObject({ code: 'no_item' });
   });
 
-  it('every dropped and shop item has a slot and positive bonuses', () => {
+  it('every dropped gear and shop item has a slot and positive bonuses', () => {
     const rng = createRng(5);
     let seen = 0;
     for (let i = 0; i < 400; i++) {
       const it = rollDrop(rng, 6, `i${i}`);
       if (!it) continue;
       seen++;
+      if (it.teaches) continue; // skill books are not worn
       expect(it.slot).toBeDefined();
       expect(Object.values(it.bonuses ?? {}).every((v) => v! > 0)).toBe(true);
     }

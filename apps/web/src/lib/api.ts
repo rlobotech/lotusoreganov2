@@ -94,6 +94,8 @@ export const api = {
   // management: every call answers with the fresh party summary
   equip: (partyId: string, memberId: string, itemId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/equip`, { memberId, itemId }),
+  learn: (partyId: string, memberId: string, itemId: string) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/learn`, { memberId, itemId }),
   unequip: (partyId: string, memberId: string, slot: SlotName) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/unequip`, { memberId, slot }),
   moveItem: (

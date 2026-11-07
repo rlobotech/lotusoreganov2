@@ -221,6 +221,44 @@ describe('gear and bag', () => {
   });
 });
 
+describe('schools and skill books', () => {
+  it('shows schools and locked skills, and a book teaches a skill through the API', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    const { party } = (await call(cookie, 'GET', '/parties/me')).json();
+    const warrior = party.members[0];
+    expect(warrior.schools.find((x: { id: string }) => x.id === 'sword').level).toBe(2);
+    expect(Array.isArray(warrior.locked)).toBe(true);
+    const catalog = (await call(cookie, 'GET', '/content/skills')).json();
+    expect(JSON.stringify(catalog)).toContain('vanish_strike');
+
+    await patch(id, (s) => {
+      s.bag.push({
+        id: 'book1',
+        name: 'Book of Stab',
+        rarity: 'common',
+        itemLevel: 3,
+        value: 6,
+        favorite: false,
+        teaches: 'stab',
+      } as never);
+    });
+    const read = await call(cookie, 'POST', `/parties/${id}/learn`, {
+      memberId: 'm1',
+      itemId: 'book1',
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().party.members[0].skills).toContain('stab');
+    expect(read.json().party.bag.find((i: { id: string }) => i.id === 'book1')).toBeUndefined();
+
+    const again = await call(cookie, 'POST', `/parties/${id}/learn`, {
+      memberId: 'm1',
+      itemId: 'book1',
+    });
+    expect(again.statusCode).toBeGreaterThanOrEqual(400);
+  });
+});
+
 describe('points and combat AI', () => {
   it('spends points, resets them and toggles auto-spend', async () => {
     const cookie = await signUp();

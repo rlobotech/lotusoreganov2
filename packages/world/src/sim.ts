@@ -1,3 +1,5 @@
+import { SKILLS } from './skills.ts';
+import { trainFromFight } from './learning.ts';
 import { createRng, runCombat, weaponRange, type Rng, type UnitDef } from '@game/engine';
 import { ARENAS } from './arenas.ts';
 import {
@@ -10,7 +12,7 @@ import {
   zoneAt,
   type PathStep,
 } from './hex.ts';
-import { addToBag, bagCapacity, rollDrop, shopItem } from './loot.ts';
+import { addToBag, bagCapacity, gearOf, rollDrop, shopItem } from './loot.ts';
 import { MONSTERS, monsterUnit } from './monsters.ts';
 import {
   activeQuest,
@@ -33,7 +35,6 @@ import {
   monsterGold,
   monsterXp,
   normalizeMember,
-  SKILLS,
 } from './progression.ts';
 import { partyGold, splitGold } from './gold.ts';
 import { DEFAULT_BAG_SIZE } from './types.ts';
@@ -188,6 +189,7 @@ function memberUnit(p: PartyState, m: Member): UnitDef {
     ai: m.ai,
     sprite: `${m.race}_${m.cls}`,
     weapon: gear.weapon ?? weaponRange(p.level, 'smash', 0.5),
+    weaponKind: gear.kind,
     extraDamage: gear.extra,
     resist: gear.resist,
     hp: m.hp,
@@ -227,6 +229,9 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
       m.alive = s.alive;
     }
   }
+
+  // Using skills trains their schools; reaching a level (and prerequisites) teaches new skills.
+  const learned = trainFromFight(p.members, r.events);
 
   const replayKey = `f${p.stats.fights}`;
   const payload: Record<string, unknown> = {
@@ -278,6 +283,13 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
   emit(ctx, 'fight', payload, replayKey);
   if (Array.isArray(payload.missed)) emit(ctx, 'bag_full', { missed: payload.missed });
   if (levelsGained > 0) emit(ctx, 'level_up', { level: p.level, gained: levelsGained });
+  for (const l of learned) {
+    emit(ctx, 'skill_learned', {
+      member: l.member.name,
+      skill: l.skill,
+      name: SKILLS[l.skill]?.name ?? l.skill,
+    });
+  }
 
   if (r.outcome === 'defeat') return handleDefeat(ctx);
 
@@ -323,6 +335,7 @@ function settleQuests(ctx: Ctx) {
         favorite: true,
         slot: s.slot,
         bonuses: { ...s.bonuses },
+        ...gearOf(s),
       };
       // Quest items are never lost: with no room they wait and arrive when a slot frees up.
       if (!addToBag(p.bag, reward, bagCapacity(p, ctx.cfg))) {

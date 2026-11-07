@@ -16,6 +16,7 @@ export const CLASS_COLORS: Record<string, { main: string; accent: string }> = {
   mage: { main: '#2f55c4', accent: '#9fe4ff' },
   priest: { main: '#e8dcc0', accent: '#e08a1e' },
   ranger: { main: '#3c6230', accent: '#b8452a' },
+  rogue: { main: '#3a3340', accent: '#c9a24a' },
 };
 export const RACE_SKIN: Record<string, string> = {
   human: '#e0ac88',

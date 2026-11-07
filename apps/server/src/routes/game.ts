@@ -7,6 +7,7 @@ import {
   buySchema,
   createPartySchema,
   equipSchema,
+  learnSchema,
   favoriteSchema,
   moveItemSchema,
   moveOrderSchema,
@@ -30,6 +31,7 @@ import {
   leaveTown,
   moveOrder,
   normalizeParty,
+  learnFromBook,
   resetMemberAi,
   resetPoints,
   sellItems,
@@ -347,6 +349,11 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
   app.post('/parties/:id/equip', { preHandler: auth }, async (req) => {
     const { memberId, itemId } = equipSchema.parse(req.body);
     return act(req, (s) => equipItem(s, memberId, itemId, req.user!.id));
+  });
+
+  app.post('/parties/:id/learn', { preHandler: auth }, async (req) => {
+    const { memberId, itemId } = learnSchema.parse(req.body);
+    return act(req, (s) => learnFromBook(s, memberId, itemId, req.user!.id));
   });
 
   app.post('/parties/:id/unequip', { preHandler: auth }, async (req) => {

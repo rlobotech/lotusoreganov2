@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const RACES = ['human', 'elf', 'dwarf', 'orc'] as const;
-export const CLASS_IDS = ['warrior', 'mage', 'priest', 'ranger'] as const;
+export const CLASS_IDS = ['warrior', 'mage', 'priest', 'ranger', 'rogue'] as const;
 
 export const raceSchema = z.enum(RACES);
 export const classSchema = z.enum(CLASS_IDS);
@@ -27,6 +27,7 @@ export const SLOT_NAMES = ['weapon', 'offhand', 'head', 'body', 'feet', 'ring', 
 const idStr = z.string().min(1).max(80);
 
 export const equipSchema = z.object({ memberId: idStr, itemId: idStr });
+export const learnSchema = z.object({ memberId: idStr, itemId: idStr });
 export const unequipSchema = z.object({ memberId: idStr, slot: z.enum(SLOT_NAMES) });
 export const moveItemSchema = z.object({
   itemId: idStr,

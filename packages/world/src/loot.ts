@@ -1,5 +1,13 @@
-import { armorPoints, weaponRange, type Attributes, type DamageType, type Rng } from '@game/engine';
-import type { GearStats, Item, Rarity, ShopItem, Slot, WeaponKind } from './types.ts';
+import {
+  armorPoints,
+  weaponRange,
+  type Attributes,
+  type DamageType,
+  type Rng,
+  type WeaponKind,
+} from '@game/engine';
+import { SKILLS } from './skills.ts';
+import type { GearStats, Item, Rarity, ShopItem, Slot } from './types.ts';
 
 export const RARITY_RANK: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
 const RARITY_VALUE: Record<Rarity, number> = { common: 1, uncommon: 2.5, rare: 6, epic: 15 };
@@ -229,9 +237,41 @@ function rollRarity(rng: Rng): Rarity {
 const itemName = (base: ItemBase, rarity: Rarity, gear: GearStats): string =>
   `${RARITY_PREFIX[rarity]}${gear.extra ? (ELEMENT_PREFIX[gear.extra[0]!.type] ?? '') : ''}${base.name}`;
 
+/** Share (percent) of drops that are skill books. */
+export const BOOK_CHANCE = 10;
+
+/** A skill book: basic skills are common, advanced ones rare, and book-only ones at least rare. */
+export function bookItem(skillId: string, itemLevel: number, id: string): Item {
+  const skill = SKILLS[skillId];
+  if (!skill) throw new Error(`Unknown skill ${skillId}`);
+  const level = skill.unlock?.level ?? 1;
+  const rarity: Rarity = skill.bookOnly || level >= 6 ? 'rare' : level >= 3 ? 'uncommon' : 'common';
+  return {
+    id,
+    name: `Book of ${skill.name}`,
+    rarity,
+    itemLevel,
+    value: itemValue(itemLevel, rarity),
+    favorite: false,
+    teaches: skillId,
+  };
+}
+
+/** Skills a book dropped at `itemLevel` may teach: higher levels bring more advanced ones. */
+function bookPool(itemLevel: number): string[] {
+  const reach = 2 + Math.floor(itemLevel / 5);
+  return Object.values(SKILLS)
+    .filter((s) => s.school && s.unlock && s.unlock.level <= reach)
+    .map((s) => s.id);
+}
+
 /** Rolls at most one item for a defeated monster. */
 export function rollDrop(rng: Rng, monsterLevel: number, id: string): Item | null {
   if (!rng.chance(DROP_CHANCE)) return null;
+  if (rng.chance(BOOK_CHANCE)) {
+    const pool = bookPool(monsterLevel);
+    return bookItem(pool[rng.int(0, pool.length - 1)]!, Math.max(1, monsterLevel), id);
+  }
   const rarity = rollRarity(rng);
   const base = BASES[rng.int(0, BASES.length - 1)]!;
   const itemLevel = Math.max(1, monsterLevel + rng.int(-1, 1));
@@ -307,4 +347,16 @@ export function addToBag(bag: Item[], item: Item, capacity: number): boolean {
   if (bag.length >= capacity) return false;
   bag.push(item);
   return true;
+}
+
+/** The combat stats of an item or shop entry, copied so the new item shares nothing with it. */
+export function gearOf(s: GearStats): GearStats {
+  const { requires, kind, hands, weapon, extra, resist } = s;
+  return structuredClone(
+    Object.fromEntries(
+      Object.entries({ requires, kind, hands, weapon, extra, resist }).filter(
+        ([, v]) => v !== undefined,
+      ),
+    ),
+  );
 }

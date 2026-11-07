@@ -36,11 +36,25 @@ const manaPct = (u: UnitState) => (u.base.maxMana > 0 ? (u.mana / u.base.maxMana
 export const skillCost = (unit: UnitState, skill: SkillDef): number =>
   Math.round(skill.manaCost * manaCostMult(unit.def.level));
 
+/** Does the unit hold the weapon the skill asks for (if it asks for one)? */
+export function holdsWeaponFor(unit: UnitState, skill: SkillDef): boolean {
+  if (!skill.weapons) return true;
+  const kind = unit.def.weaponKind;
+  return !!kind && skill.weapons.includes(kind);
+}
+
 /** The unit's basic weapon attack: its first free damage skill that uses the weapon. */
 export function basicAttack(unit: UnitState, skills: Record<string, SkillDef>): SkillDef | null {
   for (const id of unit.def.skills) {
     const s = skills[id];
-    if (s && s.kind === 'damage' && s.source === 'weapon' && s.manaCost === 0 && s.cooldown === 0) {
+    if (
+      s &&
+      s.kind === 'damage' &&
+      s.source === 'weapon' &&
+      s.manaCost === 0 &&
+      s.cooldown === 0 &&
+      holdsWeaponFor(unit, s)
+    ) {
       return s;
     }
   }
@@ -62,7 +76,8 @@ export function opportunitySkill(
       s.side === 'enemy' &&
       !s.radius &&
       s.manaCost === 0 &&
-      s.cooldown === 0
+      s.cooldown === 0 &&
+      holdsWeaponFor(unit, s)
     ) {
       return s;
     }
@@ -198,7 +213,7 @@ export function planTurn(
   const move = unit.movesLeft;
 
   const usable = (s: SkillDef) =>
-    unit.mana >= skillCost(unit, s) && (unit.cooldowns[s.id] ?? 0) === 0;
+    unit.mana >= skillCost(unit, s) && (unit.cooldowns[s.id] ?? 0) === 0 && holdsWeaponFor(unit, s);
 
   function canHitFrom(tile: Point, target: UnitState, skill: SkillDef): boolean {
     if (distance(tile, target) > skill.range) return false;

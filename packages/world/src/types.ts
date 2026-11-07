@@ -6,6 +6,7 @@ import type {
   Outcome,
   Resistances,
   WeaponDef,
+  WeaponKind,
 } from '@game/engine';
 
 // ---------- world content ----------
@@ -89,7 +90,7 @@ export interface WorldDef {
 // ---------- party ----------
 
 export type Race = 'human' | 'elf' | 'dwarf' | 'orc';
-export type ClassId = 'warrior' | 'mage' | 'priest' | 'ranger';
+export type ClassId = 'warrior' | 'mage' | 'priest' | 'ranger' | 'rogue';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
 export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'feet' | 'ring' | 'charm';
@@ -136,13 +137,15 @@ export interface Member {
   points: number;
   /** Spend new points automatically in the class's usual pattern. */
   autoAlloc: boolean;
-  /** Skills this member can use (class skills for now; more are learned later). */
+  /** Skills this member has learned. */
   skills: string[];
+  /** Experience in each school (see skills.ts); the school level comes from it. */
+  schools: Record<string, number>;
+  /** How many times each skill was used, for the training prerequisites of other skills. */
+  uses: Record<string, number>;
   /** The member's combat AI, edited by the player. */
   ai: AIRule[];
 }
-
-export type WeaponKind = 'sword' | 'dagger' | 'axe' | 'mace' | 'hammer' | 'staff' | 'bow';
 
 /** What a worn item does in combat, beyond its attribute bonuses. All optional. */
 export interface GearStats {
@@ -168,6 +171,8 @@ export interface Item extends GearStats {
   /** Where it is worn. Items without a slot cannot be equipped (older saves). */
   slot?: Slot;
   bonuses?: Partial<Attributes>;
+  /** A book: using it teaches this skill and uses the book up. */
+  teaches?: string;
 }
 
 export interface ShopItem extends GearStats {
@@ -358,6 +363,8 @@ export interface ClassDef {
   ai: AIRule[];
   /** The pattern attribute points follow when spent automatically (repeats). */
   pointOrder: Array<keyof Attributes>;
+  /** School levels a new character of this class starts with (they unlock its starting skills). */
+  schools: Record<string, number>;
   /** Item bases a new character of this class starts wearing (common, at the party's level). */
   kit: string[];
 }

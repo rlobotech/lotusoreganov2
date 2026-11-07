@@ -1,7 +1,6 @@
 import {
   armorPoints,
   derive,
-  samples,
   type AIRule,
   type Attributes,
   type DamageType,
@@ -9,8 +8,10 @@ import {
   type ExtraDamage,
   type Resistances,
   type WeaponDef,
+  type WeaponKind,
 } from '@game/engine';
 import { starterGear } from './loot.ts';
+import { schoolXpForLevel } from './skills.ts';
 import type { ClassDef, ClassId, Item, Member, MemberTemplate, Race } from './types.ts';
 
 export const MAX_LEVEL = 100;
@@ -70,6 +71,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     growth: { str: 0.8, dex: 0.2, int: 0, vit: 0.8, wis: 0.2 },
     move: 3,
     skills: ['attack', 'power_strike', 'war_cry'],
+    schools: { sword: 2 },
     ai: warriorAi,
     pointOrder: ['str', 'vit', 'str', 'vit', 'dex'],
     kit: ['Rusty Sword', 'Wooden Shield', 'Leather Cap', 'Iron Mail', 'Worn Boots'],
@@ -80,7 +82,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     base: { str: 2, dex: 5, int: 10, vit: 5, wis: 6 },
     growth: { str: 0.1, dex: 0.2, int: 0.9, vit: 0.3, wis: 0.4 },
     move: 3,
-    skills: ['staff_bolt', 'fireball'],
+    skills: ['staff_bolt', 'ember', 'fireball'],
+    schools: { electric: 1, fire: 3 },
     ai: [{ skill: 'fireball', order: 'crowded' }, { skill: 'staff_bolt' }],
     pointOrder: ['int', 'int', 'wis', 'vit'],
     kit: ['Gnarled Staff', 'Cloth Hood', 'Cloth Robe'],
@@ -91,7 +94,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     base: { str: 3, dex: 4, int: 6, vit: 6, wis: 9 },
     growth: { str: 0.1, dex: 0.2, int: 0.4, vit: 0.4, wis: 0.8 },
     move: 3,
-    skills: ['staff_bolt', 'heal', 'big_heal'],
+    skills: ['staff_bolt', 'heal', 'smite', 'big_heal', 'crushing_blow'],
+    schools: { electric: 1, light: 4, hammer: 1 },
     ai: [
       { skill: 'big_heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 40 } },
       { skill: 'heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 75 } },
@@ -107,6 +111,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     growth: { str: 0.4, dex: 0.8, int: 0.1, vit: 0.4, wis: 0.2 },
     move: 4,
     skills: ['shoot', 'poison_arrow', 'backstep_shot'],
+    schools: { bow: 3 },
     ai: [
       { skill: 'backstep_shot', when: { enemyAdjacent: true } },
       { skill: 'poison_arrow', order: 'highest_hp', filter: { lacksStatus: 'poison' } },
@@ -115,10 +120,23 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     pointOrder: ['dex', 'dex', 'str', 'vit'],
     kit: ['Short Bow', 'Leather Cap', 'Padded Vest', 'Worn Boots'],
   },
+  rogue: {
+    id: 'rogue',
+    name: 'Rogue',
+    base: { str: 5, dex: 10, int: 3, vit: 6, wis: 3 },
+    growth: { str: 0.3, dex: 0.9, int: 0.1, vit: 0.5, wis: 0.1 },
+    move: 5,
+    skills: ['stab', 'quick_cut', 'vanish_strike', 'shoot'],
+    schools: { dagger: 3, bow: 1 },
+    ai: [
+      { skill: 'vanish_strike', when: { enemyAdjacent: true } },
+      { skill: 'quick_cut' },
+      { skill: 'stab' },
+    ],
+    pointOrder: ['dex', 'dex', 'vit', 'str'],
+    kit: ['Iron Dagger', 'Leather Cap', 'Padded Vest', 'Worn Boots'],
+  },
 };
-
-/** Skills available in the engine. Real skill content arrives with packages/content. */
-export const SKILLS = samples.skills;
 
 export const ATTRS: ReadonlyArray<keyof Attributes> = ['str', 'dex', 'int', 'vit', 'wis'];
 export const zeroAttrs = (): Attributes => ({ str: 0, dex: 0, int: 0, vit: 0, wis: 0 });
@@ -147,6 +165,7 @@ export function memberBreakdown(m: MemberLike, level: number) {
 /** What a member's worn gear does in combat: weapon, extra damage and summed resistances. */
 export function memberGear(m: Pick<Member, 'equipment'>): {
   weapon: WeaponDef | undefined;
+  kind: WeaponKind | undefined;
   extra: ExtraDamage[];
   resist: Resistances;
 } {
@@ -157,7 +176,7 @@ export function memberGear(m: Pick<Member, 'equipment'>): {
       resist[type] = (resist[type] ?? 0) + pts;
     }
   }
-  return { weapon: weapon?.weapon, extra: weapon?.extra ?? [], resist };
+  return { weapon: weapon?.weapon, kind: weapon?.kind, extra: weapon?.extra ?? [], resist };
 }
 
 /** Attribute requirements of `item` that `m` does not meet (counting base and spent points only). */
@@ -184,6 +203,13 @@ export function memberDerived(m: MemberLike, level: number): Derived {
   return derive(memberAttributes(m, level), level, CLASSES[m.cls].move);
 }
 
+/** The experience a class starts with in its schools, enough for the levels it lists. */
+function startingSchools(cls: ClassDef): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(cls.schools).map(([id, lvl]) => [id, schoolXpForLevel(lvl)]),
+  );
+}
+
 export function createMember(index: number, t: MemberTemplate, level = 1): Member {
   const cls = CLASSES[t.cls];
   const m: Member = {
@@ -201,6 +227,8 @@ export function createMember(index: number, t: MemberTemplate, level = 1): Membe
     points: 0,
     autoAlloc: true,
     skills: [...cls.skills],
+    schools: startingSchools(cls),
+    uses: {},
     ai: structuredClone(cls.ai),
   };
   m.equipment = starterGear(cls.kit, m.id, level);
@@ -220,6 +248,8 @@ export function normalizeMember(m: Member): Member {
   m.points ??= 0;
   m.autoAlloc ??= true;
   m.skills ??= [...cls.skills];
+  m.schools ??= startingSchools(cls);
+  m.uses ??= {};
   m.ai ??= structuredClone(cls.ai);
   return m;
 }

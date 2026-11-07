@@ -32,6 +32,8 @@ export function formatFeedEvent(e: FeedEvent): string {
       return `The bag is full: ${(p.missed as string[]).join(', ')} could not be picked up.`;
     case 'items_delivered':
       return `Delivered to the bag: ${(p.items as string[]).join(', ')}.`;
+    case 'skill_learned':
+      return `${p.member} learned ${p.name}.`;
     case 'level_up':
       return `The party reached level ${p.level}!`;
     case 'rest':

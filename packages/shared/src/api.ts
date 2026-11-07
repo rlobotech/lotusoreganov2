@@ -37,6 +37,8 @@ export interface GearInfo {
 
 export interface ItemInfo extends GearInfo {
   id: string;
+  /** A skill book: the id of the skill it teaches. */
+  teaches?: string;
   name: string;
   rarity: 'common' | 'uncommon' | 'rare' | 'epic';
   itemLevel: number;
@@ -123,7 +125,21 @@ export interface MemberInfo {
   /** The viewing player controls this character (solo: all of them). Others are look-only. */
   mine: boolean;
   skills: string[];
+  /** Every school the character has opened, with its level and progress. */
+  schools: SchoolInfo[];
+  /** Skills still locked in those schools, with what is missing. */
+  locked: Array<{ skill: string; missing: string }>;
   ai: AiRuleInfo[];
+}
+
+export interface SchoolInfo {
+  id: string;
+  name: string;
+  level: number;
+  /** Experience, and the experience at the start and end of the current level. */
+  xp: number;
+  levelXp: number;
+  nextXp: number | null;
 }
 
 export interface SkillInfo {
@@ -147,6 +163,12 @@ export interface SkillInfo {
   /** Costs no action. */
   free?: boolean;
   status?: { id: string; kind: string; duration: number };
+  /** The school, the school level that unlocks it, and a prerequisite skill used N times. */
+  school?: string;
+  unlock?: { level: number; skill?: string; uses?: number };
+  bookOnly?: boolean;
+  /** Weapon kinds it needs in hand. */
+  weapons?: string[];
 }
 
 export interface ShopEntry extends GearInfo {

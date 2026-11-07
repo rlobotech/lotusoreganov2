@@ -139,3 +139,38 @@ describe('linked moves', () => {
     expect(planAfterMove(grid, units, skills, me, 'stay', bow, target)).toBeNull();
   });
 });
+
+describe('weapon requirements', () => {
+  const bowOnly: SkillDef = { ...bow, id: 'aimed', weapons: ['bow'] };
+  const all = { ...skills, aimed: bowOnly };
+
+  it('a skill that needs a bow is only used with a bow in hand', () => {
+    const run = (weaponKind?: 'bow' | 'dagger') => {
+      const me = stateOf(
+        unitDef('me', 'party', ['attack', 'aimed'], [{ skill: 'aimed' }], { weaponKind }),
+        5,
+        2,
+      );
+      const foe = stateOf(unitDef('e', 'enemy', ['attack'], []), 8, 2);
+      const p = planTurn(grid, [me, foe], all, me);
+      return p.kind === 'act' ? p.skill.id : p.kind;
+    };
+    expect(run('bow')).toBe('aimed');
+    expect(run('dagger')).toBe('attack');
+    expect(run(undefined)).toBe('attack');
+  });
+
+  it('the weapon attack action skips weapon-locked skills the unit cannot use', () => {
+    const lockedAttack: SkillDef = { ...melee, id: 'stabby', weapons: ['dagger'] };
+    const me = stateOf(
+      unitDef('me', 'party', ['stabby', 'attack'], [{ skill: WEAPON_ATTACK }], {
+        weaponKind: 'bow',
+      }),
+      5,
+      2,
+    );
+    const foe = stateOf(unitDef('e', 'enemy', ['attack'], []), 6, 2);
+    const p = planTurn(grid, [me, foe], { ...skills, stabby: lockedAttack }, me);
+    expect(p.kind === 'act' && p.skill.id).toBe('attack');
+  });
+});

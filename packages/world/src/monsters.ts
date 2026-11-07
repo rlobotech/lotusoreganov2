@@ -4,8 +4,15 @@ import {
   type Attributes,
   type DamageType,
   type UnitDef,
+  type WeaponKind,
 } from '@game/engine';
 import { armorResist } from './progression.ts';
+
+/** Monsters hold a natural weapon so the skills that ask for one work: bows, blades, clubs. */
+function naturalKind(t: MonsterTemplate): WeaponKind {
+  if (t.skills.includes('shoot')) return 'bow';
+  return t.weapon === 'smash' ? 'hammer' : t.weapon === 'piercing' ? 'dagger' : 'sword';
+}
 
 export interface MonsterTemplate {
   id: string;
@@ -146,6 +153,7 @@ export function monsterUnit(t: MonsterTemplate, id: string, level: number): Unit
     ai: t.ai,
     sprite: t.sprite,
     weapon: weaponRange(level, t.weapon),
+    weaponKind: naturalKind(t),
     resist: armorResist(t.armor ?? {}, level),
   };
 }

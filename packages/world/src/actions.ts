@@ -1,3 +1,4 @@
+import { SKILLS } from './skills.ts';
 import {
   MOVE_MODES,
   TARGET_ORDERS,
@@ -7,21 +8,14 @@ import {
 } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
 import { canControl, spendableGold, spendGold, splitGold } from './gold.ts';
-import { addToBag, bagCapacity } from './loot.ts';
-import {
-  ATTRS,
-  CLASSES,
-  memberDerived,
-  SKILLS,
-  spentPoints,
-  unmetRequirements,
-} from './progression.ts';
+import { bookProblem } from './learning.ts';
+import { addToBag, bagCapacity, gearOf } from './loot.ts';
+import { ATTRS, CLASSES, memberDerived, spentPoints, unmetRequirements } from './progression.ts';
 import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
   PERSONAL_BAG_SIZE,
   SLOTS,
   type FeedEvent,
-  type GearStats,
   type Item,
   type Member,
   type PartyState,
@@ -224,6 +218,28 @@ export function unequipItem(
   const item = m.equipment[slot];
   if (!item) return fail('empty_slot', 'Nothing is worn there');
   return moveItem(p, item.id, { kind: 'bag' }, cfg, viewer);
+}
+
+/** Reads a skill book: the character learns the skill and the book is used up. */
+export function learnFromBook(
+  p: PartyState,
+  memberId: string,
+  itemId: string,
+  viewer?: string,
+): ActionResult {
+  const m = ownMember(p, memberId, viewer);
+  if (isFail(m)) return m;
+  const found = locate(p, itemId);
+  if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
+  if (!placeIsYours(p, found.place, viewer)) return fail('not_yours', NOT_YOURS);
+  if (!found.item.teaches) return fail('not_a_book', 'That is not a skill book');
+  const problem = bookProblem(m, found.item);
+  if (problem) return fail('cannot_learn', problem);
+  m.skills.push(found.item.teaches);
+  const school = SKILLS[found.item.teaches]?.school;
+  if (school) m.schools[school] ??= 0;
+  removeFrom(p, found.place, found.item);
+  return OK;
 }
 
 export function setFavorite(
@@ -546,15 +562,6 @@ export function sellItems(
   return OK;
 }
 
-function gearOf(s: GearStats): GearStats {
-  const { requires, kind, hands, weapon, extra, resist } = s;
-  return Object.fromEntries(
-    Object.entries({ requires, kind, hands, weapon, extra, resist }).filter(
-      ([, v]) => v !== undefined,
-    ),
-  );
-}
-
 export function buyItem(
   p: PartyState,
   world: WorldDef,
@@ -579,7 +586,7 @@ export function buyItem(
     favorite: false,
     slot: stock.slot,
     bonuses: { ...stock.bonuses },
-    ...structuredClone(gearOf(stock)),
+    ...gearOf(stock),
   };
   addToBag(p.bag, item, bagCapacity(p, cfg));
   return OK;

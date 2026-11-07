@@ -6,6 +6,7 @@ import {
   DEFAULT_BAG_SIZE,
   memberBreakdown,
   memberDerived,
+  MAX_SCHOOL_LEVEL,
   memberGear,
   MONSTERS,
   objectiveTarget,
@@ -14,7 +15,12 @@ import {
   questAvailability,
   questTargetSite,
   shopItem,
+  SCHOOL_NAMES,
+  schoolLevel,
+  schoolXpForLevel,
   SKILLS,
+  unlockProblem,
+  type SchoolId,
   spendableGold,
   usableCity,
   xpToNext,
@@ -150,6 +156,23 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
         gold: m.gold,
         mine: canControl(m, viewer),
         skills: m.skills,
+        schools: Object.entries(m.schools).map(([id, xp]) => {
+          const level = schoolLevel(xp);
+          return {
+            id,
+            name: SCHOOL_NAMES[id as SchoolId] ?? id,
+            level,
+            xp,
+            levelXp: schoolXpForLevel(level),
+            nextXp: level >= MAX_SCHOOL_LEVEL ? null : schoolXpForLevel(level + 1),
+          };
+        }),
+        locked: Object.values(SKILLS).flatMap((s) => {
+          const why = unlockProblem(m, s);
+          return why && s.school && m.schools[s.school] !== undefined && !m.skills.includes(s.id)
+            ? [{ skill: s.id, missing: why }]
+            : [];
+        }),
         ai: m.ai,
       };
     }),
@@ -197,6 +220,10 @@ export function skillCatalog(): SkillInfo[] {
     ...(s.radius ? { radius: s.radius } : {}),
     ...(s.retreat ? { retreat: s.retreat } : {}),
     ...(s.free ? { free: true } : {}),
+    ...(s.school ? { school: s.school } : {}),
+    ...(s.unlock ? { unlock: s.unlock } : {}),
+    ...(s.bookOnly ? { bookOnly: true } : {}),
+    ...(s.weapons ? { weapons: s.weapons } : {}),
     ...(s.status
       ? { status: { id: s.status.id, kind: s.status.kind, duration: s.status.duration } }
       : {}),

@@ -3,7 +3,7 @@
   import { session } from './session.svelte.ts';
 
   const RACES = ['human', 'elf', 'dwarf', 'orc'];
-  const CLASSES = ['warrior', 'mage', 'priest', 'ranger'];
+  const CLASSES = ['warrior', 'mage', 'priest', 'ranger', 'rogue'];
 
   let name = $state('The Wanderers');
   let mode = $state<'standard' | 'hardcore'>('standard');
