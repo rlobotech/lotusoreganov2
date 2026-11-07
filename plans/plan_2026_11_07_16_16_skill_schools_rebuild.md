@@ -58,7 +58,7 @@ Starter progress: 32 of 130 skills defined. Water and Staff are thin; Rain and S
 1. **Rules and data model** (`packages/world`, shared types). School list and ring adjacency; `SkillDef` gets `schools` (one or two), `levels` (10), `requires` (character level, school levels, skill levels), a `measure` (what raises its level) and a per-level `effects` list; a member stores a level and experience per skill; school level is the capped sum; school power is 1% per point. The shared power curve, the level-up cost curve per measure, the equipped-skill limit (6, 7 at level 30, 8 at level 60), and "only skills in the AI earn experience". Unit tests for every rule above (sum and cap, dual skills counting for both schools, shared starters being separate per school, requirements, the experience gate).
 2. **Catalogue migration.** Move the existing skills into the new schools and levels, add the 32 starter skills (new ones that are only data first), set the 11 classes' starting skills and weapons. Rename the old ids only where the sheet requires it (keep ids stable otherwise). Balance with `balance:levels` and `balance:encounters`.
 3. **Learning and books.** Unlock by the new requirements (tree view data: what a skill still needs); books teach any skill and the book requirement follows the tree; gear weakens a skill cast with the wrong weapon.
-4. **Skills UI.** The Spellbook shows each school as a tree (dual skills in both trees, locked skills with their missing requirements), skill levels and progress, equipped slots (6 to 8), and the AI tab only offers equipped skills. Phone-friendly.
+4. **Skills UI.** The circular wheel described above. The Spellbook shows each school as a tree (dual skills in both trees, locked skills with their missing requirements), skill levels and progress, equipped slots (6 to 8), and the AI tab only offers equipped skills. Phone-friendly.
 5. **New classes.** Barbarian, Paladin, Warlock, Necromancer, Shaman, Druid: attributes and growth, kit, starting AI, character creation list. Proposed numbers go in this file for review before coding. Placeholder sprites.
 6. **Engine: summons** (Summon Imp, Summon Skeleton): units added mid-fight for the caster's team, not counted in party size, with a limit per kind (one demon; skeletons one, then two, then three with Necromancy Mastery), their own AI and lifetime, level and power from the caster's skill and school, log format version bump, replay support.
 7. **Engine: stealth, dual wield, ricochet** (Dash, Shadow Step, Axe and Dagger dual wield with two weapon slots, Ricochet Arrow). One at a time, each with tests and replay support.
@@ -72,9 +72,18 @@ Starter progress: 32 of 130 skills defined. Water and Staff are thin; Rain and S
 - **Weapon slots:** a two-handed weapon takes the main hand and the off hand. Dual wield needs a one-handed weapon in the main hand and another in the off hand.
 - **Summons:** they do not count against party size. Each kind has its own limit: one demon at a time (always one), and skeletons start at one, rising to two and then three with Necromancy Mastery levels. There will be several different demons and several different skeletons, but only up to the limit of each kind can be out at once.
 
+## Skills screen reference (from the user)
+
+Two pictures are kept as references: `docs/art/skill_wheel_reference_layout.webp` (the layout: a diagram of the 13 schools) and `docs/art/skill_wheel_reference_style.webp` (the look: glowing nodes joined by lines, one colour per school, a tree at the centre). The Skills screen (phase 4) follows them:
+- **One circular wheel**, centre labelled "Skill Tree", with a sector for each of the 13 schools in ring order (Bow at the top, then Air / Electric, Axe, Fire, Sword, Water, Staff, Mace, Light, Shield, Earth, Dagger, Dark). Each sector has its own colour and a badge with the school's level (0 to 100).
+- **Skills are nodes along a branch from the centre outward.** Starter skills sit near the centre; the more advanced a skill, the farther out. Branches split where a skill leads to several others (Bow has one start and many branches; Dark has several starts: Demonology, Necromancy, Dash).
+- **Dual skills** are drawn as a dashed line across sectors, from one school's tree to the other's (like Summon Imp from Fire to Dark Demonology), and the node shows in both trees.
+- **Node look:** a locked skill is dim with its missing requirements on tap; an unlocked one shows its level (1 to 10) and progress; skills marked proposed are shown as such until named for good. A skill in the AI (equipped) is highlighted.
+- **Phone:** the wheel scales to the screen and can be zoomed and dragged like the world map; tapping a school fills the screen with that school's tree, and a list view stays available. The wheel is a view of the same data the rules use.
+
 ## Still open
 
 - The exact level-up numbers (to tune): the cost curve per measure and the scaling by unlock requirement.
-- The missing skills (and their effects) of every school, to be proposed batch by batch.
-- Which Necromancy Mastery levels raise the skeleton limit to 2 and 3 (proposal: levels 4 and 8), and which demons and skeletons exist.
+- The missing skills (and their effects) of every school: the user will provide them later, batch by batch.
+- Necromancy Mastery raises the skeleton limit to 2 at level 4 and to 3 at level 8 (the user agreed; to be balanced later). Which demons and skeletons exist comes with the skills.
 - Replays and the log format will change for summons; old replays are dropped, as in earlier combat changes.
