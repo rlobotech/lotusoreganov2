@@ -215,11 +215,14 @@ describe('heap pathfinding', () => {
 });
 
 describe('the current world on the new model', () => {
-  it('has an overlay for every hex and keeps roads as plains with a road', () => {
+  it('has an overlay for every hex, with roads only on open ground and crossings on what they open', () => {
     expect(W.overlay).toHaveLength(W.width * W.height);
     expect(W.overlay.filter((o) => o === 'road').length).toBeGreaterThan(20);
     W.overlay.forEach((o, i) => {
-      if (o === 'road') expect(W.terrain[i]).toBe('plains');
+      const t = W.terrain[i]!;
+      if (o === 'road') expect(BIOME_COST[t]).not.toBe(Infinity);
+      if (o === 'pass') expect(t).toBe('mountains');
+      if (o === 'bridge' || o === 'ford') expect(t).toBe('river');
     });
   });
 

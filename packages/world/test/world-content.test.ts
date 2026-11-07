@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { partyAtLevel } from '../src/balance.ts';
 import { TIERS } from '../src/high-world.ts';
-import { findPath, isPassable, zoneAt } from '../src/hex.ts';
+import { CONTINENT } from '../src/continent.ts';
+import { findPath, hexDistance, isPassable, zoneAt } from '../src/hex.ts';
 import { MONSTERS } from '../src/monsters.ts';
 import { objectiveTarget } from '../src/quests.ts';
 import { advance, defaultConfig } from '../src/sim.ts';
@@ -15,10 +16,12 @@ const allEncounters = (): EncounterDef[] => [
 ];
 
 describe('the world', () => {
-  it('has terrain and zone data for every hex, and a taller map for the high regions', () => {
+  it('has terrain and zone data for every hex of the 40 by 40 continent', () => {
     expect(W.terrain).toHaveLength(W.width * W.height);
     expect(W.zoneOf).toHaveLength(W.width * W.height);
-    expect(W.height).toBe(10 + TIERS.length * 10);
+    expect([W.width, W.height]).toEqual([40, 40]);
+    // The zones are the regions of the map, in the order they open up.
+    expect(Object.keys(W.zones)).toEqual(CONTINENT.zones.map((z) => z.id));
     for (const z of W.zoneOf) expect(W.zones[z], z).toBeDefined();
   });
 
@@ -54,12 +57,18 @@ describe('the world', () => {
       const path = findPath(W, start, site, cleared, 10);
       expect(path, `${site.id} is unreachable`).not.toBeNull();
     }
-    // Each high region's sites are inside its own zone.
-    for (const t of TIERS) {
-      for (const id of [`${t.id}_city`, `${t.id}_dungeon`, `${t.id}_boss`]) {
+    // Each region's city and dungeon are inside it. A boss stands on the pass that leads into the
+    // next region, on the side of the region before it (the last boss lairs in its own region).
+    TIERS.forEach((t, k) => {
+      for (const id of [`${t.id}_city`, `${t.id}_dungeon`]) {
         expect(zoneAt(W, W.sites[id]!), id).toBe(t.id);
       }
-    }
+      const next = TIERS[k + 1];
+      const gate = next && CONTINENT.gates.find((g) => g.to === next.id);
+      const boss = W.sites[`${t.id}_boss`]!;
+      expect(zoneAt(W, boss), boss.id).toBe(gate ? gate.from : t.id);
+      if (gate) expect(hexDistance(boss, gate), boss.id).toBe(1);
+    });
   });
 
   it('the high regions stay closed until the previous boss falls', () => {

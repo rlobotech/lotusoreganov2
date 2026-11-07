@@ -271,7 +271,7 @@ describe('playing quests', () => {
     accept(p, 'orc_menace');
     const r = advance(p, 8 * 3600_000, W, cfg);
     const firstFight = r.events.find((e) => e.kind === 'fight')!;
-    expect(String(firstFight.payload.title)).toMatch(/^Ashen Hills/);
+    expect(String(firstFight.payload.title)).toMatch(/^East Moors/);
     expect(r.events.some((e) => e.kind === 'travel')).toBe(true);
     const prog = r.party.quests.active[0];
     expect(prog === undefined || prog.progress[0]! > 0).toBe(true);

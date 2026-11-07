@@ -11,14 +11,16 @@ import type {
 } from './types.ts';
 
 /**
- * The high-level lands south of the Ashen Hills: five regions that carry the party from level 21 to
+ * The regions of the continent from the Southern Fen on, which carry the party from level 21 to
  * level 100. Everything here is generated from one table (`TIERS`) so the regions share a shape:
  * a city with a shop, a normal dungeon, a boss dungeon that unlocks the next region, three wild
- * encounters and a chain of quests. Terrain is generated deterministically (no random state), with a
- * road down column 3 and carved paths to every site, so every site is always reachable.
+ * encounters and a chain of quests. Where things stand comes from the map (see layout.ts): the
+ * city and dungeon inside the region, and the boss dungeon on the pass that leads to the next one.
+ * Tier ids are the ids of the regions on the map (world-map-data.ts).
  */
 
 export interface Tier {
+  /** The id of the region on the map. */
   id: string;
   name: string;
   minLevel: number;
@@ -26,8 +28,6 @@ export interface Tier {
   city: string;
   dungeon: string;
   bossDungeon: string;
-  /** Terrain characters picked at random for the region (see MAP legend in starter-world.ts). */
-  palette: string;
   arena: string;
   /** Front-line, second and third monster of the region, its boss and the boss's court. */
   monsters: [string, string, string];
@@ -40,128 +40,116 @@ export interface Tier {
   reward: { base: string; rarity: Rarity; caravan: { kind: CaravanKind; tier: number } };
 }
 
+/** In the order the regions open up (the order of the map's zones, after Greenwood and the East Moors). */
 export const TIERS: Tier[] = [
   {
-    id: 'mirewood_fen',
+    id: 'southern_fen',
     tiers: [3, 3],
-    name: 'Mirewood Fen',
+    name: 'Southern Fen',
     minLevel: 21,
     maxLevel: 35,
     city: 'Reedhollow',
     dungeon: 'Sunken Barrow',
     bossDungeon: "Hag's Hollow",
-    palette: 'sssff.s~h',
     arena: 'fen',
     monsters: ['bog_lurker', 'fen_witch', 'fen_wisp'],
     boss: 'bog_hag',
     reward: { base: 'Iron Mail', rarity: 'rare', caravan: { kind: 'mount', tier: 3 } },
   },
   {
-    id: 'frostpeak_reach',
+    id: 'northern_woods',
     tiers: [3, 4],
-    name: 'Frostpeak Reach',
+    name: 'Northern Woods',
     minLevel: 36,
-    maxLevel: 50,
+    maxLevel: 45,
+    city: 'Thornwick',
+    dungeon: 'Hollow Oak',
+    bossDungeon: "Elder's Grove",
+    arena: 'forest',
+    monsters: ['dire_wolf', 'treant', 'forest_stalker'],
+    boss: 'elder_treant',
+    reward: { base: 'Short Bow', rarity: 'rare', caravan: { kind: 'pet', tier: 3 } },
+  },
+  {
+    id: 'western_highlands',
+    tiers: [4, 4],
+    name: 'Western Highlands',
+    minLevel: 46,
+    maxLevel: 55,
+    city: 'Crag Hold',
+    dungeon: 'Eagle Caves',
+    bossDungeon: "Guardian's Gate",
+    arena: 'spire',
+    monsters: ['stone_gargoyle', 'rock_golem', 'storm_caller'],
+    boss: 'ancient_guardian',
+    reward: { base: 'Wooden Shield', rarity: 'rare', caravan: { kind: 'bag', tier: 3 } },
+  },
+  {
+    id: 'frozen_north',
+    tiers: [4, 4],
+    name: 'Frozen North',
+    minLevel: 56,
+    maxLevel: 65,
     city: 'Rimewatch',
     dungeon: 'Glacier Caves',
     bossDungeon: 'Frostgiant Keep',
-    palette: 'nniihmnf~',
     arena: 'ice',
     monsters: ['ice_golem', 'frost_wolf', 'frost_archer'],
     boss: 'frost_giant',
     reward: { base: 'War Hammer', rarity: 'rare', caravan: { kind: 'tent', tier: 4 } },
   },
   {
-    id: 'scorched_wastes',
-    tiers: [4, 4],
-    name: 'Scorched Wastes',
-    minLevel: 51,
-    maxLevel: 65,
-    city: 'Cinderport',
+    id: 'sand_wastes',
+    tiers: [4, 5],
+    name: 'Sand Wastes',
+    minLevel: 66,
+    maxLevel: 75,
+    city: 'Dustport',
     dungeon: 'Buried Temple',
-    bossDungeon: 'Drake Roost',
-    palette: 'ddaahmd.al',
+    bossDungeon: "Warden's Citadel",
     arena: 'dunes',
-    monsters: ['sand_scorpion', 'dune_raider', 'flame_elemental'],
-    boss: 'ash_drake',
+    monsters: ['sand_scorpion', 'dune_raider', 'dust_mage'],
+    boss: 'sand_warden',
     reward: { base: 'Iron Axe', rarity: 'epic', caravan: { kind: 'pet', tier: 4 } },
   },
   {
-    id: 'shadowmarch',
-    tiers: [4, 5],
-    name: 'Shadowmarch',
-    minLevel: 66,
-    maxLevel: 80,
+    id: 'southwest_coast',
+    tiers: [5, 5],
+    name: 'Southwest Coast',
+    minLevel: 76,
+    maxLevel: 85,
     city: 'Gloamgate',
     dungeon: 'Haunted Bastion',
     bossDungeon: 'Throne of Dust',
-    palette: 'ffFsh.m~s',
     arena: 'crypt',
     monsters: ['bone_knight', 'shade_archer', 'shadow_wraith'],
     boss: 'death_knight',
     reward: { base: 'Cloth Robe', rarity: 'epic', caravan: { kind: 'bag', tier: 4 } },
   },
   {
-    id: 'the_spire',
+    id: 'ashen_volcano',
     tiers: [5, 5],
-    name: 'The Spire',
-    minLevel: 81,
+    name: 'Ashen Volcano',
+    minLevel: 86,
     maxLevel: 100,
-    city: 'Skyhold',
-    dungeon: 'Crystal Halls',
-    bossDungeon: 'The Eternal Spire',
-    palette: 'hmmh..~h.',
-    arena: 'spire',
-    monsters: ['arcane_construct', 'void_stalker', 'spire_seraph'],
-    boss: 'void_lord',
-    finalBoss: 'the_eternal',
+    city: 'Cinderhold',
+    dungeon: 'Magma Halls',
+    bossDungeon: "The Dragon's Maw",
+    arena: 'dunes',
+    monsters: ['magma_hound', 'cinder_knight', 'flame_elemental'],
+    boss: 'ash_drake',
+    finalBoss: 'dragon_wyrm',
     reward: { base: 'Spell Tome', rarity: 'epic', caravan: { kind: 'mount', tier: 5 } },
   },
 ];
 
-/** Rows of the map each region takes. */
-export const TIER_ROWS = 10;
-/** Column of the road that links the regions. */
-const ROAD_COL = 3;
-const WIDTH = 14;
-
-/** Where a region's sites are, relative to its first row. */
-const CITY_AT = { col: ROAD_COL, row: 1 };
-const DUNGEON_AT = { col: 7, row: 4 };
-const BOSS_AT = { col: 10, row: 7 };
-
-/** A small deterministic generator (no shared state), so the map is the same every time. */
-function lcg(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
-    return s / 2 ** 32;
-  };
+/** Where a tier's sites stand on the map. */
+export interface TierPlace {
+  city: { col: number; row: number };
+  dungeon: { col: number; row: number };
+  /** The boss dungeon, on the pass that leads on to the next region. */
+  boss: { col: number; row: number };
 }
-
-/** The terrain rows of every region, to append to the starter map (which ends on a road). */
-export function highMapRows(): string[] {
-  const rows: string[] = [];
-  TIERS.forEach((tier, k) => {
-    const rnd = lcg(7919 * (k + 3));
-    const grid: string[][] = Array.from({ length: TIER_ROWS }, () =>
-      Array.from({ length: WIDTH }, () => tier.palette[Math.floor(rnd() * tier.palette.length)]!),
-    );
-    for (const row of grid) row[ROAD_COL] = 'R';
-    // Paths from the road to the dungeons, so no site ever sits in a pocket.
-    for (const at of [DUNGEON_AT, BOSS_AT]) {
-      for (let c = ROAD_COL + 1; c <= at.col; c++) grid[at.row]![c] = '.';
-    }
-    for (const row of grid) rows.push(row.join(''));
-  });
-  return rows;
-}
-
-const baseRow = (k: number) => 10 + k * TIER_ROWS;
-
-/** Which region a map row belongs to (rows from 10 on), or -1. */
-export const tierOfRow = (row: number): number =>
-  row < 10 ? -1 : Math.floor((row - 10) / TIER_ROWS);
 
 const SHOP_BASES = [
   'Rusty Sword',
@@ -204,7 +192,11 @@ export interface HighContent {
  * Zones, sites and quests of the high-level regions. `unlockedBy` is the site whose clearing opens
  * the first region, and `previousQuest` the quest that comes before the first welcome quest.
  */
-export function highContent(unlockedBy: string, previousQuest: string): HighContent {
+export function highContent(
+  unlockedBy: string,
+  previousQuest: string,
+  place: (tierId: string) => TierPlace,
+): HighContent {
   const zones: Record<string, ZoneDef> = {};
   const sites: Record<string, SiteDef> = {};
   const quests: Record<string, QuestDef> = {};
@@ -213,7 +205,7 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
 
   TIERS.forEach((t, k) => {
     const [m1, m2, m3] = t.monsters;
-    const r0 = baseRow(k);
+    const at = place(t.id);
     const packA = enc(
       `${t.id}_vanguard`,
       `${t.name} vanguard`,
@@ -242,9 +234,10 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
       ],
       2,
     );
+    // The boss and a small court (one front-liner and one caster or archer).
     const court = enc(`${t.id}_court`, `The ${nameOf(t.boss)}`, t.arena, [
       { template: t.boss, min: 1, max: 1 },
-      { template: m1, min: 1, max: 2 },
+      { template: m1, min: 1, max: 1 },
       { template: m3, min: 1, max: 1 },
     ]);
     zones[t.id] = {
@@ -266,8 +259,8 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
       id: cityId,
       name: t.city,
       kind: 'city',
-      col: CITY_AT.col,
-      row: r0 + CITY_AT.row,
+      col: at.city.col,
+      row: at.city.row,
       shop: shopFor(Math.round((t.minLevel + t.maxLevel) / 2)),
       stock: { level: Math.round((t.minLevel + t.maxLevel) / 2), tiers: t.tiers },
     };
@@ -275,8 +268,8 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
       id: dungeonId,
       name: t.dungeon,
       kind: 'dungeon',
-      col: DUNGEON_AT.col,
-      row: r0 + DUNGEON_AT.row,
+      col: at.dungeon.col,
+      row: at.dungeon.row,
       dungeon: {
         level: dungeonLevel,
         restPolicy: 'limited',
@@ -311,8 +304,8 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
       id: bossId,
       name: t.bossDungeon,
       kind: 'boss_dungeon',
-      col: BOSS_AT.col,
-      row: r0 + BOSS_AT.row,
+      col: at.boss.col,
+      row: at.boss.row,
       requiresQuest: `${t.id}_boss`,
       dungeon: {
         level: bossLevel,

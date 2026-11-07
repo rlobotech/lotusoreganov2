@@ -55,7 +55,7 @@ describe('rotating stock', () => {
   });
 
   it('brings accessories of the city tiers at a price far above normal items', () => {
-    for (const city of [oakhaven, W.sites.stonebridge!, W.sites.the_spire_city!]) {
+    for (const city of [oakhaven, W.sites.stonebridge!, W.sites.ashen_volcano_city!]) {
       const [lo, hi] = city.stock!.tiers;
       for (let day = 1; day <= 40; day++) {
         const rotating = rotatingStock(city, day);
@@ -223,7 +223,7 @@ describe('rotation by party level', () => {
     // A weaker party gets weaker gear, but never below the window.
     expect(Math.max(...gearLevels(1))).toBeLessThanOrEqual(city);
     // The high regions follow the party up to their own window.
-    const spire = W.sites.the_spire_city!;
+    const spire = W.sites.ashen_volcano_city!;
     const high = rotatingStock(spire, dayOf(NOW), 95).filter((s) => !s.caravan);
     expect(Math.min(...high.map((s) => s.itemLevel))).toBeGreaterThanOrEqual(90 - 2);
   });

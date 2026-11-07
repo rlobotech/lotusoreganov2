@@ -1,6 +1,6 @@
 # World map rebuild
 
-Status: in progress (phases 1 to 3 done, phase 4 next)
+Status: in progress (phases 1 to 4 done, phase 5 next)
 
 
 Goal: replace the 14x60 strip with an organic continent of about 40x40 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
@@ -69,6 +69,15 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - **Result:** the continent passes with no errors. One warning: East Moors has only 25 walkable hexes (the picture's eastern slate lands are mostly rock). Walkable hexes per region: 72, 25, 140, 87, 67, 88, 57, 75, 41.
 - **Not yet:** interior rivers with fords (rivers exist only as region borders), the sites (cities, dungeons, boss dungeons) on the map, region content. The picture's landmarks were snapped onto open ground of the region they fall in (they are hints for phase 4, not sites).
 - Tests: `map-check.test.ts` (the continent passes; unlock order; gates; walls; and the checker catches a missing crossing, a hole in a wall, a sealed pocket, land on the edge, a gateless region, a backwards gate, a city on rock, a ford on mountains).
+
+### Phase 4 notes (what exists now)
+- **The world is the continent.** `starter-world.ts` takes the 40x40 terrain, overlay, regions and zone ids from `CONTINENT`; the world id is now `continent`. Zones, in unlock order, with level bands: Greenwood 1-5, East Moors 6-20 (the old Ashen Hills content), Southern Fen 21-35, Northern Woods 36-45, Western Highlands 46-55, Frozen North 56-65, Sand Wastes 66-75, Southwest Coast 76-85, Ashen Volcano 86-100. The sea counts as part of the first region (never locked).
+- **Placement from the map** (`layout.ts`): the first city is the `starting_city` landmark; a region's city is the open hex nearest the middle of its ground; its dungeon is the open hex farthest from the places already there; the boss that opens a region stands next to that region's gate on the side of the region that leads into it (the gate hex belongs to the closed region, so the boss cannot stand on it); the last region's boss lairs inside it. Moving a region or a gate on the map moves its places.
+- **Unlocks:** the Goblin King (at the pass east of the start) opens the East Moors; the Old Crypt (a dungeon in the East Moors, not on a pass) opens the Southern Fen; after that the boss of each region opens the next one in order, standing at that next region's pass. The boss quests chain in the same order (`requires`), which keeps the levels in line even though some passes can be reached early.
+- **High regions** are one table (`TIERS` in `high-world.ts`, ids = the map's region ids). Three regions are new: Northern Woods (Thornwick, Hollow Oak, Elder's Grove; Dire Wolf, Treant, Forest Stalker, Elder Treant), Western Highlands (Crag Hold, Eagle Caves, Guardian's Gate; Stone Gargoyle, Rock Golem, Storm Caller, Ancient Guardian) and the Sand Wastes' Dust Mage and Sand Warden; the Ashen Volcano has Magma Hound, Cinder Knight, Flame Elemental, the Ash Drake and the final Dragon Wyrm. The Spire monsters (Void Lord, The Eternal and so on) are no longer in any region.
+- **Balance:** `balance:encounters --own` shows 0 to 20% defeats for every encounter and every region; boss final stages are 0 to 37% (Goblin King 37%, the rest 0 to 17%). The boss court is now one front-liner and one caster/archer. The Death Knight was far too hard (57 to 95% defeats) and is now a plain knight-family monster, now only 3%: it, the Volcano (very easy, 10% of health lost) and the Southern Fen boss (0%) want a pass with real play.
+- **Reset:** migration `0003_reset_for_continent.sql` deletes all parties (the map and sites changed).
+- **Not done here (phase 6):** the map view on a phone (the whole 40x40 map is shown at once, about 0.5x on desktop), fog for locked regions; (phase 5): biome travel costs in the sim, biome-aware encounters.
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).

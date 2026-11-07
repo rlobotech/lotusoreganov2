@@ -48,7 +48,8 @@ describe('pathfinding', () => {
   const from = { col: oak.col, row: oak.row };
 
   it('finds a route whose cost is the sum of its steps and ends at the goal', () => {
-    const goal = { col: 7, row: 3 };
+    const warren = W.sites.goblin_warren!;
+    const goal = { col: warren.col, row: warren.row };
     const path = findPath(W, from, goal, [], 10)!;
     expect(path.length).toBeGreaterThan(0);
     expect(sameHex(path[path.length - 1]!, goal)).toBe(true);

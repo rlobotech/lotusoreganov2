@@ -1,68 +1,46 @@
-import { highContent, highMapRows, tierOfRow, TIERS } from './high-world.ts';
+import { CONTINENT } from './continent.ts';
+import { highContent, TIERS } from './high-world.ts';
+import { Layout } from './layout.ts';
 import { shopItem } from './loot.ts';
-import type {
-  EncounterDef,
-  Overlay,
-  QuestDef,
-  SiteDef,
-  Terrain,
-  WorldDef,
-  ZoneDef,
-} from './types.ts';
+import type { EncounterDef, QuestDef, SiteDef, WorldDef, ZoneDef } from './types.ts';
+import { mapCells } from './world-map.ts';
 
-// R = road, . = plains, f = forest, h = hills, s = swamp, m = mountains, ~ = water (see MAP_CODES)
-const BASE_MAP = [
-  'mmmhh.ffff~~~~',
-  'mmhh..fRfffh~~',
-  'mh..ffRR.ffhh~',
-  'h..fRRf..fhhhm',
-  '.ff.R.ff..hhmm',
-  '..f.RR....hhmm',
-  '...fRf.sshhhmm',
-  '..RRf..ssh.mmm',
-  '.f.R..sssh.mmm',
-  'ffRR.ss.hh.mmm',
-];
+// The land, the regions and where the gates are come from the continent map (world-map-data.ts).
+const { terrain, overlay } = mapCells(CONTINENT);
+const WIDTH = CONTINENT.width;
+const HEIGHT = CONTINENT.height;
 
-// The high-level regions continue the map to the south, one block of rows each.
-const MAP = [...BASE_MAP, ...highMapRows()];
-
-// Legend of the map text: each character is a biome, and R is plains with a road on top.
-const MAP_CODES: Record<string, [Terrain, Overlay]> = {
-  R: ['plains', 'road'],
-  '.': ['plains', 'none'],
-  S: ['savanna', 'none'],
-  f: ['forest', 'none'],
-  F: ['dense_forest', 'none'],
-  h: ['hills', 'none'],
-  s: ['swamp', 'none'],
-  d: ['desert', 'none'],
-  n: ['snow', 'none'],
-  i: ['ice', 'none'],
-  a: ['ashlands', 'none'],
-  l: ['lava', 'none'],
-  m: ['mountains', 'none'],
-  r: ['river', 'none'],
-  '~': ['water', 'none'],
-};
-
-const cells = MAP.flatMap((row) =>
-  [...row].map((c) => {
-    const t = MAP_CODES[c];
-    if (!t) throw new Error(`Unknown terrain code ${c}`);
-    return t;
-  }),
+// Every hex belongs to a region; the sea (region 0) is counted with the first region, which is
+// never locked, so the sea is never shown as closed.
+const zoneIdOf = new Map(CONTINENT.zones.map((z) => [z.char, z.id]));
+const zoneOf = CONTINENT.regions.flatMap((row) =>
+  [...row].map((ch) => zoneIdOf.get(ch) ?? CONTINENT.zones[0]!.id),
 );
 
-const WIDTH = MAP[0]!.length;
-const HEIGHT = MAP.length;
-
-// Columns 0-7 are Greenwood, 8-13 are the Ashen Hills (closed until the Goblin King falls).
-const zoneOf = MAP.flatMap((row, r) =>
-  [...row].map((_, col) =>
-    r >= BASE_MAP.length ? TIERS[tierOfRow(r)]!.id : col < 8 ? 'greenwood' : 'ashen_hills',
-  ),
-);
+// Where the places stand, in a fixed order so the layout is always the same.
+const layout = new Layout();
+const start = layout.startCity();
+const places = new Map<
+  string,
+  {
+    city: ReturnType<Layout['city']>;
+    dungeon: ReturnType<Layout['city']>;
+    boss: ReturnType<Layout['city']>;
+  }
+>();
+const warren = layout.far('greenwood', [start]);
+const keep = layout.guard('east_moors');
+const stonebridgeAt = layout.city('east_moors');
+const crypt = layout.far('east_moors', [stonebridgeAt]);
+const order = TIERS.map((t) => t.id);
+for (const [k, t] of TIERS.entries()) {
+  const city = layout.city(t.id);
+  const dungeon = layout.far(t.id, [city]);
+  // The boss of a region stands on the pass into the next one (the last one lairs in its region).
+  const next = order[k + 1];
+  const boss = next ? layout.guard(next) : layout.far(t.id, [city, dungeon]);
+  places.set(t.id, { city, dungeon, boss });
+}
 
 const enc = (e: Omit<EncounterDef, 'weight'> & { weight?: number }): EncounterDef => ({
   weight: 1,
@@ -133,7 +111,7 @@ const lichCourt = enc({
 });
 
 // The Fen opens when the Old Crypt is cleared; each region after it opens with the last boss.
-const high = highContent('old_crypt', 'into_the_crypt');
+const high = highContent('old_crypt', 'into_the_crypt', (id) => places.get(id)!);
 
 const zones: Record<string, ZoneDef> = {
   greenwood: {
@@ -143,9 +121,9 @@ const zones: Record<string, ZoneDef> = {
     maxLevel: 5,
     encounters: [goblinPack, wolfPack],
   },
-  ashen_hills: {
-    id: 'ashen_hills',
-    name: 'Ashen Hills',
+  east_moors: {
+    id: 'east_moors',
+    name: 'East Moors',
     minLevel: 6,
     maxLevel: 20,
     encounters: [orcPatrol, boneWalkers, wolfPack],
@@ -158,8 +136,8 @@ const sites: Record<string, SiteDef> = {
     id: 'oakhaven',
     name: 'Oakhaven',
     kind: 'city',
-    col: 4,
-    row: 5,
+    col: start.col,
+    row: start.row,
     stock: { level: 3, tiers: [1, 2] },
     shop: [
       shopItem('Rusty Sword', 2, 'common'),
@@ -180,8 +158,8 @@ const sites: Record<string, SiteDef> = {
     id: 'goblin_warren',
     name: 'Goblin Warren',
     kind: 'dungeon',
-    col: 2,
-    row: 2,
+    col: warren.col,
+    row: warren.row,
     dungeon: {
       level: 3,
       restPolicy: 'limited',
@@ -199,8 +177,8 @@ const sites: Record<string, SiteDef> = {
     id: 'goblin_keep',
     name: "Goblin King's Keep",
     kind: 'boss_dungeon',
-    col: 7,
-    row: 3,
+    col: keep.col,
+    row: keep.row,
     requiresQuest: 'goblin_king',
     dungeon: {
       level: 5,
@@ -220,8 +198,8 @@ const sites: Record<string, SiteDef> = {
     id: 'stonebridge',
     name: 'Stonebridge',
     kind: 'city',
-    col: 9,
-    row: 4,
+    col: stonebridgeAt.col,
+    row: stonebridgeAt.row,
     stock: { level: 9, tiers: [2, 3] },
     shop: [
       shopItem('Rusty Sword', 7, 'uncommon'),
@@ -240,8 +218,8 @@ const sites: Record<string, SiteDef> = {
     id: 'old_crypt',
     name: 'Old Crypt',
     kind: 'dungeon',
-    col: 10,
-    row: 7,
+    col: crypt.col,
+    row: crypt.row,
     dungeon: {
       level: 8,
       restPolicy: 'none',
@@ -325,7 +303,7 @@ const quests: Record<string, QuestDef> = {
   orc_menace: {
     id: 'orc_menace',
     name: 'Orc menace',
-    description: 'Orc brutes are raiding caravans in the Ashen Hills.',
+    description: 'Orc brutes are raiding caravans in the East Moors.',
     minLevel: 6,
     requires: ['goblin_king'],
     objectives: [{ type: 'kill', template: 'orc_brute', count: 8 }],
@@ -367,11 +345,11 @@ const quests: Record<string, QuestDef> = {
 };
 
 export const STARTER_WORLD: WorldDef = {
-  id: 'starter',
+  id: 'continent',
   width: WIDTH,
   height: HEIGHT,
-  terrain: cells.map(([t]) => t),
-  overlay: cells.map(([, o]) => o),
+  terrain,
+  overlay,
   zoneOf,
   zones: { ...zones, ...high.zones },
   sites: { ...sites, ...high.sites },

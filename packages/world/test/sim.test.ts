@@ -203,7 +203,7 @@ describe('orders and dungeons', () => {
     withBossQuest(p);
     const r = advance(p, 3 * DAY, W, cfg);
     expect(
-      r.events.some((e) => e.kind === 'zone_unlocked' && e.payload.zoneId === 'ashen_hills'),
+      r.events.some((e) => e.kind === 'zone_unlocked' && e.payload.zoneId === 'east_moors'),
     ).toBe(true);
     const boss = r.events.find((e) => e.kind === 'fight' && e.payload.boss)!;
     expect(r.replays.find((x) => x.key === boss.replayKey)!.pinned).toBe(true);
