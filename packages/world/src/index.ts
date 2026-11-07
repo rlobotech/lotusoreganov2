@@ -25,3 +25,5 @@ export {
   normalizeParty,
   type CreatePartyOptions,
 } from './sim.ts';
+export * from './skill-tree.ts';
+export * from './skill-levels.ts';

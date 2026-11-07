@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: planned (questions answered, no phase started)
+Status: in progress (phase 1 done, phase 2 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -63,6 +63,14 @@ Starter progress: 32 of 130 skills defined. Water and Staff are thin; Rain and S
 6. **Engine: summons** (Summon Imp, Summon Skeleton): units added mid-fight for the caster's team, not counted in party size, with a limit per kind (one demon; skeletons one, then two, then three with Necromancy Mastery), their own AI and lifetime, level and power from the caster's skill and school, log format version bump, replay support.
 7. **Engine: stealth, dual wield, ricochet** (Dash, Shadow Step, Axe and Dagger dual wield with two weapon slots, Ricochet Arrow). One at a time, each with tests and replay support.
 8. **Fill the schools in batches** (about 100 more skills), a few schools per batch, each batch with the user's skill list and effects, balance run and tests. Water and Staff first, since they are the thinnest.
+
+## Phase 1 notes (what exists now)
+
+Phase 1 is a pure rules layer, not yet wired into parties, combat or the old skills (that is phase 2 and 3), so nothing in the running game changed.
+- **`packages/world/src/skill-tree.ts`:** the ring of 13 schools (ids `bow, electric, axe, fire, sword, water, staff, mace, light, shield, earth, dagger, dark`; `electric` is Air / Electric and `mace` replaces the old `hammer`), `areAdjacent` and `adjacentSchools`, the tree node type (`TreeNode`: one or two schools, `family` for shared names like Slash, `requires` {character level, school levels, skills at levels}, `measure` damage / healing / uses, passive masteries with a `trainedBy`), the 32 starter nodes of the sheet (`SKILL_TREE`; Rain and Staff Strike marked `proposed`), `CLASS_START_SKILLS` for all 11 classes, and `treeProblems()` (ids, schools, requirement loops, nothing over school level 80, classes only start with skills they can hold).
+- **`packages/world/src/skill-levels.ts`:** works on a small `SkillState` {`skillLevels`, `skillXp`, `equipped`}. School level = sum of skill levels capped at 100, a dual skill counting for both schools; school power 1% per point (a dual skill uses the better of its two schools); status +1 round per 20 points; level-up cost = base per measure (damage 400, healing 300, uses 12) x (1 + unlock level / 10) x 1.5 per level, so a starter is cheap and a skill that unlocks at school level 50 costs 6 times as much per step; `addSkillXp`; `trainingFor` / `trainSkills` (a skill trains only if carried; weapon masteries train from damage with that weapon split by hands and dual wield; Staff Mastery from any elemental spell; Shield Mastery from damage stopped; Demonology and Necromancy Mastery from their summon skill); requirements in words (`unmetSkillRequirements`), `learnable`; the carried-skill limit (6, 7 from level 30, 8 from level 60) with `equipSkill` and `unequipSkill`.
+- **Decisions I took (tell me if wrong):** masteries are passive and take no slot (the sheet did not say); a skill that is not carried never trains (it cannot be used); Shield Mastery trains from damage stopped, and the two summon masteries from their summon skill (the sheet only said weapon masteries and Staff Mastery). All numbers are first guesses for the balance tools.
+- Tests: `skill-rules.test.ts` (33 tests, one group per rule of the sheet).
 
 ## Decided after the first draft (from the user)
 
