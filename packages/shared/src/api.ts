@@ -185,7 +185,9 @@ export interface SkillInfo {
 export interface ShopEntry extends GearInfo {
   id: string;
   name: string;
-  slot: SlotName;
+  /** Missing for caravan accessories, which are not worn. */
+  slot?: SlotName;
+  caravan?: CaravanItemInfo;
   rarity: ItemInfo['rarity'];
   itemLevel: number;
   bonuses: Partial<AttrMap>;
@@ -196,6 +198,8 @@ export interface ShopEntry extends GearInfo {
 export interface CityInfo {
   city: { id: string; name: string };
   stock: ShopEntry[];
+  /** When the rotating part of the stock changes (ms since epoch). */
+  rotatesAt: number;
   teleports: Array<{ siteId: string; name: string; cost: number }>;
 }
 
@@ -283,7 +287,7 @@ export interface PartySummary {
     petSpeed: number[];
   };
   pet: PetInfo;
-  /** Set while the party stands in a city it can use (shop, sell, teleport). */
+  /** Set while the party is on a city or right next to it: it can trade there. */
   city: { id: string; name: string } | null;
   /** The party is waiting in town and can be sent on its way. */
   inTown: boolean;

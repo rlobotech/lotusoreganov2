@@ -135,6 +135,7 @@ const sites: Record<string, SiteDef> = {
     kind: 'city',
     col: 4,
     row: 5,
+    stock: { level: 3, tiers: [1, 2] },
     shop: [
       shopItem('Rusty Sword', 2, 'common'),
       shopItem('Iron Dagger', 2, 'common'),
@@ -196,6 +197,7 @@ const sites: Record<string, SiteDef> = {
     kind: 'city',
     col: 9,
     row: 4,
+    stock: { level: 9, tiers: [2, 3] },
     shop: [
       shopItem('Rusty Sword', 7, 'uncommon'),
       shopItem('Short Bow', 7, 'uncommon'),

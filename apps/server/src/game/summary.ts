@@ -36,7 +36,7 @@ import {
   unlockProblem,
   type SchoolId,
   spendableGold,
-  usableCity,
+  tradeCity,
   xpToNext,
   type PartyState,
   type QuestDef,
@@ -139,7 +139,7 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
   else if (a.kind === 'rest') label = a.forced ? 'Recovering' : 'Resting';
   else if (a.kind === 'town') label = 'Resting in town';
   else if (a.kind === 'dead') label = 'Fallen';
-  const city = usableCity(state, world);
+  const city = tradeCity(state, world);
 
   return {
     id: state.id,

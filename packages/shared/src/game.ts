@@ -58,6 +58,11 @@ export const autoAllocSchema = z.object({ auto: z.boolean() });
 export const aiSchema = z.object({ rules: z.array(z.record(z.string(), z.unknown())).max(32) });
 export const sellSchema = z.object({ itemIds: z.array(idStr).min(1).max(40) });
 export const buySchema = z.object({ stockId: idStr });
+/** Sell some items and buy some stock in one step (stock ids may repeat to buy several). */
+export const tradeSchema = z.object({
+  itemIds: z.array(idStr).max(60),
+  stockIds: z.array(idStr).max(30),
+});
 export const sendGoldSchema = z.object({
   fromId: idStr,
   toId: idStr,

@@ -409,16 +409,53 @@ describe('city', () => {
     });
   }
 
-  it('is closed while the party is out hunting', async () => {
+  it('is closed while the party is far from every city', async () => {
     const cookie = await signUp();
     const id = await newParty(cookie);
     await patch(id, (s) => {
       s.activity = { kind: 'fight' } as never;
+      s.pos = { col: s.pos.col - 3, row: s.pos.row };
     });
     expect((await call(cookie, 'GET', `/parties/${id}/city`)).statusCode).toBe(409);
     expect(
       (await call(cookie, 'POST', `/parties/${id}/city/sell`, { itemIds: ['x'] })).statusCode,
     ).toBe(409);
+  });
+
+  it('trades near a city while hunting: rotating stock, accessories and a combined trade', async () => {
+    const cookie = await signUp();
+    const id = await newParty(cookie);
+    await patch(id, (s) => {
+      s.activity = { kind: 'fight' } as never;
+      s.pos = { col: s.pos.col + 1, row: s.pos.row };
+      s.members[0]!.gold = 5000;
+      s.bag.push({
+        id: 'junk',
+        name: 'Junk',
+        rarity: 'common',
+        itemLevel: 1,
+        value: 200,
+        favorite: false,
+      } as never);
+    });
+    const info = (await call(cookie, 'GET', `/parties/${id}/city`)).json();
+    expect(info.rotatesAt).toBeGreaterThan(Date.now());
+    const acc = info.stock.find((x: { caravan?: unknown }) => x.caravan);
+    expect(acc).toBeDefined();
+    expect(acc.slot).toBeUndefined();
+    const trade = await call(cookie, 'POST', `/parties/${id}/city/trade`, {
+      itemIds: ['junk'],
+      stockIds: [acc.id],
+    });
+    expect(trade.statusCode).toBe(200);
+    const party = trade.json().party;
+    expect(party.bag.find((i: { id: string }) => i.id === 'junk')).toBeUndefined();
+    expect(party.bag.some((i: { caravan?: unknown }) => i.caravan)).toBe(true);
+    const stale = await call(cookie, 'POST', `/parties/${id}/city/trade`, {
+      itemIds: [],
+      stockIds: ['nope'],
+    });
+    expect(stale.statusCode).toBe(404);
   });
 
   it('shows the shop and teleports, sells and buys', async () => {

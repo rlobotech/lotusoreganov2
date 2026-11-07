@@ -154,6 +154,11 @@ export const api = {
   city: (partyId: string) => request<CityInfo>('GET', `/parties/${partyId}/city`),
   sell: (partyId: string, itemIds: string[]) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/sell`, { itemIds }),
+  trade: (partyId: string, itemIds: string[], stockIds: string[]) =>
+    request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/trade`, {
+      itemIds,
+      stockIds,
+    }),
   buy: (partyId: string, stockId: string) =>
     request<{ party: PartySummary }>('POST', `/parties/${partyId}/city/buy`, { stockId }),
   teleport: (partyId: string, siteId: string) =>

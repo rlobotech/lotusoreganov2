@@ -5,6 +5,7 @@ export * from './skills.ts';
 export * from './learning.ts';
 export * from './caravan-data.ts';
 export * from './caravan.ts';
+export * from './stock.ts';
 export * from './balance.ts';
 export * from './monsters.ts';
 export * from './loot.ts';

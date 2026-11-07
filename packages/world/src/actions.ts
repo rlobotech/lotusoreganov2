@@ -7,10 +7,12 @@ import {
   type Attributes,
 } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
-import { canControl, spendableGold, spendGold, splitGold } from './gold.ts';
+import { canControl, payWithShares, spendableGold, spendGold, splitGold } from './gold.ts';
 import { bookProblem } from './learning.ts';
+import { evenShares } from './caravan-data.ts';
 import { petIsOut } from './caravan.ts';
-import { addToBag, bagCapacity, itemFromStock } from './loot.ts';
+import { cityStock } from './stock.ts';
+import { bagCapacity, itemFromStock } from './loot.ts';
 import { ATTRS, CLASSES, memberDerived, spentPoints, unmetRequirements } from './progression.ts';
 import { activeQuest, MAX_ACTIVE_QUESTS, newProgress, questAvailability } from './quests.ts';
 import {
@@ -21,6 +23,7 @@ import {
   type Member,
   type PartyState,
   type SimConfig,
+  type ShopItem,
   type SiteDef,
   type Slot,
   type WorldDef,
@@ -538,22 +541,44 @@ export function sellPrice(item: Item): number {
   return item.value;
 }
 
-export function sellItems(
-  p: PartyState,
-  world: WorldDef,
-  itemIds: string[],
-  viewer?: string,
-): ActionResult {
-  if (!usableCity(p, world)) return fail('not_in_city', 'The party is not in a city');
-  if (petIsOut(p)) return fail('pet_out', 'The pet is out on a trip');
-  const ids = new Set(itemIds);
-  if (ids.size === 0) return fail('no_item', 'Nothing selected');
+/** How far from a city (in hexes) the party can still trade with it: on it or right next to it. */
+export const TRADE_RANGE = 1;
+
+/** The city the party is close enough to trade with, or null. Works while travelling or hunting. */
+export function tradeCity(p: PartyState, world: WorldDef): SiteDef | null {
+  if (p.status !== 'active') return null;
+  let best: SiteDef | null = null;
+  for (const site of Object.values(world.sites)) {
+    if (site.kind !== 'city') continue;
+    const d = hexDistance(p.pos, site);
+    if (d <= TRADE_RANGE && (!best || d < hexDistance(p.pos, best))) best = site;
+  }
+  return best;
+}
+
+/** The items a player may sell: the shared bag and the personal bags of characters they control. */
+function sellableItems(p: PartyState, ids: Set<string>, viewer?: string) {
   const lists = [p.bag, ...p.members.map((m) => m.bag)];
   const chosen = lists.flatMap((l) => l.filter((i) => ids.has(i.id)));
   if (chosen.length !== ids.size) return fail('no_item', 'Some items are not in a bag');
   if (chosen.some((i) => i.favorite)) return fail('favorite', 'Favorites cannot be sold');
   const others = p.members.filter((m) => !canControl(m, viewer));
   if (others.some((m) => m.bag.some((i) => ids.has(i.id)))) return fail('not_yours', NOT_YOURS);
+  return chosen;
+}
+
+export function sellItems(
+  p: PartyState,
+  world: WorldDef,
+  itemIds: string[],
+  viewer?: string,
+): ActionResult {
+  if (!tradeCity(p, world)) return fail('not_in_city', 'The party is not near a city');
+  if (petIsOut(p)) return fail('pet_out', 'The pet is out on a trip');
+  const ids = new Set(itemIds);
+  if (ids.size === 0) return fail('no_item', 'Nothing selected');
+  const chosen = sellableItems(p, ids, viewer);
+  if ('ok' in chosen) return chosen;
   // The money is shared by every character, rounded down.
   splitGold(
     p.members,
@@ -570,18 +595,64 @@ export function buyItem(
   stockId: string,
   cfg: Pick<SimConfig, 'bagSize'>,
   viewer?: string,
+  now?: number,
 ): ActionResult {
-  const city = usableCity(p, world);
-  if (!city) return fail('not_in_city', 'The party is not in a city');
+  return tradeItems(p, world, [], [stockId], cfg, viewer, now);
+}
+
+/**
+ * Sells and buys in one go: the items to sell are paid out as an even share to every character, the
+ * shares of the characters the player controls pay for the purchases first, and the rest of the cost
+ * comes from the player's spendable gold. Nothing changes unless all of it works.
+ */
+export function tradeItems(
+  p: PartyState,
+  world: WorldDef,
+  itemIds: string[],
+  stockIds: string[],
+  cfg: Pick<SimConfig, 'bagSize'>,
+  viewer?: string,
+  now?: number,
+): ActionResult {
+  const city = tradeCity(p, world);
+  if (!city) return fail('not_in_city', 'The party is not near a city');
   if (petIsOut(p)) return fail('pet_out', 'The pet is out on a trip');
-  const stock = city.shop?.find((s) => s.id === stockId);
-  if (!stock) return fail('no_stock', 'The shop does not sell that');
-  if (spendableGold(p, viewer) < stock.price) return fail('no_gold', 'Not enough gold');
-  if (p.bag.length >= bagCapacity(p, cfg)) return fail('bag_full', 'The bag is full');
-  p.counter += 1;
-  spendGold(p, viewer, stock.price);
-  const item = itemFromStock(stock, `b${p.counter}_${stock.id}`);
-  addToBag(p.bag, item, bagCapacity(p, cfg));
+  const ids = new Set(itemIds);
+  if (ids.size !== itemIds.length) return fail('no_item', 'An item was chosen twice');
+  if (ids.size === 0 && stockIds.length === 0) return fail('no_item', 'Nothing selected');
+  const stock = cityStock(city, now);
+  const wanted: ShopItem[] = [];
+  for (const id of stockIds) {
+    const entry = stock.find((s) => s.id === id);
+    if (!entry) return fail('no_stock', 'The shop does not sell that');
+    wanted.push(entry);
+  }
+  const chosen = sellableItems(p, ids, viewer);
+  if ('ok' in chosen) return chosen;
+
+  const soldFromShared = chosen.filter((i) => p.bag.includes(i)).length;
+  if (p.bag.length - soldFromShared + wanted.length > bagCapacity(p, cfg)) {
+    return fail('bag_full', 'The bag is full');
+  }
+  const sale = chosen.reduce((s, i) => s + sellPrice(i), 0);
+  const shares = evenShares(p.members.length, sale);
+  if (
+    !payWithShares(
+      p,
+      shares,
+      wanted.reduce((s, w) => s + w.price, 0),
+      viewer,
+    )
+  ) {
+    return fail('no_gold', 'Not enough gold');
+  }
+  p.members.forEach((m, i) => (m.gold += shares[i]!));
+  p.bag = p.bag.filter((i) => !ids.has(i.id));
+  for (const m of p.members) m.bag = m.bag.filter((i) => !ids.has(i.id));
+  for (const entry of wanted) {
+    p.counter += 1;
+    p.bag.push(itemFromStock(entry, `b${p.counter}_${entry.id}`));
+  }
   return OK;
 }
 

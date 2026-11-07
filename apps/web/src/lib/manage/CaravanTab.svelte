@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CaravanKindName, ItemInfo, PetShopInfo } from '@game/shared';
   import { api, ApiError } from '../api.ts';
+  import { caravanEffect } from '../caravanText.ts';
   import { cap } from '../labels.ts';
   import { manage, session } from '../session.svelte.ts';
 
@@ -20,31 +21,8 @@
 
   const pct = (v: number | undefined) => `${Math.round((v ?? 0) * 100)}%`;
 
-  /** What an accessory does, from the tier tables the server sends. */
-  function effectText(item: ItemInfo): string {
-    const c = item.caravan;
-    if (!c) return '';
-    const t = party.caravanTiers;
-    const i = c.tier - 1;
-    switch (c.kind) {
-      case 'mount':
-        return `+${pct(t.mountSpeed[i])} travel speed`;
-      case 'bag':
-        return `+${t.bagSlots[i]} shared bag slots`;
-      case 'tent':
-        return `+${pct(t.tentHealing[i])} faster recovery`;
-      case 'pet': {
-        const ab =
-          c.abilities?.map((a) => (a === 'scavenger' ? 'may find items' : 'fast return')) ?? [];
-        return [
-          `carries ${t.petBag[i]} items`,
-          `sells for ${pct(t.petSaleRate[i])} of the price`,
-          `speed x${t.petSpeed[i]}`,
-          ...ab,
-        ].join(' · ');
-      }
-    }
-  }
+  const effectText = (item: ItemInfo) =>
+    item.caravan ? caravanEffect(item.caravan, party.caravanTiers) : '';
 
   const inBag = $derived(party.bag.filter((i) => i.caravan));
   const pet = $derived(party.pet);
@@ -202,47 +180,7 @@
     {/if}
 
     {#if !pet.trip}
-      <div class="label">Items to sell ({chosen.length}/{pet.capacity})</div>
-      <div class="list">
-        {#each sellable as it (it.id)}
-          <label class="check">
-            <input type="checkbox" bind:checked={sendItems[it.id]} />
-            <span class={it.rarity}>{it.name}</span>
-            <span class="muted small">worth {it.value}</span>
-          </label>
-        {:else}
-          <div class="muted small">Nothing in the shared bag to sell.</div>
-        {/each}
-      </div>
-
-      <div class="label">Shopping list</div>
-      <div class="list">
-        {#each shop?.stock ?? [] as s (s.id)}
-          <div class="row item">
-            <div>
-              <span class={s.rarity}>{s.name}</span>
-              <span class="muted small">L{s.itemLevel} · {s.price} gold</span>
-            </div>
-            <div class="qty">
-              <button class="icon-btn" disabled={!wanted[s.id]} onclick={() => adjust(s.id, -1)}
-                >-</button
-              >
-              <span>{wanted[s.id] ?? 0}</span>
-              <button class="icon-btn" onclick={() => adjust(s.id, 1)}>+</button>
-            </div>
-          </div>
-        {/each}
-      </div>
-
-      <div class="row">
-        <span class="muted small">
-          Sale {sale} gold · shopping {cost} gold · your gold {party.spendableGold}
-        </span>
-        <button class="primary" disabled={!canSend} onclick={send}>Send the pet</button>
-      </div>
-      {#if cost > sale + party.spendableGold}
-        <p class="bad small">Not enough gold for that shopping list.</p>
-      {/if}
+      <div class="muted small">Send it from the Trade tab: pick what to sell and what to buy.</div>
     {/if}
   </div>
 {/if}
@@ -279,10 +217,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-  .check input {
-    width: 20px;
-    height: 20px;
   }
   .qty {
     display: flex;

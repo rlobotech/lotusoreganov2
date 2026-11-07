@@ -8,7 +8,8 @@ import {
   petSpeed,
   petTier,
 } from './caravan-data.ts';
-import { canControl, spendableGold, spendGold } from './gold.ts';
+import { payWithShares } from './gold.ts';
+import { cityStock } from './stock.ts';
 import { hexDistance } from './hex.ts';
 import { addToBag, bagCapacity, itemFromStock, rollDrop } from './loot.ts';
 import type {
@@ -92,7 +93,7 @@ export function nearestShopCity(world: WorldDef, from: PartyState['pos']): SiteD
   let best: SiteDef | null = null;
   let bestDist = Infinity;
   for (const site of Object.values(world.sites)) {
-    if (site.kind !== 'city' || !site.shop?.length) continue;
+    if (site.kind !== 'city' || !(site.shop?.length || site.stock)) continue;
     const d = hexDistance(from, site);
     if (d < bestDist) {
       best = site;
@@ -110,7 +111,12 @@ export interface PetQuote {
   ticks: number;
 }
 
-export function petQuote(p: PartyState, world: WorldDef, cfg: SimConfig): PetQuote | null {
+export function petQuote(
+  p: PartyState,
+  world: WorldDef,
+  cfg: SimConfig,
+  now?: number,
+): PetQuote | null {
   const city = nearestShopCity(world, p.pos);
   const tier = petTier(p);
   if (!city || !tier) return null;
@@ -118,7 +124,7 @@ export function petQuote(p: PartyState, world: WorldDef, cfg: SimConfig): PetQuo
     3,
     Math.ceil((hexDistance(p.pos, city) * cfg.travelTicksPerHex) / petSpeed(tier)),
   );
-  return { cityId: city.id, stock: city.shop ?? [], ticks };
+  return { cityId: city.id, stock: cityStock(city, now), ticks };
 }
 
 /**
@@ -139,7 +145,7 @@ export function sendPet(
   const tier = petTier(p);
   if (!tier) return fail('no_pet', 'The party has no carrier pet');
   if (petIsOut(p)) return fail('pet_out', 'The pet is already out on a trip');
-  const quote = petQuote(p, world, cfg);
+  const quote = petQuote(p, world, cfg, now);
   if (!quote) return fail('no_city', 'There is no city with a shop to send the pet to');
 
   const ids = new Set(itemIds);
@@ -162,27 +168,15 @@ export function sendPet(
   const sold = items.reduce((s, i) => s + petSalePrice(i, tier), 0);
   const cost = wanted.reduce((s, w) => s + w.price, 0);
   const shares = evenShares(p.members.length, sold);
-  // The shares of the characters this player controls can pay for the shopping first.
-  const mine = p.members.map((m, i) => (canControl(m, viewer) ? i : -1)).filter((i) => i >= 0);
-  let fromSale = Math.min(
-    cost,
-    mine.reduce((s, i) => s + shares[i]!, 0),
-  );
-  const fromGold = cost - fromSale;
-  if (fromGold > spendableGold(p, viewer)) return fail('no_gold', 'Not enough gold');
-  for (const i of mine) {
-    const use = Math.min(fromSale, shares[i]!);
-    shares[i]! -= use;
-    fromSale -= use;
-  }
-  spendGold(p, viewer, fromGold);
+  // The shares of the characters this player controls pay for the shopping first.
+  if (!payWithShares(p, shares, cost, viewer)) return fail('no_gold', 'Not enough gold');
 
   const there = Math.max(1, quote.ticks);
   p.bag = p.bag.filter((i) => !ids.has(i.id));
   const trip: PetTrip = {
     cityId: quote.cityId,
     items,
-    shopping: stockIds,
+    shopping: wanted.map((w) => structuredClone(w)),
     arriveAt: now + there * cfg.tickMs,
     returnAt: 0,
     phase: 'out',
@@ -248,12 +242,9 @@ export function settlePet(
     for (const m of p.members) m.gold += trip.shares[m.id] ?? 0;
     const city = world.sites[trip.cityId];
     const bought: Item[] = [];
-    for (const id of trip.shopping) {
-      const stock = city?.shop?.find((s) => s.id === id);
-      if (stock) {
-        p.counter += 1;
-        bought.push(itemFromStock(stock, `pet${p.counter}_${stock.id}`));
-      }
+    for (const stock of trip.shopping) {
+      p.counter += 1;
+      bought.push(itemFromStock(stock, `pet${p.counter}_${stock.id}`));
     }
     emit(trip.arriveAt, 'pet_arrived', {
       city: city?.name ?? trip.cityId,

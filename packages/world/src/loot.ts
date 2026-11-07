@@ -362,9 +362,10 @@ export function itemFromStock(stock: ShopItem, id: string): Item {
     itemLevel: stock.itemLevel,
     value: stock.value,
     favorite: false,
-    slot: stock.slot,
+    ...(stock.slot ? { slot: stock.slot } : {}),
     bonuses: { ...stock.bonuses },
     ...gearOf(stock),
+    ...(stock.caravan ? { caravan: structuredClone(stock.caravan) } : {}),
   };
 }
 

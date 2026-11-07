@@ -11,6 +11,7 @@ import {
   equipSchema,
   learnSchema,
   petSendSchema,
+  tradeSchema,
   favoriteSchema,
   moveItemSchema,
   moveOrderSchema,
@@ -49,7 +50,11 @@ import {
   teleport,
   teleportOptions,
   unequipItem,
-  usableCity,
+  tradeCity,
+  tradeItems,
+  cityStock,
+  dayOf,
+  DAY_MS,
   type ActionResult,
   type PartyState,
   type SimConfig,
@@ -372,7 +377,7 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.get('/parties/:id/pet/shop', { preHandler: auth }, async (req) => {
     const { state } = await ownedParty(req);
-    const quote = petQuote(state, world, cfg);
+    const quote = petQuote(state, world, cfg, Date.now());
     if (!quote) throw new HttpError(409, 'no_pet', 'The party has no carrier pet');
     return {
       city: { id: quote.cityId, name: world.sites[quote.cityId]?.name ?? quote.cityId },
@@ -451,11 +456,14 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.get('/parties/:id/city', { preHandler: auth }, async (req) => {
     const { state } = await ownedParty(req);
-    const city = usableCity(state, world);
-    if (!city) throw new HttpError(409, 'not_in_city', 'The party is not in a city');
+    const city = tradeCity(state, world);
+    if (!city) throw new HttpError(409, 'not_in_city', 'The party is not near a city');
+    const now = Date.now();
     return {
       city: { id: city.id, name: city.name },
-      stock: city.shop ?? [],
+      stock: cityStock(city, now),
+      // The shop changes at midnight UTC.
+      rotatesAt: (dayOf(now) + 1) * DAY_MS,
       teleports: teleportOptions(state, world, cfg),
     };
   });
@@ -467,7 +475,12 @@ export async function gameRoutes(app: FastifyInstance, { pool, world, cfg }: Dep
 
   app.post('/parties/:id/city/buy', { preHandler: auth }, async (req) => {
     const { stockId } = buySchema.parse(req.body);
-    return act(req, (s) => buyItem(s, world, stockId, cfg, req.user!.id));
+    return act(req, (s) => buyItem(s, world, stockId, cfg, req.user!.id, Date.now()));
+  });
+
+  app.post('/parties/:id/city/trade', { preHandler: auth }, async (req) => {
+    const { itemIds, stockIds } = tradeSchema.parse(req.body);
+    return act(req, (s) => tradeItems(s, world, itemIds, stockIds, cfg, req.user!.id, Date.now()));
   });
 
   app.post('/parties/:id/city/teleport', { preHandler: auth }, async (req) => {

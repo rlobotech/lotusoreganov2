@@ -68,8 +68,13 @@ export interface SiteDef {
   col: number;
   row: number;
   dungeon?: DungeonDef;
-  /** What a city's shop sells. */
+  /** What a city's shop always sells. */
   shop?: ShopItem[];
+  /**
+   * Rotating stock: every day the city also offers a few pieces of gear around `level` and some
+   * caravan accessories of a tier in `tiers` (inclusive).
+   */
+  stock?: { level: number; tiers: [number, number] };
   /** A boss dungeon only opens to a party that has taken this quest. */
   requiresQuest?: string;
 }
@@ -194,7 +199,7 @@ export interface PetTrip {
   cityId: string;
   /** The goods it carries to sell, and the shopping list (shop stock ids) it brings back. */
   items: Item[];
-  shopping: string[];
+  shopping: ShopItem[];
   /** When it reaches the city and when it is back with the party (ms). */
   arriveAt: number;
   returnAt: number;
@@ -215,7 +220,10 @@ export interface PetState {
 export interface ShopItem extends GearStats {
   id: string;
   name: string;
-  slot: Slot;
+  /** Missing for things that are not worn (caravan accessories). */
+  slot?: Slot;
+  /** A caravan accessory sold in the shop. */
+  caravan?: CaravanInfo;
   rarity: Rarity;
   itemLevel: number;
   bonuses: Partial<Attributes>;

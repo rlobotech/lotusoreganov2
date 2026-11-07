@@ -5,11 +5,13 @@
   import AttributesTab from './AttributesTab.svelte';
   import CaravanTab from './CaravanTab.svelte';
   import CityTab from './CityTab.svelte';
+  import TradeTab from './TradeTab.svelte';
   import InventoryTab from './InventoryTab.svelte';
   import QuestsOrdersTab from './QuestsOrdersTab.svelte';
   import SpellbookTab from './SpellbookTab.svelte';
 
-  type Tab = 'inventory' | 'attributes' | 'spellbook' | 'quests' | 'ai' | 'caravan' | 'city';
+  type Tab =
+    'inventory' | 'attributes' | 'spellbook' | 'quests' | 'ai' | 'caravan' | 'trade' | 'city';
   let { start = 'inventory', onclose }: { start?: Tab; onclose: () => void } = $props();
 
   const party = $derived(session.party!);
@@ -29,6 +31,7 @@
     ai: 'M12 3v3m0 12v3M3 12h3m12 0h3M7 7l2 2m6 6 2 2m0-10-2 2m-6 6-2 2M9 9h6v6H9z',
     caravan:
       'M3 17h18M5 17V9h9v8M14 12h4l3 3v2M7 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm10 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
+    trade: 'M4 8h16M4 8l3-4m-3 4 3 4M20 16H4m16 0-3-4m3 4-3 4',
     city: 'M4 21V10l4-3 4 3v11M12 21V6l4-3 4 3v15M2 21h20M7 14h2m6-5h2m-2 4h2',
   };
 
@@ -40,6 +43,7 @@
     { id: 'quests', label: 'Quests' },
     { id: 'ai', label: 'AI' },
     { id: 'caravan', label: 'Caravan' },
+    ...(party.city || party.pet.equipped ? [{ id: 'trade' as Tab, label: 'Trade' }] : []),
     ...(party.city ? [{ id: 'city' as Tab, label: 'City' }] : []),
   ]);
   const tab = $derived(tabs.some((t) => t.id === chosen) ? chosen : 'inventory');
@@ -79,6 +83,8 @@
       <AiTab bind:memberId />
     {:else if tab === 'caravan'}
       <CaravanTab />
+    {:else if tab === 'trade'}
+      <TradeTab />
     {:else if tab === 'city'}
       <CityTab />
     {/if}

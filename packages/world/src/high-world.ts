@@ -34,6 +34,8 @@ export interface Tier {
   boss: string;
   /** A last boss behind the first one (the final region only). */
   finalBoss?: string;
+  /** Caravan accessory tiers the region's city sells (inclusive). */
+  tiers: [number, number];
   /** What the boss quest gives besides gold and experience. */
   reward: { base: string; rarity: Rarity; caravan: { kind: CaravanKind; tier: number } };
 }
@@ -41,6 +43,7 @@ export interface Tier {
 export const TIERS: Tier[] = [
   {
     id: 'mirewood_fen',
+    tiers: [3, 3],
     name: 'Mirewood Fen',
     minLevel: 21,
     maxLevel: 35,
@@ -55,6 +58,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'frostpeak_reach',
+    tiers: [3, 4],
     name: 'Frostpeak Reach',
     minLevel: 36,
     maxLevel: 50,
@@ -69,6 +73,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'scorched_wastes',
+    tiers: [4, 4],
     name: 'Scorched Wastes',
     minLevel: 51,
     maxLevel: 65,
@@ -83,6 +88,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'shadowmarch',
+    tiers: [4, 5],
     name: 'Shadowmarch',
     minLevel: 66,
     maxLevel: 80,
@@ -97,6 +103,7 @@ export const TIERS: Tier[] = [
   },
   {
     id: 'the_spire',
+    tiers: [5, 5],
     name: 'The Spire',
     minLevel: 81,
     maxLevel: 100,
@@ -262,6 +269,7 @@ export function highContent(unlockedBy: string, previousQuest: string): HighCont
       col: CITY_AT.col,
       row: r0 + CITY_AT.row,
       shop: shopFor(Math.round((t.minLevel + t.maxLevel) / 2)),
+      stock: { level: Math.round((t.minLevel + t.maxLevel) / 2), tiers: t.tiers },
     };
     sites[dungeonId] = {
       id: dungeonId,

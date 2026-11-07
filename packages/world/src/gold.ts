@@ -47,3 +47,32 @@ export function spendGold(
   }
   return true;
 }
+
+/**
+ * Pays `cost` for a purchase made by `viewer` when a sale is being shared out at the same time
+ * (`shares` is each character's even share of the sale, in member order). The shares of the
+ * characters the viewer controls pay first; the rest comes from the viewer's spendable gold.
+ * Returns false and changes nothing when that is not enough. On success `shares` holds what is
+ * still to be paid out to each character.
+ */
+export function payWithShares(
+  p: Pick<PartyState, 'members'>,
+  shares: number[],
+  cost: number,
+  viewer: string | undefined,
+): boolean {
+  const mine = p.members.map((m, i) => (canControl(m, viewer) ? i : -1)).filter((i) => i >= 0);
+  let fromSale = Math.min(
+    cost,
+    mine.reduce((s, i) => s + shares[i]!, 0),
+  );
+  const fromGold = cost - fromSale;
+  if (fromGold > spendableGold(p, viewer)) return false;
+  for (const i of mine) {
+    const use = Math.min(fromSale, shares[i]!);
+    shares[i]! -= use;
+    fromSale -= use;
+  }
+  spendGold(p, viewer, fromGold);
+  return true;
+}
