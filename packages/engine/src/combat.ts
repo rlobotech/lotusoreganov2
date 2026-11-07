@@ -1,4 +1,12 @@
-import { opportunitySkill, planKite, planRetreat, planTurn, provokers, skillCost } from './ai.ts';
+import {
+  opportunitySkill,
+  planAfterMove,
+  planKite,
+  planRetreat,
+  planTurn,
+  provokers,
+  skillCost,
+} from './ai.ts';
 import { distance, makeGrid, tileIndex } from './grid.ts';
 import { createRng, type Rng } from './rng.ts';
 import {
@@ -351,9 +359,15 @@ export function runCombat(input: CombatInput): CombatResult {
       if (!unit.alive) return;
       if (plan.skill.free) continue;
       // Movement left over is used to get clear of enemies, or a retreat skill does it for free.
+      const move = plan.rule?.move;
       if (plan.skill.retreat) {
         const path = planRetreat(grid, units, unit, plan.skill.retreat);
         if (path) walk(unit, path, { disengage: true, retreat: true });
+      } else if (move?.when === 'after') {
+        const path = planAfterMove(grid, units, skills, unit, move.mode, plan.skill, plan.target);
+        if (path) walk(unit, path, { retreat: move.mode !== 'toward' });
+      } else if (plan.rule?.move?.mode === 'stay') {
+        // The rule asked the unit to hold its ground.
       } else if (plan.skill.range > 1 && plan.skill.side !== 'self') {
         const path = planKite(grid, units, skills, unit);
         if (path) walk(unit, path, { retreat: true });

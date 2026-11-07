@@ -1,4 +1,10 @@
-import type { AIRule, Attributes } from '@game/engine';
+import {
+  MOVE_MODES,
+  TARGET_ORDERS,
+  WEAPON_ATTACK,
+  type AIRule,
+  type Attributes,
+} from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
 import { canControl, spendableGold, spendGold, splitGold } from './gold.ts';
 import { addToBag, bagCapacity } from './loot.ts';
@@ -310,9 +316,21 @@ export function resetPoints(p: PartyState, memberId: string, viewer?: string): A
 // ---------- combat AI ----------
 
 export const MAX_AI_RULES = 16;
-const ORDERS = new Set(['nearest', 'lowest_hp', 'highest_hp', 'lowest_hp_pct']);
+const ORDERS = new Set<string>(TARGET_ORDERS);
+const MODES = new Set<string>(MOVE_MODES);
 
 const isPct = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
+const isName = (v: unknown) => typeof v === 'string' && v.length > 0 && v.length <= 30;
+
+const FILTER_PCTS = ['hpBelowPct', 'hpAbovePct'] as const;
+const FILTER_NAMES = ['lacksStatus', 'hasStatus'] as const;
+const WHEN_PCTS = [
+  'selfHpBelowPct',
+  'selfHpAbovePct',
+  'selfManaAbovePct',
+  'selfManaBelowPct',
+] as const;
+const WHEN_NAMES = ['selfHasStatus', 'selfLacksStatus'] as const;
 
 /** Returns a message if the rules are not acceptable, or null. */
 export function validateAiRules(rules: unknown, known: readonly string[]): string | null {
@@ -322,26 +340,43 @@ export function validateAiRules(rules: unknown, known: readonly string[]): strin
     const at = `Rule ${i + 1}`;
     if (!r || typeof r !== 'object') return `${at} is not valid`;
     const rule = r as AIRule;
-    if (typeof rule.skill !== 'string' || !SKILLS[rule.skill]) return `${at}: unknown skill`;
-    if (!known.includes(rule.skill)) return `${at}: this character does not know ${rule.skill}`;
+    if (rule.skill !== WEAPON_ATTACK) {
+      if (typeof rule.skill !== 'string' || !SKILLS[rule.skill]) return `${at}: unknown skill`;
+      if (!known.includes(rule.skill)) return `${at}: this character does not know ${rule.skill}`;
+    }
     if (rule.order !== undefined && !ORDERS.has(rule.order)) return `${at}: unknown target order`;
     const f = rule.filter;
     if (f !== undefined) {
       if (typeof f !== 'object' || f === null) return `${at}: bad filter`;
-      if (f.hpBelowPct !== undefined && !isPct(f.hpBelowPct))
-        return `${at}: percentages are 0 to 100`;
-      if (f.hpAbovePct !== undefined && !isPct(f.hpAbovePct))
-        return `${at}: percentages are 0 to 100`;
-      for (const s of [f.lacksStatus, f.hasStatus]) {
-        if (s !== undefined && (typeof s !== 'string' || s.length > 30)) return `${at}: bad status`;
+      for (const k of FILTER_PCTS) {
+        if (f[k] !== undefined && !isPct(f[k])) return `${at}: percentages are 0 to 100`;
       }
+      for (const k of FILTER_NAMES) {
+        if (f[k] !== undefined && !isName(f[k])) return `${at}: bad status`;
+      }
+      if (f.fullHealth !== undefined && typeof f.fullHealth !== 'boolean')
+        return `${at}: bad filter`;
     }
     const w = rule.when;
     if (w !== undefined) {
       if (typeof w !== 'object' || w === null) return `${at}: bad condition`;
-      for (const v of [w.selfHpBelowPct, w.selfManaAbovePct, w.selfManaBelowPct]) {
-        if (v !== undefined && !isPct(v)) return `${at}: percentages are 0 to 100`;
+      for (const k of WHEN_PCTS) {
+        if (w[k] !== undefined && !isPct(w[k])) return `${at}: percentages are 0 to 100`;
       }
+      for (const k of WHEN_NAMES) {
+        if (w[k] !== undefined && !isName(w[k])) return `${at}: bad status`;
+      }
+      if (w.enemyAdjacent !== undefined && typeof w.enemyAdjacent !== 'boolean')
+        return `${at}: bad condition`;
+      const n = w.enemiesAtLeast;
+      if (n !== undefined && !(Number.isInteger(n) && n >= 1 && n <= 12))
+        return `${at}: enemy count is 1 to 12`;
+    }
+    const mv = rule.move;
+    if (mv !== undefined) {
+      if (typeof mv !== 'object' || mv === null) return `${at}: bad move`;
+      if (mv.when !== 'before' && mv.when !== 'after') return `${at}: a move goes before or after`;
+      if (!MODES.has(mv.mode)) return `${at}: unknown move`;
     }
   }
   return null;
@@ -353,19 +388,20 @@ function cleanRule(r: AIRule): AIRule {
   if (r.order) out.order = r.order;
   if (r.filter) {
     const f: NonNullable<AIRule['filter']> = {};
-    if (r.filter.hpBelowPct !== undefined) f.hpBelowPct = r.filter.hpBelowPct;
-    if (r.filter.hpAbovePct !== undefined) f.hpAbovePct = r.filter.hpAbovePct;
-    if (r.filter.lacksStatus) f.lacksStatus = r.filter.lacksStatus;
-    if (r.filter.hasStatus) f.hasStatus = r.filter.hasStatus;
+    for (const k of FILTER_PCTS) if (r.filter[k] !== undefined) f[k] = r.filter[k];
+    for (const k of FILTER_NAMES) if (r.filter[k]) f[k] = r.filter[k];
+    if (r.filter.fullHealth) f.fullHealth = true;
     if (Object.keys(f).length) out.filter = f;
   }
   if (r.when) {
     const w: NonNullable<AIRule['when']> = {};
-    if (r.when.selfHpBelowPct !== undefined) w.selfHpBelowPct = r.when.selfHpBelowPct;
-    if (r.when.selfManaAbovePct !== undefined) w.selfManaAbovePct = r.when.selfManaAbovePct;
-    if (r.when.selfManaBelowPct !== undefined) w.selfManaBelowPct = r.when.selfManaBelowPct;
+    for (const k of WHEN_PCTS) if (r.when[k] !== undefined) w[k] = r.when[k];
+    for (const k of WHEN_NAMES) if (r.when[k]) w[k] = r.when[k];
+    if (r.when.enemyAdjacent !== undefined) w.enemyAdjacent = r.when.enemyAdjacent;
+    if (r.when.enemiesAtLeast !== undefined) w.enemiesAtLeast = r.when.enemiesAtLeast;
     if (Object.keys(w).length) out.when = w;
   }
+  if (r.move) out.move = { when: r.move.when, mode: r.move.mode };
   return out;
 }
 

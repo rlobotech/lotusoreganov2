@@ -9,7 +9,14 @@ import {
 } from './grid.ts';
 import { manaCostMult } from './scaling.ts';
 import { hasStatus, isStunned } from './stats.ts';
-import type { AIRule, Point, SkillDef, UnitState } from './types.ts';
+import {
+  WEAPON_ATTACK,
+  type AIRule,
+  type MoveMode,
+  type Point,
+  type SkillDef,
+  type UnitState,
+} from './types.ts';
 
 /**
  * What a unit does this turn.
@@ -18,7 +25,7 @@ import type { AIRule, Point, SkillDef, UnitState } from './types.ts';
  * - wait: nothing possible.
  */
 export type Plan =
-  | { kind: 'act'; skill: SkillDef; target: UnitState; path: Point[] }
+  | { kind: 'act'; skill: SkillDef; target: UnitState; path: Point[]; rule?: AIRule }
   | { kind: 'approach'; target: UnitState; path: Point[] }
   | { kind: 'wait' };
 
@@ -28,6 +35,17 @@ const manaPct = (u: UnitState) => (u.base.maxMana > 0 ? (u.mana / u.base.maxMana
 /** Mana a skill costs this unit (costs grow with level, like mana). */
 export const skillCost = (unit: UnitState, skill: SkillDef): number =>
   Math.round(skill.manaCost * manaCostMult(unit.def.level));
+
+/** The unit's basic weapon attack: its first free damage skill that uses the weapon. */
+export function basicAttack(unit: UnitState, skills: Record<string, SkillDef>): SkillDef | null {
+  for (const id of unit.def.skills) {
+    const s = skills[id];
+    if (s && s.kind === 'damage' && s.source === 'weapon' && s.manaCost === 0 && s.cooldown === 0) {
+      return s;
+    }
+  }
+  return null;
+}
 
 /** The melee weapon attack a unit uses for opportunity attacks, if it has one. */
 export function opportunitySkill(
@@ -75,6 +93,13 @@ export function provokers(
 function whenOk(units: readonly UnitState[], unit: UnitState, when: AIRule['when']): boolean {
   if (!when) return true;
   if (when.selfHpBelowPct !== undefined && !(hpPct(unit) < when.selfHpBelowPct)) return false;
+  if (when.selfHpAbovePct !== undefined && !(hpPct(unit) > when.selfHpAbovePct)) return false;
+  if (when.selfHasStatus !== undefined && !hasStatus(unit, when.selfHasStatus)) return false;
+  if (when.selfLacksStatus !== undefined && hasStatus(unit, when.selfLacksStatus)) return false;
+  if (when.enemiesAtLeast !== undefined) {
+    const n = units.filter((u) => u.alive && u.team !== unit.team).length;
+    if (n < when.enemiesAtLeast) return false;
+  }
   if (when.selfManaAbovePct !== undefined && !(manaPct(unit) > when.selfManaAbovePct)) return false;
   if (when.selfManaBelowPct !== undefined && !(manaPct(unit) < when.selfManaBelowPct)) return false;
   if (when.enemyAdjacent !== undefined) {
@@ -108,6 +133,7 @@ function candidates(
     pool = pool.filter((u) => {
       if (f.hpBelowPct !== undefined && !(hpPct(u) < f.hpBelowPct)) return false;
       if (f.hpAbovePct !== undefined && !(hpPct(u) > f.hpAbovePct)) return false;
+      if (f.fullHealth && u.hp < u.base.maxHp) return false;
       if (f.lacksStatus !== undefined && hasStatus(u, f.lacksStatus)) return false;
       if (f.hasStatus !== undefined && !hasStatus(u, f.hasStatus)) return false;
       return true;
@@ -118,6 +144,15 @@ function candidates(
     switch (rule.order ?? 'nearest') {
       case 'nearest':
         return distance(unit, u);
+      case 'farthest':
+        return -distance(unit, u);
+      case 'crowded':
+        // The unit with the most of its own side within two tiles (best for area spells).
+        return -units.filter((o) => o.alive && o.team === u.team && distance(o, u) <= 2).length;
+      case 'strongest':
+        return -u.def.attributes.str;
+      case 'least_armor':
+        return Object.values(u.resist).reduce((sum, v) => sum + v, 0);
       case 'lowest_hp':
         return u.hp;
       case 'highest_hp':
@@ -181,14 +216,21 @@ export function planTurn(
     return n;
   }
 
-  function reachPlan(skill: SkillDef, target: UnitState): Plan | null {
-    if (skill.side === 'self') return { kind: 'act', skill, target: unit, path: [] };
+  function reachPlan(skill: SkillDef, target: UnitState, rule: AIRule): Plan | null {
+    if (skill.side === 'self') return { kind: 'act', skill, target: unit, path: [], rule };
+    const before = rule.move?.when === 'before' ? rule.move.mode : undefined;
+    // 'stay': the rule only applies from where the unit already stands.
+    if (before === 'stay') {
+      return canHitFrom(unit, target, skill)
+        ? { kind: 'act', skill, target, path: [], rule }
+        : null;
+    }
     // A retreat skill gets clear for free afterwards, so it fires from where the unit stands.
     if (skill.retreat && canHitFrom(unit, target, skill)) {
-      return { kind: 'act', skill, target, path: [] };
+      return { kind: 'act', skill, target, path: [], rule };
     }
     const r = getReach();
-    const ranged = skill.range > 1;
+    const ranged = before ? before !== 'toward' : skill.range > 1;
     let best = -1;
     let bestScore = -Infinity;
     let nearest = -1;
@@ -221,6 +263,7 @@ export function planTurn(
         skill,
         target,
         path: best === tileOf(unit) ? [] : pathTo(grid, r, best),
+        rule,
       };
     if (nearest < 0 || move <= 0) return null;
     return { kind: 'approach', target, path: pathTo(grid, r, nearest).slice(0, move) };
@@ -230,14 +273,14 @@ export function planTurn(
 
   function tryRule(skill: SkillDef, rule: AIRule): Plan | null {
     for (const target of candidates(units, unit, skill, rule)) {
-      const plan = reachPlan(skill, target);
+      const plan = reachPlan(skill, target, rule);
       if (plan) return plan;
     }
     return null;
   }
 
   for (const rule of unit.def.ai) {
-    const skill = skills[rule.skill];
+    const skill = rule.skill === WEAPON_ATTACK ? basicAttack(unit, skills) : skills[rule.skill];
     if (!skill || !unit.def.skills.includes(skill.id) || !usable(skill)) continue;
     if (!whenOk(units, unit, rule.when)) continue;
     const plan = tryRule(skill, rule);
@@ -245,13 +288,10 @@ export function planTurn(
   }
 
   // Fallback: a free basic attack on the nearest enemy.
-  for (const id of unit.def.skills) {
-    const skill = skills[id];
-    if (skill && skill.kind === 'damage' && skill.manaCost === 0 && skill.cooldown === 0) {
-      const plan = tryRule(skill, { skill: id });
-      if (plan) return plan;
-      break;
-    }
+  const fallback = basicAttack(unit, skills);
+  if (fallback) {
+    const plan = tryRule(fallback, { skill: fallback.id });
+    if (plan) return plan;
   }
   return { kind: 'wait' };
 }
@@ -323,6 +363,59 @@ export function planRetreat(
       best = i;
       bestDist = away;
       bestCost = d;
+    }
+  }
+  return best < 0 ? null : pathTo(grid, r, best);
+}
+
+/**
+ * The walk a rule's `after` move asks for once its skill is done, or null to stay put.
+ * toward: closer to the target. away: clear of enemies, weighing opportunity attacks.
+ * range: like away, but the target must stay within the skill's reach.
+ */
+export function planAfterMove(
+  grid: Grid,
+  units: UnitState[],
+  skills: Record<string, SkillDef>,
+  unit: UnitState,
+  mode: MoveMode,
+  skill: SkillDef,
+  target: UnitState,
+): Point[] | null {
+  if (mode === 'stay' || unit.movesLeft < 1) return null;
+  const r = reach(grid, unit, occupiedTiles(grid, units, unit));
+  const inReach = (tile: Point) =>
+    distance(tile, target) <= skill.range &&
+    (skill.range <= 1 || hasLineOfSight(grid, tile, target));
+  let best = -1;
+  let bestScore =
+    mode === 'toward'
+      ? -distance(unit, target)
+      : Math.min(nearestEnemy(units, unit, unit), SAFETY_CAP) * SAFETY_WEIGHT;
+  for (let i = 0; i < r.dist.length; i++) {
+    const d = r.dist[i]!;
+    if (d < 1 || d > unit.movesLeft) continue;
+    const tile = { x: i % grid.width, y: Math.floor(i / grid.width) };
+    if (mode === 'range' && target.alive && skill.side !== 'self' && !inReach(tile)) continue;
+    const path = pathTo(grid, r, i);
+    let score: number;
+    if (mode === 'toward') {
+      score = -distance(tile, target) - d * MOVE_WEIGHT;
+    } else {
+      let from: Point = unit;
+      let threats = 0;
+      for (const p of path) {
+        threats += provokers(units, skills, unit, from, p).length;
+        from = p;
+      }
+      score =
+        Math.min(nearestEnemy(units, unit, tile), SAFETY_CAP) * SAFETY_WEIGHT -
+        threats * THREAT_WEIGHT -
+        d * MOVE_WEIGHT;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
     }
   }
   return best < 0 ? null : pathTo(grid, r, best);

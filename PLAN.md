@@ -240,7 +240,7 @@ Goal: a combat system that mixes Baldur's Gate 3 (action economy, opportunity at
 ### Phases
 1. **(done) Combat core (`packages/engine`):** unit state with movement and action economy, reaction and opportunity attacks, 8-direction grid and pathing, damage types and resistances, hit chance, damage ranges, extra damage entries, the `scaling` curve table, new event log (format 2) and the replay viewer updated to match (splits move/act, shows hit chance, damage type colours, opportunity attacks). Old AI is adapted just enough to run until phase 3. Tests for every rule and for the level 1 and 100 targets.
 2. **(done) Items and gear (`packages/world`, shared, web):** new slots and hand types, requirements, resistances and attributes on items, weapons with damage range/type/school, extra damage affixes, loot and shop rebuilt, rarity scaling to level 100, inventory screen updated (two-handed handling, requirement checks, resistance lines in the item card).
-3. **AI rules and editor:** the new rule model, movement nodes linked to rules, kiting and retreat defaults weighing opportunity attacks, validation, and the AI tab rebuilt with the new conditions.
+3. **(done) AI rules and editor:** the new rule model, movement nodes linked to rules, kiting and retreat defaults weighing opportunity attacks, validation, and the AI tab rebuilt with the new conditions.
 4. **Schools, skills, learning, classes:** school data and levels, school XP, weapon requirements, prerequisite and book learning, skill catalogue for the starting schools, the five classes with starting schools and skills, monsters rebuilt with attributes, resistances and weapons.
 5. **Character sheet UI:** the Attributes tab described above, Spellbook updated to schools and unlock progress.
 6. **Content and balance:** the level 1 to 100 curve for characters and monsters, zone and dungeon levels, loot tables, a balance simulator report (time to level, survival per level, damage per level), and tuning.
@@ -259,6 +259,13 @@ Goal: a combat system that mixes Baldur's Gate 3 (action economy, opportunity at
 - UI and API: `MemberInfo.combat` (weapon, extra, resistances as points and percent), item cards and shop entries list damage, hands, resistances and requirements, the Attributes tab has a weapon and resistances section.
 - Balance after gear: a 24 hour demo run loses about 10% of fights at levels 1 to 8 (was about 20% with the placeholders). Real tuning is phase 6.
 - Not done yet: the inventory could grey out gear the character cannot wear (the server refuses it with a message), items have no school (phase 4), and drops have no level requirement.
+
+### Phase 3 notes (what exists now)
+- Rule model (`AIRule`, engine `types.ts`): `skill` (a skill id or `weapon_attack`, the unit's basic attack), `order` (target pick: nearest, farthest, crowded, lowest_hp, highest_hp, lowest_hp_pct, strongest, least_armor), `filter` on the target (health below/above, full health, has/lacks status), `when` on the unit and field (own health below/above, mana above/below, has/lacks status, enemy adjacent yes/no, at least N enemies), and `move` (`before` or `after`, mode toward, away, range, stay). Who the rule targets (self, enemy, ally) comes from the skill.
+- Planner: a `before` move changes how the standing tile is chosen (toward = melee scoring, away/range = ranged scoring weighing opportunity attacks, stay = only from the current tile); an `after` move uses the movement left (`planAfterMove`). Without a move, ranged units still kite after attacking and retreat skills still retreat. `stay` also stops the automatic kite.
+- World validates and cleans every field (`validateAiRules`, `cleanRule`); the mage default now aims fireball at the most crowded enemy.
+- UI: the AI tab has Target, Only when and Movement sections per rule, a plain-language summary line, and is look-only for characters that belong to another player.
+- Not done: item actions (no consumables yet), a standalone movement node with no skill, and conditions on allies as a group (for example "an ally is below 30%").
 
 ### Open for later (the user will add details)
 Skill slots and how many skills a character can use in the AI at once, status and condition catalogue, summons and pets in combat, dual wielding, ammunition, skill upgrades past school level, the blood damage type, extra slots, boss mechanics, stealth and surprise, and any BG3 features not named above.

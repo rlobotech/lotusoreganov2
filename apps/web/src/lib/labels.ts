@@ -1,4 +1,12 @@
-import type { AiRuleInfo, AttrMap, AttrName, ItemInfo, SkillInfo, SlotName } from '@game/shared';
+import {
+  WEAPON_ATTACK_ID,
+  type AiRuleInfo,
+  type AttrMap,
+  type AttrName,
+  type ItemInfo,
+  type SkillInfo,
+  type SlotName,
+} from '@game/shared';
 
 export const ATTRS: AttrName[] = ['str', 'dex', 'int', 'vit', 'wis'];
 export const ATTR_LABELS: Record<AttrName, string> = {
@@ -38,10 +46,21 @@ export function fmtBonuses(b: Partial<AttrMap> | undefined): string {
 }
 
 export const ORDER_LABELS: Record<NonNullable<AiRuleInfo['order']>, string> = {
-  nearest: 'nearest',
+  nearest: 'closest',
+  farthest: 'farthest',
+  crowded: 'most crowded (most friends around it)',
   lowest_hp: 'lowest health',
   highest_hp: 'highest health',
   lowest_hp_pct: 'lowest health %',
+  strongest: 'strongest (most Strength)',
+  least_armor: 'least armor (lowest resistances)',
+};
+
+export const MOVE_LABELS: Record<NonNullable<AiRuleInfo['move']>['mode'], string> = {
+  toward: 'move closer to the target',
+  away: 'step away from enemies',
+  range: 'keep distance but stay in reach',
+  stay: 'hold position',
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -50,30 +69,42 @@ export const STATUS_LABELS: Record<string, string> = {
   war_cry: 'War Cry',
 };
 
-/** A plain-language summary of one rule, e.g. "Heal the ally with the lowest health % (below 75%)". */
+/** A plain-language summary of one rule, e.g. "Heal an ally (lowest health % first) with health below 75%". */
 export function describeRule(rule: AiRuleInfo, skills: SkillInfo[]): string {
+  const weapon = rule.skill === WEAPON_ATTACK_ID;
   const skill = skills.find((s) => s.id === rule.skill);
-  const name = skill?.name ?? rule.skill;
-  const who = skill?.side === 'self' ? 'yourself' : skill?.side === 'ally' ? 'an ally' : 'an enemy';
+  const name = weapon ? 'Weapon attack' : (skill?.name ?? rule.skill);
+  const self = !weapon && skill?.side === 'self';
+  const who = self ? 'yourself' : !weapon && skill?.side === 'ally' ? 'an ally' : 'an enemy';
+  const status = (id: string) => STATUS_LABELS[id] ?? id;
   const bits: string[] = [];
   const f = rule.filter;
-  if (skill && skill.side !== 'self') {
+  if (!self) {
+    if (f?.fullHealth) bits.push('full health');
     if (f?.hpBelowPct !== undefined) bits.push(`health below ${f.hpBelowPct}%`);
     if (f?.hpAbovePct !== undefined) bits.push(`health above ${f.hpAbovePct}%`);
-    if (f?.lacksStatus) bits.push(`without ${STATUS_LABELS[f.lacksStatus] ?? f.lacksStatus}`);
-    if (f?.hasStatus) bits.push(`with ${STATUS_LABELS[f.hasStatus] ?? f.hasStatus}`);
+    if (f?.lacksStatus) bits.push(`without ${status(f.lacksStatus)}`);
+    if (f?.hasStatus) bits.push(`with ${status(f.hasStatus)}`);
   }
   const w = rule.when;
   const mine: string[] = [];
   if (w?.selfHpBelowPct !== undefined) mine.push(`your health is below ${w.selfHpBelowPct}%`);
+  if (w?.selfHpAbovePct !== undefined) mine.push(`your health is above ${w.selfHpAbovePct}%`);
   if (w?.selfManaAbovePct !== undefined) mine.push(`your mana is above ${w.selfManaAbovePct}%`);
   if (w?.selfManaBelowPct !== undefined) mine.push(`your mana is below ${w.selfManaBelowPct}%`);
-  const pick =
-    skill && skill.side !== 'self' ? ` (${ORDER_LABELS[rule.order ?? 'nearest']} first)` : '';
+  if (w?.selfHasStatus) mine.push(`you have ${status(w.selfHasStatus)}`);
+  if (w?.selfLacksStatus) mine.push(`you lack ${status(w.selfLacksStatus)}`);
+  if (w?.enemyAdjacent !== undefined) {
+    mine.push(w.enemyAdjacent ? 'an enemy is next to you' : 'no enemy is next to you');
+  }
+  if (w?.enemiesAtLeast !== undefined) mine.push(`at least ${w.enemiesAtLeast} enemies remain`);
+  const pick = !self ? ` (${ORDER_LABELS[rule.order ?? 'nearest'].split(' (')[0]} first)` : '';
   let text = `${name} on ${who}`;
   if (bits.length) text += ` with ${bits.join(' and ')}`;
   text += pick;
   if (mine.length) text += `, only when ${mine.join(' and ')}`;
+  if (rule.move)
+    text += `; ${rule.move.when === 'before' ? 'first' : 'then'} ${MOVE_LABELS[rule.move.mode]}`;
   return text;
 }
 

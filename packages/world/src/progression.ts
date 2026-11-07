@@ -81,7 +81,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     growth: { str: 0.1, dex: 0.2, int: 0.9, vit: 0.3, wis: 0.4 },
     move: 3,
     skills: ['staff_bolt', 'fireball'],
-    ai: [{ skill: 'fireball', order: 'highest_hp' }, { skill: 'staff_bolt' }],
+    ai: [{ skill: 'fireball', order: 'crowded' }, { skill: 'staff_bolt' }],
     pointOrder: ['int', 'int', 'wis', 'vit'],
     kit: ['Gnarled Staff', 'Cloth Hood', 'Cloth Robe'],
   },

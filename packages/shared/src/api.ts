@@ -46,16 +46,46 @@ export interface ItemInfo extends GearInfo {
   bonuses?: Partial<AttrMap>;
 }
 
+export type TargetOrderName =
+  | 'nearest'
+  | 'farthest'
+  | 'crowded'
+  | 'lowest_hp'
+  | 'highest_hp'
+  | 'lowest_hp_pct'
+  | 'strongest'
+  | 'least_armor';
+
+export type MoveModeName = 'toward' | 'away' | 'range' | 'stay';
+
+/** The skill id of the basic weapon attack, whatever the weapon is. */
+export const WEAPON_ATTACK_ID = 'weapon_attack';
+
 export interface AiRuleInfo {
+  /** A skill id, or 'weapon_attack'. Who it targets (self, enemy, ally) follows from the skill. */
   skill: string;
-  order?: 'nearest' | 'lowest_hp' | 'highest_hp' | 'lowest_hp_pct';
+  order?: TargetOrderName;
+  /** Conditions on the target. */
   filter?: {
     hpBelowPct?: number;
     hpAbovePct?: number;
+    fullHealth?: boolean;
     lacksStatus?: string;
     hasStatus?: string;
   };
-  when?: { selfHpBelowPct?: number; selfManaAbovePct?: number; selfManaBelowPct?: number };
+  /** Special conditions on the character and the battlefield. */
+  when?: {
+    selfHpBelowPct?: number;
+    selfHpAbovePct?: number;
+    selfManaAbovePct?: number;
+    selfManaBelowPct?: number;
+    selfHasStatus?: string;
+    selfLacksStatus?: string;
+    enemyAdjacent?: boolean;
+    enemiesAtLeast?: number;
+  };
+  /** A move linked to the rule, before or after its skill. */
+  move?: { when: 'before' | 'after'; mode: MoveModeName };
 }
 
 export interface MemberInfo {

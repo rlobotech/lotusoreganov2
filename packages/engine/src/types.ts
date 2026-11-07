@@ -117,26 +117,79 @@ export interface SkillDef {
   vfx?: string;
 }
 
+/** How a rule picks among the valid targets (the first one wins). */
+export type TargetOrder =
+  /** Closest (the default), farthest, or the enemy/ally with the most of its own side around it. */
+  | 'nearest'
+  | 'farthest'
+  | 'crowded'
+  /** Lowest or highest current health, or lowest health share. */
+  | 'lowest_hp'
+  | 'highest_hp'
+  | 'lowest_hp_pct'
+  /** Highest strength, or the least total resistance ("least armor"). */
+  | 'strongest'
+  | 'least_armor';
+
+export const TARGET_ORDERS: readonly TargetOrder[] = [
+  'nearest',
+  'farthest',
+  'crowded',
+  'lowest_hp',
+  'highest_hp',
+  'lowest_hp_pct',
+  'strongest',
+  'least_armor',
+];
+
+/** Conditions on the target. */
 export interface TargetFilter {
   hpBelowPct?: number;
   hpAbovePct?: number;
+  /** True: only a target at full health. */
+  fullHealth?: boolean;
   lacksStatus?: string;
   hasStatus?: string;
 }
 
+/**
+ * A move linked to a rule. `before` walks first and the rule only applies if the skill can then be
+ * used; `after` walks with the movement left once the skill is done.
+ * - toward: close in on the target. away: get clear of enemies (weighing opportunity attacks).
+ * - range: keep as far from enemies as the skill's reach allows. stay: do not move at all.
+ */
+export type MoveMode = 'toward' | 'away' | 'range' | 'stay';
+export const MOVE_MODES: readonly MoveMode[] = ['toward', 'away', 'range', 'stay'];
+
+export interface RuleMove {
+  when: 'before' | 'after';
+  mode: MoveMode;
+}
+
+/** Special action: the unit's basic weapon attack, whatever it is. */
+export const WEAPON_ATTACK = 'weapon_attack';
+
 export interface AIRule {
+  /** A skill id, or WEAPON_ATTACK. Who it targets (self, enemy, ally) follows from the skill. */
   skill: string;
   /** How to pick among valid targets. Default 'nearest'. */
-  order?: 'nearest' | 'lowest_hp' | 'highest_hp' | 'lowest_hp_pct';
+  order?: TargetOrder;
   filter?: TargetFilter;
-  /** Conditions on the acting unit itself. */
+  /** Special conditions on the acting unit and the battlefield. */
   when?: {
     selfHpBelowPct?: number;
+    selfHpAbovePct?: number;
     selfManaAbovePct?: number;
     selfManaBelowPct?: number;
-    /** True: only when an enemy stands next to the unit. */
+    selfHasStatus?: string;
+    selfLacksStatus?: string;
+    /** True: only when an enemy stands next to the unit. False: only when none does. */
     enemyAdjacent?: boolean;
+    /** At least this many enemies are still standing. */
+    enemiesAtLeast?: number;
   };
+  /** A move linked to this rule. Without one, ranged units still step back after shooting. */
+  move?: RuleMove;
 }
 
 /** What a unit hits with. Skills of source 'weapon' roll between `min` and `max`. */
