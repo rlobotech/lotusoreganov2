@@ -34,6 +34,8 @@ export function formatFeedEvent(e: FeedEvent): string {
       return `Delivered to the bag: ${(p.items as string[]).join(', ')}.`;
     case 'skill_learned':
       return `${p.member} learned ${p.name}.`;
+    case 'skill_level':
+      return `${p.member}'s ${p.name} reached level ${p.level}.`;
     case 'pet_sent':
       return `The pet set off for the city with ${p.items} item${p.items === 1 ? '' : 's'} to sell${p.buying ? ` and ${p.buying} to buy` : ''}.`;
     case 'pet_arrived': {

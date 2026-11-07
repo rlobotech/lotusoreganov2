@@ -158,23 +158,18 @@
         <div class="row2">
           <span>{s.name}</span>
           <span class="muted small">
-            level {s.level}{s.nextXp === null ? ' (max)' : ''}
+            level {s.level}/{s.max}
           </span>
         </div>
         <div
           class="bar"
           role="progressbar"
-          aria-label="{s.name} progress"
-          aria-valuenow={s.xp - s.levelXp}
+          aria-label="{s.name} level"
+          aria-valuenow={s.level}
           aria-valuemin={0}
-          aria-valuemax={s.nextXp === null ? s.xp - s.levelXp : s.nextXp - s.levelXp}
+          aria-valuemax={s.max}
         >
-          <div
-            class="fill xp"
-            style:width="{s.nextXp === null
-              ? 100
-              : ((s.xp - s.levelXp) / (s.nextXp - s.levelXp)) * 100}%"
-          ></div>
+          <div class="fill xp" style:width="{(s.level / s.max) * 100}%"></div>
         </div>
       </div>
     {:else}
@@ -186,7 +181,9 @@
     <div class="label">Skills</div>
     <div class="chips">
       {#each m.skills as id (id)}
-        <span class="chip" title={skill(id)?.school ?? 'basic'}>{skill(id)?.name ?? id}</span>
+        <span class="chip" title={skill(id)?.schools.join(' + ') || 'basic'}
+          >{skill(id)?.name ?? id}</span
+        >
       {/each}
     </div>
     <div class="muted tiny">Details, locked skills and books are in the Spellbook tab.</div>

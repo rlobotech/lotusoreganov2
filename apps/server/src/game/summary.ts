@@ -6,7 +6,13 @@ import {
   DEFAULT_BAG_SIZE,
   memberBreakdown,
   memberDerived,
-  MAX_SCHOOL_LEVEL,
+  MAX_RING_SCHOOL_LEVEL,
+  equippedLimit,
+  levelUpCost,
+  memberSchools,
+  memberSchoolLevel,
+  RING_NAMES,
+  SKILL_TREE,
   BAG_SLOTS,
   bagCapacity,
   caravanBagSlots,
@@ -29,12 +35,9 @@ import {
   questAvailability,
   questTargetSite,
   shopItem,
-  SCHOOL_NAMES,
-  schoolLevel,
-  schoolXpForLevel,
   SKILLS,
   unlockProblem,
-  type SchoolId,
+  type RingSchool,
   spendableGold,
   tradeCity,
   xpToNext,
@@ -194,21 +197,27 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
         gold: m.gold,
         mine: canControl(m, viewer),
         skills: m.skills,
-        schools: Object.entries(m.schools).map(([id, xp]) => {
-          const level = schoolLevel(xp);
-          return {
-            id,
-            name: SCHOOL_NAMES[id as SchoolId] ?? id,
-            level,
-            xp,
-            levelXp: schoolXpForLevel(level),
-            nextXp: level >= MAX_SCHOOL_LEVEL ? null : schoolXpForLevel(level + 1),
-          };
-        }),
-        locked: Object.values(SKILLS).flatMap((s) => {
-          const why = unlockProblem(m, s);
-          return why && s.school && m.schools[s.school] !== undefined && !m.skills.includes(s.id)
-            ? [{ skill: s.id, missing: why }]
+        schools: Object.entries(memberSchools(m)).map(([id, level]) => ({
+          id,
+          name: RING_NAMES[id as RingSchool] ?? id,
+          level: level ?? 0,
+          max: MAX_RING_SCHOOL_LEVEL,
+        })),
+        skillLevels: Object.fromEntries(
+          Object.entries(m.skillLevels).map(([id, level]) => {
+            const node = SKILL_TREE[id];
+            const cost = node ? levelUpCost(node, level) : 0;
+            return [id, { level, xp: m.skillXp[id] ?? 0, next: cost > 0 ? cost : null }];
+          }),
+        ),
+        equipped: m.equipped,
+        equipLimit: equippedLimit(state.level),
+        locked: Object.values(SKILL_TREE).flatMap((n) => {
+          // Skills of schools the character has, that it cannot learn yet.
+          const why = unlockProblem(m, state.level, n);
+          const open = n.schools.some((sc) => memberSchoolLevel(m, sc) > 0);
+          return why && open && !m.skills.includes(n.id) && !/starting skill/.test(why)
+            ? [{ skill: n.id, missing: why }]
             : [];
         }),
         ai: m.ai,
@@ -258,29 +267,52 @@ export function summarize(state: PartyState, world: WorldDef, viewer?: string): 
 
 /** Skill definitions the AI editor and character sheet show. */
 export function skillCatalog(): SkillInfo[] {
-  return Object.values(SKILLS).map((s) => ({
-    id: s.id,
-    name: s.name,
-    kind: s.kind,
-    source: s.source,
-    damageType: s.damageType ?? null,
-    attr: s.attr,
-    power: s.power,
-    range: s.range,
-    manaCost: s.manaCost,
-    cooldown: s.cooldown,
-    side: s.side,
-    ...(s.radius ? { radius: s.radius } : {}),
-    ...(s.retreat ? { retreat: s.retreat } : {}),
-    ...(s.free ? { free: true } : {}),
-    ...(s.school ? { school: s.school } : {}),
-    ...(s.unlock ? { unlock: s.unlock } : {}),
-    ...(s.bookOnly ? { bookOnly: true } : {}),
-    ...(s.weapons ? { weapons: s.weapons } : {}),
-    ...(s.status
-      ? { status: { id: s.status.id, kind: s.status.kind, duration: s.status.duration } }
-      : {}),
-  }));
+  const fromCombat = Object.values(SKILLS).map((s): SkillInfo => {
+    const node = SKILL_TREE[s.id];
+    return {
+      id: s.id,
+      name: s.name,
+      kind: s.kind,
+      source: s.source,
+      damageType: s.damageType ?? null,
+      attr: s.attr,
+      power: s.power,
+      range: s.range,
+      manaCost: s.manaCost,
+      cooldown: s.cooldown,
+      side: s.side,
+      ...(s.radius ? { radius: s.radius } : {}),
+      ...(s.retreat ? { retreat: s.retreat } : {}),
+      ...(s.free ? { free: true } : {}),
+      schools: node ? [...node.schools] : [],
+      ...(node?.bookOnly ? { bookOnly: true } : {}),
+      usable: true,
+      ...(s.weapons ? { weapons: s.weapons } : {}),
+      ...(s.status
+        ? { status: { id: s.status.id, kind: s.status.kind, duration: s.status.duration } }
+        : {}),
+    };
+  });
+  // Skills of the tree without a combat definition yet: the masteries (passive), the summons and Dash.
+  const fromTree = Object.values(SKILL_TREE)
+    .filter((n) => !SKILLS[n.id])
+    .map((n): SkillInfo => ({
+      id: n.id,
+      name: n.name,
+      kind: 'status',
+      source: 'spell',
+      damageType: null,
+      attr: 'int',
+      power: 0,
+      range: 0,
+      manaCost: 0,
+      cooldown: 0,
+      side: 'self',
+      schools: [...n.schools],
+      ...(n.passive ? { passive: true } : {}),
+      usable: false,
+    }));
+  return [...fromCombat, ...fromTree];
 }
 
 /** The map and sites, without anything the player should not know yet. */

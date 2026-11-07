@@ -1,61 +1,9 @@
-import type { SkillDef, StatusDef, WeaponKind } from '@game/engine';
+import type { SkillDef, StatusDef } from '@game/engine';
 
 /**
- * Schools group skills. A character has experience in each school, earned by using skills of that
- * school (weapon skills earn the school of the weapon held, so they only progress with the right
- * weapon). A school's level unlocks its skills.
+ * The combat definitions of the skills (what each one does in a fight). Where a skill sits in the
+ * tree, and what it needs, is in skill-tree.ts under the same id.
  */
-export const SCHOOLS = [
-  'sword',
-  'axe',
-  'hammer',
-  'dagger',
-  'bow',
-  'fire',
-  'water',
-  'electric',
-  'earth',
-  'dark',
-  'light',
-] as const;
-export type SchoolId = (typeof SCHOOLS)[number];
-
-export const SCHOOL_NAMES: Record<SchoolId, string> = {
-  sword: 'Sword',
-  axe: 'Axe',
-  hammer: 'Hammer',
-  dagger: 'Dagger',
-  bow: 'Bow',
-  fire: 'Fire',
-  water: 'Water',
-  electric: 'Electric',
-  earth: 'Earth',
-  dark: 'Dark',
-  light: 'Light',
-};
-
-export const MAX_SCHOOL_LEVEL = 20;
-
-/** The school a weapon kind trains. Staffs only focus spells, so they train nothing. */
-export const WEAPON_SCHOOL: Partial<Record<WeaponKind, SchoolId>> = {
-  sword: 'sword',
-  axe: 'axe',
-  mace: 'hammer',
-  hammer: 'hammer',
-  dagger: 'dagger',
-  bow: 'bow',
-};
-
-/** Total school experience needed to reach `level` (level 1 needs none). */
-export const schoolXpForLevel = (level: number): number =>
-  level <= 1 ? 0 : Math.round(30 * (level - 1) ** 2);
-
-/** The level a school has with `xp` experience. */
-export function schoolLevel(xp: number): number {
-  let level = 1;
-  while (level < MAX_SCHOOL_LEVEL && xp >= schoolXpForLevel(level + 1)) level += 1;
-  return level;
-}
 
 const poison: StatusDef = { id: 'poison', kind: 'dot', duration: 3, power: 5, damageType: 'earth' };
 const bleed: StatusDef = { id: 'bleed', kind: 'dot', duration: 3, power: 5, damageType: 'blood' };
@@ -75,8 +23,141 @@ const skill = (d: Def): SkillDef => ({
 });
 
 const list: SkillDef[] = [
-  // Basic attack: any weapon, no school of its own (it trains the weapon's school).
+  // Basic attack: any weapon, in no school (everyone has it).
   skill({ id: 'attack', name: 'Attack', attr: 'str', power: 10, range: 1, vfx: 'slash' }),
+
+  // Starting skills of the sheet that did not exist before. The summons, Dash and the masteries have
+  // no combat skill here yet: they wait for their engine feature (or are passive).
+  skill({
+    id: 'sword_slash',
+    name: 'Slash',
+    attr: 'str',
+    power: 17,
+    range: 1,
+    manaCost: 2,
+    cooldown: 1,
+    vfx: 'slash',
+    weapons: ['sword'],
+  }),
+  skill({
+    id: 'axe_slash',
+    name: 'Slash',
+    attr: 'str',
+    power: 17,
+    range: 1,
+    manaCost: 2,
+    cooldown: 1,
+    vfx: 'slash',
+    weapons: ['axe'],
+  }),
+  skill({
+    id: 'dagger_slash',
+    name: 'Slash',
+    attr: 'dex',
+    power: 15,
+    range: 1,
+    manaCost: 2,
+    cooldown: 1,
+    vfx: 'slash',
+    weapons: ['dagger'],
+  }),
+  skill({
+    id: 'blunt_strike',
+    name: 'Blunt Strike',
+    attr: 'str',
+    power: 18,
+    range: 1,
+    manaCost: 2,
+    cooldown: 1,
+    vfx: 'slash_heavy',
+    weapons: ['mace', 'hammer'],
+  }),
+  skill({
+    id: 'staff_strike',
+    name: 'Staff Strike',
+    attr: 'str',
+    power: 11,
+    range: 1,
+    vfx: 'slash',
+    weapons: ['staff'],
+  }),
+  skill({
+    id: 'ricochet_arrow',
+    name: 'Ricochet Arrow',
+    attr: 'dex',
+    power: 14,
+    range: 5,
+    manaCost: 3,
+    cooldown: 1,
+    vfx: 'arrow',
+    weapons: ['bow'],
+  }),
+  skill({
+    id: 'gust',
+    name: 'Gust',
+    source: 'spell',
+    damageType: 'electric',
+    attr: 'int',
+    power: 6,
+    range: 4,
+    vfx: 'bolt',
+  }),
+  skill({
+    id: 'rain',
+    name: 'Rain',
+    source: 'spell',
+    damageType: 'water',
+    attr: 'int',
+    power: 7,
+    range: 5,
+    radius: 1,
+    manaCost: 5,
+    cooldown: 3,
+    vfx: 'bolt',
+    status: chill,
+  }),
+  skill({
+    id: 'poison_dart',
+    name: 'Poison Dart',
+    source: 'spell',
+    damageType: 'earth',
+    attr: 'dex',
+    power: 7,
+    range: 4,
+    manaCost: 2,
+    cooldown: 1,
+    vfx: 'arrow',
+    dodgeable: true,
+    status: poison,
+  }),
+  skill({
+    id: 'defensive_stance',
+    name: 'Defensive Stance',
+    kind: 'status',
+    source: 'spell',
+    side: 'self',
+    attr: 'vit',
+    power: 0,
+    range: 0,
+    manaCost: 3,
+    cooldown: 5,
+    vfx: 'buff',
+    status: { id: 'defensive_stance', kind: 'mod', duration: 3, stat: 'evasion', amount: 30 },
+  }),
+  skill({
+    id: 'fortify',
+    name: 'Fortify',
+    kind: 'status',
+    source: 'spell',
+    side: 'ally',
+    attr: 'wis',
+    power: 0,
+    range: 3,
+    manaCost: 4,
+    cooldown: 4,
+    vfx: 'buff',
+    status: { id: 'fortify', kind: 'mod', duration: 3, stat: 'evasion', amount: 20 },
+  }),
 
   // Sword
   skill({
@@ -89,8 +170,6 @@ const list: SkillDef[] = [
     cooldown: 2,
     vfx: 'slash_heavy',
     weapons: ['sword', 'axe', 'mace', 'hammer'],
-    school: 'sword',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'war_cry',
@@ -105,8 +184,6 @@ const list: SkillDef[] = [
     cooldown: 4,
     vfx: 'buff',
     status: { id: 'war_cry', kind: 'mod', duration: 3, stat: 'damage', amount: 25 },
-    school: 'sword',
-    unlock: { level: 2 },
   }),
   skill({
     id: 'lunge',
@@ -118,8 +195,6 @@ const list: SkillDef[] = [
     cooldown: 2,
     vfx: 'slash',
     weapons: ['sword'],
-    school: 'sword',
-    unlock: { level: 4, skill: 'power_strike', uses: 5 },
   }),
   skill({
     id: 'whirlwind',
@@ -132,8 +207,6 @@ const list: SkillDef[] = [
     cooldown: 3,
     vfx: 'slash_heavy',
     weapons: ['sword', 'axe'],
-    school: 'sword',
-    unlock: { level: 7, skill: 'lunge', uses: 8 },
   }),
 
   // Axe
@@ -147,8 +220,6 @@ const list: SkillDef[] = [
     cooldown: 1,
     vfx: 'slash_heavy',
     weapons: ['axe'],
-    school: 'axe',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'rend',
@@ -161,8 +232,6 @@ const list: SkillDef[] = [
     vfx: 'slash',
     weapons: ['axe'],
     status: bleed,
-    school: 'axe',
-    unlock: { level: 3, skill: 'axe_chop', uses: 4 },
   }),
 
   // Hammer (and mace)
@@ -176,8 +245,6 @@ const list: SkillDef[] = [
     cooldown: 2,
     vfx: 'slash_heavy',
     weapons: ['mace', 'hammer'],
-    school: 'hammer',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'stun_bash',
@@ -190,8 +257,6 @@ const list: SkillDef[] = [
     weapons: ['mace', 'hammer'],
     status: { id: 'stun', kind: 'stun', duration: 1 },
     statusChance: 50,
-    school: 'hammer',
-    unlock: { level: 3, skill: 'crushing_blow', uses: 4 },
   }),
 
   // Dagger
@@ -203,8 +268,6 @@ const list: SkillDef[] = [
     range: 1,
     vfx: 'slash',
     weapons: ['dagger'],
-    school: 'dagger',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'quick_cut',
@@ -216,8 +279,6 @@ const list: SkillDef[] = [
     free: true,
     vfx: 'slash',
     weapons: ['dagger'],
-    school: 'dagger',
-    unlock: { level: 2 },
   }),
   skill({
     id: 'vanish_strike',
@@ -230,8 +291,6 @@ const list: SkillDef[] = [
     retreat: 3,
     vfx: 'slash',
     weapons: ['dagger'],
-    school: 'dagger',
-    unlock: { level: 3, skill: 'stab', uses: 4 },
   }),
   skill({
     id: 'throat_cut',
@@ -244,8 +303,6 @@ const list: SkillDef[] = [
     vfx: 'slash',
     weapons: ['dagger'],
     status: bleed,
-    school: 'dagger',
-    unlock: { level: 6, skill: 'vanish_strike', uses: 6 },
   }),
 
   // Bow
@@ -257,8 +314,6 @@ const list: SkillDef[] = [
     range: 5,
     vfx: 'arrow',
     weapons: ['bow'],
-    school: 'bow',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'poison_arrow',
@@ -271,8 +326,6 @@ const list: SkillDef[] = [
     vfx: 'arrow_poison',
     weapons: ['bow'],
     status: poison,
-    school: 'bow',
-    unlock: { level: 2 },
   }),
   skill({
     id: 'backstep_shot',
@@ -285,8 +338,6 @@ const list: SkillDef[] = [
     retreat: 3,
     vfx: 'arrow',
     weapons: ['bow'],
-    school: 'bow',
-    unlock: { level: 3, skill: 'shoot', uses: 4 },
   }),
   skill({
     id: 'volley',
@@ -299,14 +350,12 @@ const list: SkillDef[] = [
     cooldown: 3,
     vfx: 'arrow',
     weapons: ['bow'],
-    school: 'bow',
-    unlock: { level: 6, skill: 'poison_arrow', uses: 6 },
   }),
 
   // Spells
   skill({
     id: 'ember',
-    name: 'Ember',
+    name: 'Fire Bolt',
     source: 'spell',
     damageType: 'fire',
     attr: 'int',
@@ -314,8 +363,6 @@ const list: SkillDef[] = [
     range: 4,
     manaCost: 2,
     vfx: 'fireball',
-    school: 'fire',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'fireball',
@@ -329,20 +376,16 @@ const list: SkillDef[] = [
     manaCost: 8,
     cooldown: 2,
     vfx: 'fireball',
-    school: 'fire',
-    unlock: { level: 3, skill: 'ember', uses: 4 },
   }),
   skill({
     id: 'staff_bolt',
-    name: 'Staff Bolt',
+    name: 'Lightning Bolt',
     source: 'spell',
     damageType: 'electric',
     attr: 'int',
     power: 8,
     range: 4,
     vfx: 'bolt',
-    school: 'electric',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'chain_lightning',
@@ -356,13 +399,10 @@ const list: SkillDef[] = [
     manaCost: 9,
     cooldown: 3,
     vfx: 'bolt',
-    school: 'electric',
-    unlock: { level: 5, skill: 'staff_bolt', uses: 6 },
-    bookOnly: true,
   }),
   skill({
     id: 'frost_shard',
-    name: 'Frost Shard',
+    name: 'Ice Bolt',
     source: 'spell',
     damageType: 'water',
     attr: 'int',
@@ -372,8 +412,6 @@ const list: SkillDef[] = [
     cooldown: 1,
     vfx: 'bolt',
     status: chill,
-    school: 'water',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'stone_spike',
@@ -386,12 +424,10 @@ const list: SkillDef[] = [
     manaCost: 4,
     cooldown: 1,
     vfx: 'bolt',
-    school: 'earth',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'shadow_bolt',
-    name: 'Shadow Bolt',
+    name: 'Void Bolt',
     source: 'spell',
     damageType: 'dark',
     attr: 'int',
@@ -400,12 +436,10 @@ const list: SkillDef[] = [
     manaCost: 3,
     cooldown: 1,
     vfx: 'bolt',
-    school: 'dark',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'smite',
-    name: 'Smite',
+    name: 'Holy Bolt',
     source: 'spell',
     damageType: 'light',
     attr: 'wis',
@@ -414,12 +448,10 @@ const list: SkillDef[] = [
     manaCost: 3,
     cooldown: 1,
     vfx: 'bolt',
-    school: 'light',
-    unlock: { level: 2 },
   }),
   skill({
     id: 'heal',
-    name: 'Heal',
+    name: 'Less Heal',
     kind: 'heal',
     source: 'spell',
     damageType: 'light',
@@ -429,8 +461,6 @@ const list: SkillDef[] = [
     range: 4,
     manaCost: 6,
     vfx: 'heal',
-    school: 'light',
-    unlock: { level: 1 },
   }),
   skill({
     id: 'big_heal',
@@ -445,8 +475,6 @@ const list: SkillDef[] = [
     manaCost: 12,
     cooldown: 3,
     vfx: 'heal_big',
-    school: 'light',
-    unlock: { level: 4, skill: 'heal', uses: 6 },
   }),
 ];
 

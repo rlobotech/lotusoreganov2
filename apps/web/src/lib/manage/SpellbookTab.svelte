@@ -41,7 +41,7 @@
   const groups = $derived.by(() => {
     const out = new Map<string, string[]>();
     for (const id of m.skills) {
-      const school = skillInfo(id)?.school ?? '';
+      const school = skillInfo(id)?.schools[0] ?? '';
       out.set(school, [...(out.get(school) ?? []), id]);
     }
     return [...out.entries()].sort(([a], [b]) =>
@@ -49,6 +49,11 @@
     );
   });
   const schoolName = (id: string) => m.schools.find((s) => s.id === id)?.name ?? cap(id);
+  const levelOf = (id: string) => m.skillLevels[id];
+  const progress = (id: string) => {
+    const l = levelOf(id);
+    return l ? `level ${l.level}${l.next === null ? ' (max)' : ` · ${l.xp}/${l.next}`}` : '';
+  };
 
   /** Skill books in the shared bag and in the personal bags of characters you control. */
   const books = $derived<ItemInfo[]>(
@@ -75,32 +80,23 @@
     <div class="school">
       <div class="row">
         <span>{s.name}</span>
-        <span class="muted small">
-          level {s.level}{s.nextXp === null
-            ? ' (max)'
-            : ` · ${s.xp - s.levelXp}/${s.nextXp - s.levelXp}`}
-        </span>
+        <span class="muted small">level {s.level}/{s.max}</span>
       </div>
       <div
         class="bar"
         role="progressbar"
-        aria-label="{s.name} progress"
-        aria-valuenow={s.xp - s.levelXp}
+        aria-label="{s.name} level"
+        aria-valuenow={s.level}
         aria-valuemin={0}
-        aria-valuemax={s.nextXp === null ? s.xp - s.levelXp : s.nextXp - s.levelXp}
+        aria-valuemax={s.max}
       >
-        <div
-          class="fill xp"
-          style:width="{s.nextXp === null
-            ? 100
-            : ((s.xp - s.levelXp) / (s.nextXp - s.levelXp)) * 100}%"
-        ></div>
+        <div class="fill xp" style:width="{(s.level / s.max) * 100}%"></div>
       </div>
     </div>
   {/each}
   <div class="muted small">
-    Using a skill trains its school. Weapon skills train the school of the weapon in hand, so a
-    dagger skill only progresses while holding a dagger.
+    A school's level is the sum of its skills' levels. Skills level up by being used, and only the
+    skills you carry ({m.equipped.length}/{m.equipLimit}) are used.
   </div>
 </div>
 
@@ -111,8 +107,17 @@
     {#each ids as id (id)}
       {@const s = skillInfo(id)}
       <div class="skill">
-        <div>{s?.name ?? id}</div>
-        <div class="muted small">{kindLine(id)}{s ? ' · ' : ''}{skillLine(id)}</div>
+        <div>
+          {s?.name ?? id}
+          {#if m.equipped.includes(id)}<span class="muted small">(carried)</span>{/if}
+        </div>
+        <div class="muted small">
+          {progress(id)}{levelOf(id) ? ' · ' : ''}{s?.passive
+            ? 'passive'
+            : kindLine(id)}{s?.usable === false && !s?.passive ? ' · not usable yet' : ''}{s?.usable
+            ? ' · '
+            : ''}{s?.usable ? skillLine(id) : ''}
+        </div>
       </div>
     {/each}
   {/each}

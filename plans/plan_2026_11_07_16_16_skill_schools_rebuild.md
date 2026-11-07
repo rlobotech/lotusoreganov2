@@ -1,6 +1,6 @@
 # Skill schools rebuild
 
-Status: in progress (phase 1 done, phase 2 next)
+Status: in progress (phases 1 and 2 done, phase 3 next)
 
 Source: the user's spreadsheet, kept as `docs/skill_schools_sheet.csv`. This plan turns it into code.
 
@@ -71,6 +71,18 @@ Phase 1 is a pure rules layer, not yet wired into parties, combat or the old ski
 - **`packages/world/src/skill-levels.ts`:** works on a small `SkillState` {`skillLevels`, `skillXp`, `equipped`}. School level = sum of skill levels capped at 100, a dual skill counting for both schools; school power 1% per point (a dual skill uses the better of its two schools); status +1 round per 20 points; level-up cost = base per measure (damage 400, healing 300, uses 12) x (1 + unlock level / 10) x 1.5 per level, so a starter is cheap and a skill that unlocks at school level 50 costs 6 times as much per step; `addSkillXp`; `trainingFor` / `trainSkills` (a skill trains only if carried; weapon masteries train from damage with that weapon split by hands and dual wield; Staff Mastery from any elemental spell; Shield Mastery from damage stopped; Demonology and Necromancy Mastery from their summon skill); requirements in words (`unmetSkillRequirements`), `learnable`; the carried-skill limit (6, 7 from level 30, 8 from level 60) with `equipSkill` and `unequipSkill`.
 - **Decisions I took (tell me if wrong):** masteries are passive and take no slot (the sheet did not say); a skill that is not carried never trains (it cannot be used); Shield Mastery trains from damage stopped, and the two summon masteries from their summon skill (the sheet only said weapon masteries and Staff Mastery). All numbers are first guesses for the balance tools.
 - Tests: `skill-rules.test.ts` (33 tests, one group per rule of the sheet).
+
+## Phase 2 notes (what exists now)
+
+The new rules now run the game: the old school experience system is gone.
+- **Members** (`Member`): `skillLevels`, `skillXp` and `equipped` replace `schools` and `uses`. A saved member without them is upgraded when loaded (every learned skill at level 1), so no reset was needed.
+- **Classes:** the five that exist start with the skills of the sheet (`CLASS_START_SKILLS`) and new default AIs (warrior: Defensive Stance, Slash, Attack; mage: Ice Bolt, Fire Bolt, Lightning Bolt; priest: Less Heal, Holy Bolt, Blunt Strike; ranger: Ricochet Arrow, Attack; rogue: Slash, Attack). Barbarian, Paladin, Warlock, Necromancer, Shaman and Druid already have their starts in the data but are not playable until phase 5.
+- **Skill ids:** a tree node has the id of its combat skill. The starters that already existed keep their old ids with the sheet's names: `ember` is Fire Bolt, `frost_shard` Ice Bolt, `staff_bolt` Lightning Bolt, `shadow_bolt` Void Bolt, `heal` Less Heal, `smite` Holy Bolt. Twelve new combat skills were added for the starters that did not exist: Slash (sword, axe and dagger), Blunt Strike, Staff Strike, Ricochet Arrow (a plain arrow until phase 7), Gust, Rain, Poison Dart, Defensive Stance and Fortify (both only raise evasion for now, since the engine has no armour status). The masteries, Summon Imp, Summon Skeleton and Dash have no combat skill yet (passive or waiting for phases 6 and 7): they can be learned and level up but cannot be carried.
+- **The earlier skills** (power strike, war cry, lunge, whirlwind, axe chop, rend, crushing blow, stun bash, stab, quick cut, vanish strike, throat cut, shoot, poison arrow, backstep shot, volley, fireball, chain lightning, stone spike, greater heal) were placed in the tree behind the starters, with the old school levels turned into school levels 0 to 30 and "used N times" into a skill level. Monsters use the combat skills directly, so they are unchanged.
+- **Learning:** a skill with requirements is learned by itself once they are met (starters come from a class or a book; Chain Lightning stays book-only); a learned skill is carried if there is a free slot. Books waive the skill-level requirements but not the school levels. The AI can only use carried skills. Training: after every fight each carried skill gains experience from its damage, healing or uses, and the masteries from their own measure; `skill_level` feed events report level-ups.
+- **Combat:** a new optional `UnitDef.skillMods` (engine) makes a skill stronger: +5% per skill level above 1 times the school's 1% per point (the better school for a dual skill) on damage and healing, and +1 round of its status per 20 school points. The engine has three new tests.
+- **Server and web:** members report `schools` (level out of 100), `skillLevels`, `equipped` and `equipLimit`; skills report their `schools`, `passive` and `usable`; the Attributes and Spellbook tabs show the new levels (the wheel comes in phase 4).
+- **Balance:** the monster power curve was raised (`+0.9` instead of `+0.4`, since school power makes characters stronger in the late game) and the new starter skills were strengthened; `balance:levels` now shows about 4 to 14% defeats at levels 1 to 10, 13 to 20% in the middle and under 10% above level 90. The level 90 to 100 band is still too easy and needs another pass (as does the world's boss tuning).
 
 ## Decided after the first draft (from the user)
 

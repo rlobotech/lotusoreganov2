@@ -1,10 +1,11 @@
 import { createRng, runCombat, type Rng } from '@game/engine';
 import { ARENAS } from './arenas.ts';
-import { learnUnlocked } from './learning.ts';
+import { autoEquip, learnUnlocked } from './learning.ts';
 import { starterGear } from './loot.ts';
 import { MONSTERS, monsterUnit } from './monsters.ts';
 import { CLASSES, grantPoints, memberDerived } from './progression.ts';
-import { SKILLS, MAX_SCHOOL_LEVEL, schoolXpForLevel } from './skills.ts';
+import { SKILL_TREE } from './skill-tree.ts';
+import { SKILLS } from './skills.ts';
 import { createParty, memberUnit } from './sim.ts';
 import { STARTER_WORLD } from './starter-world.ts';
 import type { ClassId, EncounterDef, PartyState, Rarity } from './types.ts';
@@ -22,9 +23,9 @@ export interface PartyAtLevelOptions {
 
 const DEFAULT_CLASSES: ClassId[] = ['warrior', 'mage', 'priest', 'rogue'];
 
-/** School level a character has trained to by `level` (one school level per five character levels). */
-export const trainedSchoolLevel = (level: number): number =>
-  Math.min(MAX_SCHOOL_LEVEL, Math.max(1, Math.ceil(level / 5)));
+/** The level a character's skills have been trained to by `level` (one skill level per ten character levels). */
+export const trainedSkillLevel = (level: number): number =>
+  Math.min(10, Math.max(1, Math.ceil(level / 10)));
 
 /**
  * A party as a player would have it at `level`: attribute points spent by the class pattern, the
@@ -45,15 +46,22 @@ export function partyAtLevel(level: number, opts: PartyAtLevelOptions = {}): Par
     const cls = CLASSES[m.cls];
     grantPoints(m, (level - 1) * 1);
     m.equipment = starterGear(cls.kit, m.id, level, opts.rarity ?? 'common');
-    for (const school of Object.keys(cls.schools)) {
-      m.schools[school] = Math.max(
-        m.schools[school] ?? 0,
-        schoolXpForLevel(trainedSchoolLevel(level)),
-      );
+    // Every skill the character knows is trained to match its level, which unlocks more skills
+    // (their requirements follow from the school levels), until nothing new opens up.
+    const trained = trainedSkillLevel(level);
+    for (let again = true; again;) {
+      again = false;
+      for (const id of m.skills) {
+        if (SKILL_TREE[id] && (m.skillLevels[id] ?? 0) < trained) {
+          m.skillLevels[id] = trained;
+          again = true;
+        }
+      }
+      if (learnUnlocked(m, level).length > 0) again = true;
     }
-    // Pretend the prerequisites were used enough, then learn whatever the schools unlock.
-    for (const id of Object.keys(SKILLS)) m.uses[id] = 99;
-    learnUnlocked(m);
+    // Carry what the AI uses first, then whatever else fits.
+    m.equipped = [];
+    autoEquip(m, level);
   }
   return p;
 }

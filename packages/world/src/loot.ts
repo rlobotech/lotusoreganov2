@@ -7,6 +7,8 @@ import {
   type WeaponKind,
 } from '@game/engine';
 import { caravanBagSlots, makeCaravanItem } from './caravan-data.ts';
+import { unlockLevel } from './skill-levels.ts';
+import { SKILL_TREE } from './skill-tree.ts';
 import { SKILLS } from './skills.ts';
 import type { GearStats, Item, Rarity, ShopItem, Slot } from './types.ts';
 
@@ -245,8 +247,10 @@ export const BOOK_CHANCE = 10;
 export function bookItem(skillId: string, itemLevel: number, id: string): Item {
   const skill = SKILLS[skillId];
   if (!skill) throw new Error(`Unknown skill ${skillId}`);
-  const level = skill.unlock?.level ?? 1;
-  const rarity: Rarity = skill.bookOnly || level >= 6 ? 'rare' : level >= 3 ? 'uncommon' : 'common';
+  const node = SKILL_TREE[skillId];
+  const level = node ? unlockLevel(node) : 0;
+  const rarity: Rarity =
+    node?.bookOnly || level >= 30 ? 'rare' : level >= 10 ? 'uncommon' : 'common';
   return {
     id,
     name: `Book of ${skill.name}`,
@@ -260,10 +264,10 @@ export function bookItem(skillId: string, itemLevel: number, id: string): Item {
 
 /** Skills a book dropped at `itemLevel` may teach: higher levels bring more advanced ones. */
 function bookPool(itemLevel: number): string[] {
-  const reach = 2 + Math.floor(itemLevel / 5);
-  return Object.values(SKILLS)
-    .filter((s) => s.school && s.unlock && s.unlock.level <= reach)
-    .map((s) => s.id);
+  const reach = 10 + itemLevel;
+  return Object.values(SKILL_TREE)
+    .filter((n) => SKILLS[n.id] && unlockLevel(n) <= reach)
+    .map((n) => n.id);
 }
 
 /** Share (percent) of drops that are caravan accessories. Rare: they are mostly quest rewards. */

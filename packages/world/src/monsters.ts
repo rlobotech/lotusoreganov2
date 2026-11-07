@@ -635,7 +635,7 @@ for (const t of HIGH) MONSTERS[t.id] = t;
  */
 export const MONSTER_POWER = 1.7;
 export const monsterPower = (level: number): number =>
-  MONSTER_POWER + 0.4 * (1 - Math.exp(-level / 25));
+  MONSTER_POWER + 0.9 * (1 - Math.exp(-level / 25));
 
 export function monsterAttributes(t: MonsterTemplate, level: number): Attributes {
   const at = (k: keyof Attributes) =>

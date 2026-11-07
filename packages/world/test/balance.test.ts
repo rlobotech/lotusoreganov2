@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { partyAtLevel, runLevel, trainedSchoolLevel } from '../src/balance.ts';
+import { partyAtLevel, runLevel, trainedSkillLevel } from '../src/balance.ts';
 import { rollDrop } from '../src/loot.ts';
 import { CLASSES, memberDerived, memberGear } from '../src/progression.ts';
 import { createRng } from '@game/engine';
@@ -29,8 +29,8 @@ describe('level 1 to 100 curves', () => {
     for (let i = 0; i < low.members.length; i++) {
       expect(high.members[i]!.skills.length).toBeGreaterThanOrEqual(low.members[i]!.skills.length);
     }
-    expect(trainedSchoolLevel(1)).toBe(1);
-    expect(trainedSchoolLevel(100)).toBe(20);
+    expect(trainedSkillLevel(1)).toBe(1);
+    expect(trainedSkillLevel(100)).toBe(10);
   });
 
   it('item drops keep up with the level', () => {

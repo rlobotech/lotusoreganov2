@@ -213,18 +213,18 @@ describe('attribute points', () => {
 });
 
 describe('combat AI', () => {
-  const known = CLASSES.warrior.skills;
+  const known = ['attack', ...CLASSES.warrior.skills.filter((id) => id !== 'attack')];
 
   it('accepts sensible rules and rejects broken ones', () => {
     expect(
       validateAiRules(
-        [{ skill: 'attack' }, { skill: 'power_strike', when: { selfManaAbovePct: 30 } }],
+        [{ skill: 'attack' }, { skill: 'sword_slash', when: { selfManaAbovePct: 30 } }],
         known,
       ),
     ).toBeNull();
     expect(validateAiRules([], known)).toBeNull();
     expect(validateAiRules('nope', known)).not.toBeNull();
-    expect(validateAiRules([{ skill: 'fireball' }], known)).toMatch(/does not know/);
+    expect(validateAiRules([{ skill: 'fireball' }], known)).toMatch(/does not carry/);
     expect(validateAiRules([{ skill: 'made_up' }], known)).toMatch(/unknown skill/);
     expect(validateAiRules([{ skill: 'attack', order: 'random' }], known)).toMatch(/order/);
     expect(validateAiRules([{ skill: 'attack', filter: { hpBelowPct: 150 } }], known)).toMatch(

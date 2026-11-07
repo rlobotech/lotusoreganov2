@@ -95,6 +95,8 @@ export interface TreeNode {
   /** Masteries are passive: always on, no slot, trained by `trainedBy` and not by being cast. */
   passive?: boolean;
   trainedBy?: MasteryTraining;
+  /** Cannot be learned by training, only from a book. */
+  bookOnly?: boolean;
   /** Only a proposal until the user settles the name. */
   proposed?: boolean;
 }
@@ -115,14 +117,20 @@ const weaponMastery = (
   trainedBy: MasteryTraining,
 ): TreeNode => node(id, name, [school], { passive: true, measure: 'damage', trainedBy });
 
-/** The thirty-two starting skills of the sheet (the rest of the tree comes batch by batch). */
+/**
+ * The thirty-two starting skills of the sheet. A node has the id of its combat skill (`SKILLS`):
+ * the starters that already existed keep their old ids with the names of the sheet (`ember` is Fire
+ * Bolt, `frost_shard` Ice Bolt, `staff_bolt` Lightning Bolt, `shadow_bolt` Void Bolt, `heal` Less
+ * Heal, `smite` Holy Bolt). Nodes without a combat skill (the summons, Dash and the masteries) wait
+ * for their engine feature.
+ */
 const STARTERS: TreeNode[] = [
   // Bow
   weaponMastery('bow_mastery', 'Bow Mastery', 'bow', { by: 'weapon', kinds: ['bow'] }),
   node('ricochet_arrow', 'Ricochet Arrow', ['bow'], { measure: 'damage' }),
   // Air / Electric
   node('gust', 'Gust', ['electric'], { measure: 'damage' }),
-  node('lightning_bolt', 'Lightning Bolt', ['electric'], { measure: 'damage' }),
+  node('staff_bolt', 'Lightning Bolt', ['electric'], { measure: 'damage' }),
   // Axe
   weaponMastery('axe_dual_wield_mastery', 'Axe Dual Wield Mastery', 'axe', {
     by: 'weapon',
@@ -136,7 +144,7 @@ const STARTERS: TreeNode[] = [
   }),
   node('axe_slash', 'Slash', ['axe'], { family: 'slash', measure: 'damage' }),
   // Fire
-  node('fire_bolt', 'Fire Bolt', ['fire'], { measure: 'damage' }),
+  node('ember', 'Fire Bolt', ['fire'], { measure: 'damage' }),
   node('summon_imp', 'Summon Imp', ['fire', 'dark'], {
     requires: { skills: { demonology_mastery: 1 } },
   }),
@@ -153,7 +161,7 @@ const STARTERS: TreeNode[] = [
   }),
   node('sword_slash', 'Slash', ['sword'], { family: 'slash', measure: 'damage' }),
   // Water
-  node('ice_bolt', 'Ice Bolt', ['water'], { measure: 'damage' }),
+  node('frost_shard', 'Ice Bolt', ['water'], { measure: 'damage' }),
   node('rain', 'Rain', ['water'], { proposed: true }),
   // Staff
   node('staff_mastery', 'Staff Mastery', ['staff'], {
@@ -174,8 +182,8 @@ const STARTERS: TreeNode[] = [
   }),
   node('blunt_strike', 'Blunt Strike', ['mace'], { measure: 'damage' }),
   // Light
-  node('less_heal', 'Less Heal', ['light'], { measure: 'healing' }),
-  node('holy_bolt', 'Holy Bolt', ['light'], { measure: 'damage' }),
+  node('heal', 'Less Heal', ['light'], { measure: 'healing' }),
+  node('smite', 'Holy Bolt', ['light'], { measure: 'damage' }),
   // Shield
   weaponMastery('shield_mastery', 'Shield Mastery', 'shield', { by: 'shield' }),
   node('defensive_stance', 'Defensive Stance', ['shield']),
@@ -190,7 +198,7 @@ const STARTERS: TreeNode[] = [
     passive: true,
     trainedBy: { by: 'skills', ids: ['summon_imp'] },
   }),
-  node('void_bolt', 'Void Bolt', ['dark'], { measure: 'damage' }),
+  node('shadow_bolt', 'Void Bolt', ['dark'], { measure: 'damage' }),
   node('dash', 'Dash', ['dark']),
   node('necromancy_mastery', 'Necromancy Mastery', ['dark'], {
     passive: true,
@@ -199,9 +207,104 @@ const STARTERS: TreeNode[] = [
   node('summon_skeleton', 'Summon Skeleton', ['dark']),
 ];
 
+/**
+ * The skills the game had before the sheet, placed in the tree behind the starters. Their old school
+ * levels (1 to 7) became school levels (0 to 30) and "used N times" became a skill level. The rest
+ * of the tree comes batch by batch from the user.
+ */
+const EARLIER: TreeNode[] = [
+  // Sword
+  node('power_strike', 'Power Strike', ['sword'], {
+    measure: 'damage',
+    requires: { schools: { sword: 5 }, skills: { sword_slash: 2 } },
+  }),
+  node('war_cry', 'War Cry', ['sword'], { requires: { schools: { sword: 5 } } }),
+  node('lunge', 'Lunge', ['sword'], {
+    measure: 'damage',
+    requires: { schools: { sword: 15 }, skills: { power_strike: 2 } },
+  }),
+  node('whirlwind', 'Whirlwind', ['sword'], {
+    measure: 'damage',
+    requires: { schools: { sword: 30 }, skills: { lunge: 3 } },
+  }),
+  // Axe
+  node('axe_chop', 'Axe Chop', ['axe'], {
+    measure: 'damage',
+    requires: { skills: { axe_slash: 2 } },
+  }),
+  node('rend', 'Rend', ['axe'], {
+    measure: 'damage',
+    requires: { schools: { axe: 10 }, skills: { axe_chop: 2 } },
+  }),
+  // Mace
+  node('crushing_blow', 'Crushing Blow', ['mace'], {
+    measure: 'damage',
+    requires: { skills: { blunt_strike: 2 } },
+  }),
+  node('stun_bash', 'Stun Bash', ['mace'], {
+    measure: 'damage',
+    requires: { schools: { mace: 10 }, skills: { crushing_blow: 2 } },
+  }),
+  // Dagger
+  node('stab', 'Stab', ['dagger'], {
+    measure: 'damage',
+    requires: { skills: { dagger_slash: 2 } },
+  }),
+  node('quick_cut', 'Quick Cut', ['dagger'], {
+    measure: 'damage',
+    requires: { schools: { dagger: 5 } },
+  }),
+  node('vanish_strike', 'Vanish Strike', ['dagger'], {
+    measure: 'damage',
+    requires: { schools: { dagger: 10 }, skills: { stab: 2 } },
+  }),
+  node('throat_cut', 'Throat Cut', ['dagger'], {
+    measure: 'damage',
+    requires: { schools: { dagger: 25 }, skills: { vanish_strike: 2 } },
+  }),
+  // Bow
+  node('shoot', 'Shoot', ['bow'], {
+    measure: 'damage',
+    requires: { skills: { ricochet_arrow: 2 } },
+  }),
+  node('poison_arrow', 'Poison Arrow', ['bow'], {
+    measure: 'damage',
+    requires: { schools: { bow: 5 } },
+  }),
+  node('backstep_shot', 'Backstep Shot', ['bow'], {
+    measure: 'damage',
+    requires: { schools: { bow: 10 }, skills: { shoot: 2 } },
+  }),
+  node('volley', 'Volley', ['bow'], {
+    measure: 'damage',
+    requires: { schools: { bow: 25 }, skills: { poison_arrow: 2 } },
+  }),
+  // Fire, Air / Electric, Earth, Light
+  node('fireball', 'Fireball', ['fire'], {
+    measure: 'damage',
+    requires: { schools: { fire: 10 }, skills: { ember: 2 } },
+  }),
+  node('chain_lightning', 'Chain Lightning', ['electric'], {
+    measure: 'damage',
+    bookOnly: true,
+    requires: { schools: { electric: 20 }, skills: { staff_bolt: 2 } },
+  }),
+  node('stone_spike', 'Stone Spike', ['earth'], {
+    measure: 'damage',
+    requires: { schools: { earth: 5 } },
+  }),
+  node('big_heal', 'Greater Heal', ['light'], {
+    measure: 'healing',
+    requires: { schools: { light: 15 }, skills: { heal: 2 } },
+  }),
+];
+
 export const SKILL_TREE: Record<string, TreeNode> = Object.fromEntries(
-  STARTERS.map((n) => [n.id, n]),
+  [...STARTERS, ...EARLIER].map((n) => [n.id, n]),
 );
+
+/** The thirty-two skills of the sheet's starter table. */
+export const STARTER_IDS: string[] = STARTERS.map((n) => n.id);
 
 /** The skills of a school's tree in catalogue order, dual skills included. */
 export const skillsOfSchool = (school: RingSchool, tree = SKILL_TREE): TreeNode[] =>
@@ -229,12 +332,12 @@ export const CLASS_START_SKILLS: Record<string, string[]> = {
     'defensive_stance',
   ],
   barbarian: ['axe_dual_wield_mastery', 'axe_two_handed_mastery', 'axe_slash'],
-  paladin: ['mace_one_hand_mastery', 'mace_two_handed_mastery', 'blunt_strike', 'less_heal'],
-  priest: ['mace_one_hand_mastery', 'blunt_strike', 'less_heal', 'holy_bolt'],
-  mage: ['staff_mastery', 'fire_bolt', 'ice_bolt', 'lightning_bolt'],
-  warlock: ['staff_mastery', 'demonology_mastery', 'summon_imp', 'void_bolt'],
+  paladin: ['mace_one_hand_mastery', 'mace_two_handed_mastery', 'blunt_strike', 'heal'],
+  priest: ['mace_one_hand_mastery', 'blunt_strike', 'heal', 'smite'],
+  mage: ['staff_mastery', 'ember', 'frost_shard', 'staff_bolt'],
+  warlock: ['staff_mastery', 'demonology_mastery', 'summon_imp', 'shadow_bolt'],
   necromancer: ['staff_mastery', 'necromancy_mastery', 'summon_skeleton'],
-  shaman: ['staff_mastery', 'fire_bolt', 'gust', 'lightning_bolt'],
+  shaman: ['staff_mastery', 'ember', 'gust', 'staff_bolt'],
   druid: ['staff_mastery', 'poison_dart', 'fortify'],
   rogue: ['dagger_mastery', 'dagger_slash', 'dash'],
 };

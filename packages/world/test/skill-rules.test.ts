@@ -31,6 +31,7 @@ import {
   SCHOOL_RING,
   SKILL_TREE,
   skillsOfSchool,
+  STARTER_IDS,
   startersOf,
   treeProblems,
   type RingSchool,
@@ -101,9 +102,9 @@ describe('the starting skills of the sheet', () => {
       dark: 5,
     };
     // Summon Imp is Fire and Dark: the sheet counts it once, under Fire.
-    expect(Object.keys(SKILL_TREE)).toHaveLength(32);
+    expect(STARTER_IDS).toHaveLength(32);
     for (const s of SCHOOL_RING) {
-      const own = skillsOfSchool(s).filter((k) => k.schools[0] === s);
+      const own = skillsOfSchool(s).filter((k) => k.schools[0] === s && STARTER_IDS.includes(k.id));
       expect(own, s).toHaveLength(counts[s]);
       expect(startersOf(s).length, s).toBeGreaterThan(0);
     }
@@ -131,9 +132,9 @@ describe('the starting skills of the sheet', () => {
     );
     expect(CLASS_START_SKILLS.mage).toEqual([
       'staff_mastery',
-      'fire_bolt',
-      'ice_bolt',
-      'lightning_bolt',
+      'ember',
+      'frost_shard',
+      'staff_bolt',
     ]);
     expect(CLASS_START_SKILLS.rogue).toEqual(['dagger_mastery', 'dagger_slash', 'dash']);
     for (const ids of Object.values(CLASS_START_SKILLS)) {
@@ -159,14 +160,14 @@ describe('the starting skills of the sheet', () => {
     expect(skillsOfSchool('dark').map((k) => k.id)).toContain('summon_imp');
     expect(imp.requires.skills).toEqual({ demonology_mastery: 1 });
     expect(isStarter(imp)).toBe(false);
-    expect(isStarter(SKILL_TREE.fire_bolt!)).toBe(true);
+    expect(isStarter(SKILL_TREE.ember!)).toBe(true);
   });
 
   it('make masteries passive and train them by what they are about', () => {
     for (const id of ['bow_mastery', 'staff_mastery', 'dagger_mastery', 'shield_mastery']) {
       expect(SKILL_TREE[id]!.passive, id).toBe(true);
     }
-    expect(SKILL_TREE.fire_bolt!.passive).toBeUndefined();
+    expect(SKILL_TREE.ember!.passive).toBeUndefined();
     expect(SKILL_TREE.staff_mastery!.trainedBy).toEqual({ by: 'elemental' });
   });
 });
@@ -299,17 +300,17 @@ describe('raising a skill level by use', () => {
 
 describe('what a use trains', () => {
   const s: SkillState = newSkillState(Object.keys(SKILL_TREE));
-  s.equipped = ['fire_bolt', 'less_heal', 'ricochet_arrow', 'sword_slash', 'summon_imp'];
+  s.equipped = ['ember', 'heal', 'ricochet_arrow', 'sword_slash', 'summon_imp'];
   const of = (use: Parameters<typeof trainingFor>[1]) => Object.fromEntries(trainingFor(s, use));
 
   it('trains a damage skill by the damage, a heal by the healing, a plain skill by the use', () => {
     expect(
-      of({ skillId: 'fire_bolt', damage: 40, heal: 0, spell: true, element: 'fire' }),
+      of({ skillId: 'ember', damage: 40, heal: 0, spell: true, element: 'fire' }),
     ).toMatchObject({
-      fire_bolt: 40,
+      ember: 40,
     });
-    expect(of({ skillId: 'less_heal', damage: 0, heal: 25, spell: true })).toEqual({
-      less_heal: 25,
+    expect(of({ skillId: 'heal', damage: 0, heal: 25, spell: true })).toEqual({
+      heal: 25,
     });
     expect(of({ skillId: 'summon_imp', damage: 0, heal: 0, spell: true })).toMatchObject({
       summon_imp: 1,
@@ -317,7 +318,7 @@ describe('what a use trains', () => {
   });
 
   it('trains Staff Mastery from any elemental spell, and not from a weapon hit', () => {
-    const spell = of({ skillId: 'fire_bolt', damage: 30, heal: 0, spell: true, element: 'fire' });
+    const spell = of({ skillId: 'ember', damage: 30, heal: 0, spell: true, element: 'fire' });
     expect(spell.staff_mastery).toBe(1);
     const hit = of({ skillId: 'sword_slash', damage: 30, heal: 0, weaponKind: 'sword', hands: 1 });
     expect(hit.staff_mastery).toBeUndefined();
@@ -373,18 +374,17 @@ describe('what a use trains', () => {
       1,
     );
     expect(
-      of({ skillId: 'fire_bolt', damage: 3, heal: 0, spell: true, element: 'fire' })
-        .demonology_mastery,
+      of({ skillId: 'ember', damage: 3, heal: 0, spell: true, element: 'fire' }).demonology_mastery,
     ).toBeUndefined();
   });
 
   it('does not train a mastery the character has not learned', () => {
-    const bare = newSkillState(['fire_bolt']);
-    bare.equipped = ['fire_bolt'];
+    const bare = newSkillState(['ember']);
+    bare.equipped = ['ember'];
     const got = Object.fromEntries(
-      trainingFor(bare, { skillId: 'fire_bolt', damage: 5, heal: 0, spell: true, element: 'fire' }),
+      trainingFor(bare, { skillId: 'ember', damage: 5, heal: 0, spell: true, element: 'fire' }),
     );
-    expect(got).toEqual({ fire_bolt: 5 });
+    expect(got).toEqual({ ember: 5 });
   });
 });
 
@@ -423,7 +423,7 @@ describe('requirements', () => {
   });
 
   it('make a dual skill need both schools, and Summon Imp need Demonology Mastery', () => {
-    const s = newSkillState(['fire_bolt']);
+    const s = newSkillState(['ember']);
     const imp = SKILL_TREE.summon_imp!;
     expect(unmetSkillRequirements(s, 1, imp).join()).toMatch(/Demonology Mastery level 1/);
     s.skillLevels.demonology_mastery = 1;

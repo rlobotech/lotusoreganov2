@@ -1,4 +1,12 @@
 import { SKILLS } from './skills.ts';
+import {
+  schoolLevelOf,
+  schoolPower,
+  skillLevelOf,
+  skillLevelPower,
+  statusBonusRounds,
+} from './skill-levels.ts';
+import { SKILL_TREE } from './skill-tree.ts';
 import { trainFromFight } from './learning.ts';
 import { makeCaravanItem, mountSpeed, tentHealing } from './caravan-data.ts';
 import { deliverPetGoods, recallPet, settlePet, type PetEmit } from './caravan.ts';
@@ -190,6 +198,29 @@ export function hpFraction(p: PartyState): number {
   return max > 0 ? hp / max : 0;
 }
 
+/** What a member fights with: the basic Attack (if it has it) and the skills it carries. */
+function unitSkills(m: Member): string[] {
+  return [
+    ...(m.skills.includes('attack') ? ['attack'] : []),
+    ...m.equipped.filter((id) => SKILLS[id]),
+  ];
+}
+
+/** How much stronger the member's skill and school levels make each skill it carries. */
+function skillMods(m: Member): Record<string, { power: number; rounds: number }> {
+  const out: Record<string, { power: number; rounds: number }> = {};
+  for (const id of m.equipped) {
+    const node = SKILL_TREE[id];
+    if (!node) continue;
+    const school = Math.max(...node.schools.map((sc) => schoolLevelOf(m, sc)));
+    out[id] = {
+      power: skillLevelPower(skillLevelOf(m, id)) * schoolPower(school),
+      rounds: statusBonusRounds(school),
+    };
+  }
+  return out;
+}
+
 export function memberUnit(p: PartyState, m: Member): UnitDef {
   const cls = CLASSES[m.cls];
   const gear = memberGear(m);
@@ -200,7 +231,8 @@ export function memberUnit(p: PartyState, m: Member): UnitDef {
     level: p.level,
     attributes: memberAttributes(m, p.level),
     move: cls.move,
-    skills: m.skills,
+    skills: unitSkills(m),
+    skillMods: skillMods(m),
     ai: m.ai,
     sprite: `${m.race}_${m.cls}`,
     weapon: gear.weapon ?? weaponRange(p.level, 'smash', 0.5),
@@ -255,7 +287,7 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
   }
 
   // Using skills trains their schools; reaching a level (and prerequisites) teaches new skills.
-  const learned = trainFromFight(p.members, r.events);
+  const { learned, levelled } = trainFromFight(p.members, r.events, p.level);
 
   const replayKey = `f${p.stats.fights}`;
   const payload: Record<string, unknown> = {
@@ -311,7 +343,15 @@ function applyFight(ctx: Ctx, a: Extract<Activity, { kind: 'fight' }>) {
     emit(ctx, 'skill_learned', {
       member: l.member.name,
       skill: l.skill,
-      name: SKILLS[l.skill]?.name ?? l.skill,
+      name: SKILL_TREE[l.skill]?.name ?? SKILLS[l.skill]?.name ?? l.skill,
+    });
+  }
+  for (const l of levelled) {
+    emit(ctx, 'skill_level', {
+      member: l.member.name,
+      skill: l.skill,
+      name: SKILL_TREE[l.skill]?.name ?? l.skill,
+      level: l.level,
     });
   }
 

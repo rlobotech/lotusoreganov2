@@ -136,8 +136,13 @@ export interface MemberInfo {
   /** The viewing player controls this character (solo: all of them). Others are look-only. */
   mine: boolean;
   skills: string[];
-  /** Every school the character has opened, with its level and progress. */
+  /** Every school the character has skills in, with its level (the sum of its skills' levels, up to 100). */
   schools: SchoolInfo[];
+  /** The level of every learned skill of the tree, with its progress towards the next level. */
+  skillLevels: Record<string, { level: number; xp: number; next: number | null }>;
+  /** The skills carried into a fight (the AI can use only these), and how many fit at this level. */
+  equipped: string[];
+  equipLimit: number;
   /** Skills still locked in those schools, with what is missing. */
   locked: Array<{ skill: string; missing: string }>;
   ai: AiRuleInfo[];
@@ -146,11 +151,9 @@ export interface MemberInfo {
 export interface SchoolInfo {
   id: string;
   name: string;
+  /** 0 to `max`. */
   level: number;
-  /** Experience, and the experience at the start and end of the current level. */
-  xp: number;
-  levelXp: number;
-  nextXp: number | null;
+  max: number;
 }
 
 export interface SkillInfo {
@@ -174,10 +177,13 @@ export interface SkillInfo {
   /** Costs no action. */
   free?: boolean;
   status?: { id: string; kind: string; duration: number };
-  /** The school, the school level that unlocks it, and a prerequisite skill used N times. */
-  school?: string;
-  unlock?: { level: number; skill?: string; uses?: number };
+  /** The schools whose tree it is in (two for a dual skill). */
+  schools: string[];
   bookOnly?: boolean;
+  /** A passive mastery: always on, takes no slot. */
+  passive?: boolean;
+  /** Has a combat definition. A skill without one waits for its engine feature. */
+  usable: boolean;
   /** Weapon kinds it needs in hand. */
   weapons?: string[];
 }

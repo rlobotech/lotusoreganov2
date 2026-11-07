@@ -39,7 +39,7 @@ describe('AI rule validation', () => {
     expect(ok({ skill: 'attack', when: { selfHpAbovePct: 120 } })).toMatch(/0 to 100/);
     expect(ok({ skill: 'attack', when: { enemyAdjacent: 'yes' } })).toMatch(/bad condition/);
     expect(ok({ skill: 'attack', filter: { fullHealth: 1 } })).toMatch(/bad filter/);
-    expect(ok({ skill: 'heal' })).toMatch(/unknown skill|does not know/);
+    expect(ok({ skill: 'heal' })).toMatch(/unknown skill|does not carry/);
   });
 
   it('saving keeps the new fields and drops anything unknown', () => {
@@ -78,7 +78,7 @@ describe('AI rule validation', () => {
 
   it('every class default is valid for that class', () => {
     for (const cls of Object.values(CLASSES)) {
-      expect(validateAiRules(cls.ai, cls.skills)).toBeNull();
+      expect(validateAiRules(cls.ai, ['attack', ...cls.skills])).toBeNull();
     }
   });
 });

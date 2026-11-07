@@ -170,12 +170,14 @@ export interface Member {
   points: number;
   /** Spend new points automatically in the class's usual pattern. */
   autoAlloc: boolean;
-  /** Skills this member has learned. */
+  /** Skills this member has learned (the basic Attack included for classes that have it). */
   skills: string[];
-  /** Experience in each school (see skills.ts); the school level comes from it. */
-  schools: Record<string, number>;
-  /** How many times each skill was used, for the training prerequisites of other skills. */
-  uses: Record<string, number>;
+  /** The level (1 to 10) of every learned skill of the tree; school levels are the sums (skill-levels.ts). */
+  skillLevels: Record<string, number>;
+  /** Progress towards the next level of each skill, in the skill's own measure. */
+  skillXp: Record<string, number>;
+  /** The skills the member carries into a fight: 6, 7 from level 30 and 8 from level 60. */
+  equipped: string[];
   /** The member's combat AI, edited by the player. */
   ai: AIRule[];
 }
@@ -442,8 +444,6 @@ export interface ClassDef {
   ai: AIRule[];
   /** The pattern attribute points follow when spent automatically (repeats). */
   pointOrder: Array<keyof Attributes>;
-  /** School levels a new character of this class starts with (they unlock its starting skills). */
-  schools: Record<string, number>;
   /** Item bases a new character of this class starts wearing (common, at the party's level). */
   kit: string[];
 }

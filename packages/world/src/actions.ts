@@ -8,7 +8,7 @@ import {
 } from '@game/engine';
 import { hexDistance, siteAt } from './hex.ts';
 import { canControl, payWithShares, spendableGold, spendGold, splitGold } from './gold.ts';
-import { bookProblem } from './learning.ts';
+import { bookProblem, learnSkill } from './learning.ts';
 import { evenShares } from './caravan-data.ts';
 import { petIsOut } from './caravan.ts';
 import { cityStock } from './stock.ts';
@@ -237,11 +237,9 @@ export function learnFromBook(
   if (!found || found.place.kind === 'equip') return fail('no_item', 'That item is not in a bag');
   if (!placeIsYours(p, found.place, viewer)) return fail('not_yours', NOT_YOURS);
   if (!found.item.teaches) return fail('not_a_book', 'That is not a skill book');
-  const problem = bookProblem(m, found.item);
+  const problem = bookProblem(m, p.level, found.item);
   if (problem) return fail('cannot_learn', problem);
-  m.skills.push(found.item.teaches);
-  const school = SKILLS[found.item.teaches]?.school;
-  if (school) m.schools[school] ??= 0;
+  learnSkill(m, p.level, found.item.teaches);
   removeFrom(p, found.place, found.item);
   return OK;
 }
@@ -362,7 +360,7 @@ export function validateAiRules(rules: unknown, known: readonly string[]): strin
     const rule = r as AIRule;
     if (rule.skill !== WEAPON_ATTACK) {
       if (typeof rule.skill !== 'string' || !SKILLS[rule.skill]) return `${at}: unknown skill`;
-      if (!known.includes(rule.skill)) return `${at}: this character does not know ${rule.skill}`;
+      if (!known.includes(rule.skill)) return `${at}: this character does not carry ${rule.skill}`;
     }
     if (rule.order !== undefined && !ORDERS.has(rule.order)) return `${at}: unknown target order`;
     const f = rule.filter;
@@ -433,7 +431,9 @@ export function setMemberAi(
 ): ActionResult {
   const m = ownMember(p, memberId, viewer);
   if (isFail(m)) return m;
-  const problem = validateAiRules(rules, m.skills);
+  // The AI can only use what the member carries (the basic Attack if it has one).
+  const usable = [...(m.skills.includes('attack') ? ['attack'] : []), ...m.equipped];
+  const problem = validateAiRules(rules, usable);
   if (problem) return fail('bad_rules', problem);
   m.ai = (rules as AIRule[]).map(cleanRule);
   return OK;

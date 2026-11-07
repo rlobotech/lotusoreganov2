@@ -139,12 +139,13 @@ export function runCombat(input: CombatInput): CombatResult {
             ),
           )
         : 0;
+    const duration = def.duration + (caster.def.skillMods?.[skill.id]?.rounds ?? 0);
     const existing = target.statuses.find((s) => s.def.id === def.id);
     if (existing) {
-      existing.remaining = def.duration;
+      existing.remaining = duration;
       existing.amount = amount;
     } else {
-      target.statuses.push({ def, remaining: def.duration, amount, source: caster.id });
+      target.statuses.push({ def, remaining: duration, amount, source: caster.id });
       events.push({ t: 'status', unit: target.id, status: def.id, on: true });
     }
   }
@@ -216,6 +217,8 @@ export function runCombat(input: CombatInput): CombatResult {
     });
 
     const attr = caster.def.attributes[skill.attr];
+    // The unit's own skill and school levels make the skill stronger.
+    const strength = caster.def.skillMods?.[skill.id]?.power ?? 1;
     for (const target of targetsOf(caster, skill, primary)) {
       if (skill.kind === 'damage') {
         let chance: number | undefined;
@@ -252,7 +255,7 @@ export function runCombat(input: CombatInput): CombatResult {
             target,
             caster,
             skill,
-            base * (skill.power / 10) * dmgMult,
+            base * (skill.power / 10) * strength * dmgMult,
             type,
             crit,
             chance,
@@ -272,7 +275,11 @@ export function runCombat(input: CombatInput): CombatResult {
         const wanted = Math.max(
           1,
           Math.round(
-            spellBase(caster.def.level) * roll(1 - s, 1 + s) * (skill.power / 10) * attrMult(attr),
+            spellBase(caster.def.level) *
+              roll(1 - s, 1 + s) *
+              (skill.power / 10) *
+              strength *
+              attrMult(attr),
           ),
         );
         const amount = Math.min(wanted, target.base.maxHp - target.hp);

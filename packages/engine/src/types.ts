@@ -233,6 +233,12 @@ export interface UnitDef {
   /** The kind of weapon held, for skills that need one. Units without a kind hold none. */
   weaponKind?: WeaponKind;
   extraDamage?: ExtraDamage[];
+  /**
+   * Per-skill strength for this unit, from its skill and school levels: `power` multiplies the
+   * damage or healing of the skill (1 = unchanged) and `rounds` is added to the duration of the
+   * status it applies.
+   */
+  skillMods?: Record<string, { power?: number; rounds?: number }>;
   /** Resistance points from armor and the like. */
   resist?: Resistances;
   /** Starting hp / mana when the unit enters the fight hurt. Default: full. */

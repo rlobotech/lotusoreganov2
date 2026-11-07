@@ -1,52 +1,86 @@
-import type { CombatEvent, SkillDef } from '@game/engine';
-import { schoolLevel, SKILLS, WEAPON_SCHOOL, type SchoolId } from './skills.ts';
+import type { CombatEvent, DamageType, WeaponKind } from '@game/engine';
+import {
+  addSkillXp,
+  equippedLimit,
+  equipSkill,
+  schoolLevelOf,
+  skillLevelOf,
+  trainingFor,
+  unmetSkillRequirements,
+  type SkillUse,
+} from './skill-levels.ts';
+import { isStarter, RING_NAMES, SKILL_TREE, type RingSchool, type TreeNode } from './skill-tree.ts';
+import { SKILLS } from './skills.ts';
 import type { Item, Member } from './types.ts';
 
-/** Experience a school gains from one use of a skill. */
-export const SCHOOL_XP_PER_USE = 1;
+/**
+ * Learning and training in the running game: a member's skills, their levels and the school
+ * levels they add up to (the rules are in skill-levels.ts). A skill can be used in a fight only if
+ * it has a combat definition (`SKILLS`); the summons, Dash and the masteries wait for their
+ * engine feature or are passive.
+ */
 
-/** The school a use of `skill` trains for `m`, or null (a staff trains no weapon school). */
-export function trainedSchool(m: Pick<Member, 'equipment'>, skill: SkillDef): SchoolId | null {
-  if (skill.source === 'spell') return (skill.school as SchoolId | undefined) ?? null;
-  // Weapon skills train the school of the weapon in hand, so the right weapon is what progresses.
-  const kind = m.equipment.weapon?.kind;
-  return (kind && WEAPON_SCHOOL[kind]) || null;
-}
+/** A skill with a combat definition can be carried into a fight. */
+export const isUsable = (id: string): boolean => !!SKILLS[id];
 
-export const memberSchoolLevel = (m: Pick<Member, 'schools'>, school: string): number =>
-  schoolLevel(m.schools[school] ?? 0);
+/** A member's school level, from its skill levels. */
+export const memberSchoolLevel = (m: Pick<Member, 'skillLevels'>, school: RingSchool): number =>
+  schoolLevelOf(m, school);
 
-/** What stops `m` from learning `skill` by training, or null when it can be learned now. */
-export function unlockProblem(m: Member, skill: SkillDef): string | null {
-  if (m.skills.includes(skill.id)) return 'already known';
-  if (skill.bookOnly) return 'only a book teaches it';
-  if (!skill.school || !skill.unlock) return 'cannot be trained';
-  // A school opens when the character starts with it, learns from it or trains in it.
-  if (m.schools[skill.school] === undefined) return `start training in ${skill.school}`;
-  const level = memberSchoolLevel(m, skill.school);
-  if (level < skill.unlock.level) return `${skill.school} level ${skill.unlock.level}`;
-  const need = skill.unlock.skill;
-  if (need) {
-    const have = m.uses[need] ?? 0;
-    const times = skill.unlock.uses ?? 1;
-    if (!m.skills.includes(need) || have < times) {
-      return `use ${SKILLS[need]?.name ?? need} ${times} times (${Math.min(have, times)}/${times})`;
+/** The school levels of a member, every school that has any (for display). */
+export function memberSchools(m: Pick<Member, 'skillLevels'>): Partial<Record<RingSchool, number>> {
+  const out: Partial<Record<RingSchool, number>> = {};
+  for (const n of Object.values(SKILL_TREE)) {
+    for (const school of n.schools) {
+      const level = memberSchoolLevel(m, school);
+      if (level > 0) out[school] = level;
     }
   }
-  return null;
+  return out;
 }
 
-/** Learns every skill whose requirements are met. Returns the ids learned (in catalogue order). */
-export function learnUnlocked(m: Member): string[] {
+/**
+ * Learns a skill at level 1 and carries it when there is a free slot. Returns false if it was
+ * already known.
+ */
+export function learnSkill(m: Member, level: number, id: string): boolean {
+  if (m.skills.includes(id)) return false;
+  m.skills.push(id);
+  if (SKILL_TREE[id]) m.skillLevels[id] = 1;
+  if (SKILL_TREE[id] && isUsable(id)) equipSkill(m, level, id);
+  return true;
+}
+
+/** Sets up a new member's skills from the ones it starts with (all at level 1, carried as far as fits). */
+export function startSkills(m: Member, level: number): void {
+  const known = [...m.skills];
+  m.skills = ['attack'].filter((id) => known.includes(id));
+  for (const id of known) learnSkill(m, level, id);
+}
+
+/**
+ * What stops `m` from learning `node` by training, or null when it can be learned now. Starters
+ * come with a class or from a book, so only skills with requirements are learned this way.
+ */
+export function unlockProblem(m: Member, level: number, node: TreeNode): string | null {
+  if (m.skills.includes(node.id)) return 'already known';
+  if (node.bookOnly) return 'only a book teaches it';
+  if (isStarter(node)) return 'a starting skill: learned from a class or a book';
+  const unmet = unmetSkillRequirements(m, level, node);
+  return unmet.length ? unmet.join(', ') : null;
+}
+
+/** Learns every skill whose requirements are met. Returns the ids learned (in tree order). */
+export function learnUnlocked(m: Member, level: number): string[] {
   const learned: string[] = [];
   let again = true;
   // One skill can be the prerequisite of another, so keep going until nothing new unlocks.
   while (again) {
     again = false;
-    for (const skill of Object.values(SKILLS)) {
-      if (unlockProblem(m, skill) === null) {
-        m.skills.push(skill.id);
-        learned.push(skill.id);
+    for (const node of Object.values(SKILL_TREE)) {
+      if (unlockProblem(m, level, node) === null) {
+        learnSkill(m, level, node.id);
+        learned.push(node.id);
         again = true;
       }
     }
@@ -54,43 +88,102 @@ export function learnUnlocked(m: Member): string[] {
   return learned;
 }
 
+/** Fills the free slots with the skills the AI uses first, then the other usable ones. */
+export function autoEquip(m: Member, level: number): void {
+  const wanted = [
+    ...m.ai.map((r) => r.skill),
+    ...m.skills.filter((id) => isUsable(id) && SKILL_TREE[id]),
+  ];
+  for (const id of wanted) {
+    if (id !== 'weapon_attack' && SKILL_TREE[id] && m.skills.includes(id)) equipSkill(m, level, id);
+  }
+}
+
+/** What a character's skills and gear make of an event of a fight: one `SkillUse` per skill use. */
+function usesOf(m: Member, events: readonly CombatEvent[]): SkillUse[] {
+  const weapon = m.equipment.weapon;
+  const uses: SkillUse[] = [];
+  let current: SkillUse | null = null;
+  for (const e of events) {
+    if (e.t === 'skill' && e.unit === m.id) {
+      const def = SKILLS[e.skill];
+      current = {
+        skillId: e.skill,
+        damage: 0,
+        heal: 0,
+        weaponKind: weapon?.kind as WeaponKind | undefined,
+        hands: weapon?.hands as 1 | 2 | undefined,
+        dual: false,
+        spell: def?.source === 'spell',
+        element: def?.damageType as DamageType | undefined,
+      };
+      uses.push(current);
+    } else if (e.t === 'damage' && e.source === m.id && current) {
+      current.damage += e.amount;
+    } else if (e.t === 'heal' && e.source === m.id && current) {
+      current.heal += e.amount;
+    }
+  }
+  return uses;
+}
+
 /**
- * Counts the skills party members used in a fight, trains their schools, and teaches whatever
- * that unlocks. Mutates the members; returns who learned what.
+ * Trains skills from what the party's members did in a fight, and teaches whatever that unlocks.
+ * Mutates the members; returns who learned what, and which skills gained a level.
  */
 export function trainFromFight(
   members: Member[],
   events: readonly CombatEvent[],
-): Array<{ member: Member; skill: string }> {
-  const byId = new Map(members.map((m) => [m.id, m]));
-  for (const e of events) {
-    if (e.t !== 'skill') continue;
-    const m = byId.get(e.unit);
-    const skill = SKILLS[e.skill];
-    if (!m || !skill) continue;
-    m.uses[skill.id] = (m.uses[skill.id] ?? 0) + 1;
-    const school = trainedSchool(m, skill);
-    if (school) m.schools[school] = (m.schools[school] ?? 0) + SCHOOL_XP_PER_USE;
+  level: number,
+): {
+  learned: Array<{ member: Member; skill: string }>;
+  levelled: Array<{ member: Member; skill: string; level: number }>;
+} {
+  const levelled: Array<{ member: Member; skill: string; level: number }> = [];
+  for (const m of members) {
+    for (const use of usesOf(m, events)) {
+      for (const [id, amount] of trainingFor(m, use)) {
+        const node = SKILL_TREE[id];
+        if (node && addSkillXp(m, node, amount) > 0) {
+          levelled.push({ member: m, skill: id, level: skillLevelOf(m, id) });
+        }
+      }
+    }
   }
-  const out: Array<{ member: Member; skill: string }> = [];
-  for (const m of members) for (const skill of learnUnlocked(m)) out.push({ member: m, skill });
-  return out;
+  const learned: Array<{ member: Member; skill: string }> = [];
+  for (const m of members)
+    for (const skill of learnUnlocked(m, level)) learned.push({ member: m, skill });
+  return { learned, levelled };
 }
 
-/** The school level needed to learn `skill` from a book: basic skills need none. */
-export function bookRequirement(skill: SkillDef): number {
-  const level = skill.unlock?.level ?? 1;
-  return level > 2 ? level - 1 : 0;
+/**
+ * The school level a book asks for before it teaches a skill: the school levels of the skill's own
+ * requirements, a little relaxed (a book is a shortcut, but not past a skill's school level).
+ */
+export function bookRequirement(node: TreeNode): number {
+  const levels = Object.values(node.requires.schools ?? {});
+  const top = Math.max(0, ...levels);
+  return top > 10 ? top - 5 : 0;
 }
 
 /** Why `m` cannot learn the book's skill right now, or null. */
-export function bookProblem(m: Member, book: Pick<Item, 'teaches'>): string | null {
-  const skill = book.teaches ? SKILLS[book.teaches] : undefined;
-  if (!skill) return 'That book is blank';
-  if (m.skills.includes(skill.id)) return `${m.name} already knows ${skill.name}`;
-  const need = bookRequirement(skill);
-  if (skill.school && need > memberSchoolLevel(m, skill.school)) {
-    return `${m.name} needs ${skill.school} level ${need} to learn ${skill.name}`;
+export function bookProblem(m: Member, level: number, book: Pick<Item, 'teaches'>): string | null {
+  const node = book.teaches ? SKILL_TREE[book.teaches] : undefined;
+  const def = book.teaches ? SKILLS[book.teaches] : undefined;
+  if (!node || !def) return 'That book is blank';
+  if (m.skills.includes(node.id)) return `${m.name} already knows ${node.name}`;
+  if (node.requires.charLevel && level < node.requires.charLevel) {
+    return `${m.name} needs character level ${node.requires.charLevel} to learn ${node.name}`;
+  }
+  const need = bookRequirement(node);
+  if (need > 0) {
+    for (const school of node.schools) {
+      if (memberSchoolLevel(m, school) < need) {
+        return `${m.name} needs ${RING_NAMES[school]} level ${need} to learn ${node.name}`;
+      }
+    }
   }
   return null;
 }
+
+export { equippedLimit };

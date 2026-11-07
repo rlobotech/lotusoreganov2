@@ -227,7 +227,10 @@ describe('schools and skill books', () => {
     const id = await newParty(cookie);
     const { party } = (await call(cookie, 'GET', '/parties/me')).json();
     const warrior = party.members[0];
-    expect(warrior.schools.find((x: { id: string }) => x.id === 'sword').level).toBe(2);
+    // Three sword skills at level 1 (two masteries and Slash).
+    expect(warrior.schools.find((x: { id: string }) => x.id === 'sword').level).toBe(3);
+    expect(warrior.equipped).toContain('sword_slash');
+    expect(warrior.equipLimit).toBe(6);
     expect(Array.isArray(warrior.locked)).toBe(true);
     const catalog = (await call(cookie, 'GET', '/content/skills')).json();
     expect(JSON.stringify(catalog)).toContain('vanish_strike');
@@ -355,7 +358,7 @@ describe('points and combat AI', () => {
     const url = `/parties/${id}/members/m1/ai`;
     const good = await call(cookie, 'PUT', url, {
       rules: [
-        { skill: 'power_strike', when: { selfManaAbovePct: 40 } },
+        { skill: 'sword_slash', when: { selfManaAbovePct: 40 } },
         { skill: 'attack', order: 'lowest_hp' },
       ],
     });
@@ -369,7 +372,7 @@ describe('points and combat AI', () => {
     expect((await stateOf(id)).members[0]!.ai).toHaveLength(2);
 
     const reset = await call(cookie, 'POST', `${url}/reset`);
-    expect(reset.json().party.members[0].ai[0].skill).toBe('war_cry');
+    expect(reset.json().party.members[0].ai[0].skill).toBe('defensive_stance');
   });
 });
 

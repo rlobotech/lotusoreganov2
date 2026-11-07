@@ -68,6 +68,11 @@ export function skillSchoolPower(
   return schoolPower(best);
 }
 
+/** Each level of a skill makes it 5% stronger than at level 1 (level 10 is +45%). */
+export const POWER_PER_SKILL_LEVEL = 0.05;
+export const skillLevelPower = (level: number): number =>
+  1 + POWER_PER_SKILL_LEVEL * Math.max(0, level - 1);
+
 /** Power can also stretch a status instead of a number: one more round every 20 points. */
 export const STATUS_POINTS_PER_ROUND = 20;
 export const statusBonusRounds = (schoolLevel: number): number =>
