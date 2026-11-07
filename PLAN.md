@@ -3,7 +3,8 @@
 Idle party RPG for web (dark D&D feel, pixel art, mobile-friendly). See README.md for game design.
 **Plans live in `plans/`**, one file per piece of work, named `plan_YYYY_MM_DD_HH_MM_name.md` (sorted by time = what we did, in order). Each starts with a title and a status line (planned / in progress / done). Older plans below predate the folder.
 
-- [World map rebuild](plans/plan_2026_11_07_14_31_world_map_rebuild.md) - planned
+- [World map rebuild](plans/plan_2026_11_07_14_31_world_map_rebuild.md) - done
+- [Skill schools rebuild](plans/plan_2026_11_07_16_16_skill_schools_rebuild.md) - planned
 
 
 ## 1. Decisions so far
