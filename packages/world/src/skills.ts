@@ -48,7 +48,7 @@ export const WEAPON_SCHOOL: Partial<Record<WeaponKind, SchoolId>> = {
 
 /** Total school experience needed to reach `level` (level 1 needs none). */
 export const schoolXpForLevel = (level: number): number =>
-  level <= 1 ? 0 : Math.round(10 * (level - 1) ** 2);
+  level <= 1 ? 0 : Math.round(30 * (level - 1) ** 2);
 
 /** The level a school has with `xp` experience. */
 export function schoolLevel(xp: number): number {

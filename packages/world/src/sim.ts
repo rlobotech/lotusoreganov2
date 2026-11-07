@@ -175,7 +175,7 @@ export function hpFraction(p: PartyState): number {
   return max > 0 ? hp / max : 0;
 }
 
-function memberUnit(p: PartyState, m: Member): UnitDef {
+export function memberUnit(p: PartyState, m: Member): UnitDef {
   const cls = CLASSES[m.cls];
   const gear = memberGear(m);
   return {

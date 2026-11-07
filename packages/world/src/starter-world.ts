@@ -113,7 +113,7 @@ const zones: Record<string, ZoneDef> = {
     id: 'ashen_hills',
     name: 'Ashen Hills',
     minLevel: 6,
-    maxLevel: 10,
+    maxLevel: 100,
     encounters: [orcPatrol, boneWalkers, wolfPack],
     unlockedBy: 'goblin_keep',
   },

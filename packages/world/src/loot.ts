@@ -312,6 +312,7 @@ export function starterGear(
   kit: string[],
   memberId: string,
   level: number,
+  rarity: Rarity = 'common',
 ): Partial<Record<Slot, Item>> {
   const worn: Partial<Record<Slot, Item>> = {};
   for (const name of kit) {
@@ -319,13 +320,13 @@ export function starterGear(
     worn[base.slot] = {
       id: `${memberId}_${base.slot}`,
       name: base.name,
-      rarity: 'common',
+      rarity,
       itemLevel: level,
-      value: itemValue(level, 'common'),
+      value: itemValue(level, rarity),
       favorite: false,
       slot: base.slot,
-      bonuses: makeBonuses(base, level, 'common'),
-      ...makeGear(base, level, 'common'),
+      bonuses: makeBonuses(base, level, rarity),
+      ...makeGear(base, level, rarity),
     };
   }
   return worn;

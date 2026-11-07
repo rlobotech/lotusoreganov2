@@ -3,6 +3,7 @@ export * from './hex.ts';
 export * from './progression.ts';
 export * from './skills.ts';
 export * from './learning.ts';
+export * from './balance.ts';
 export * from './monsters.ts';
 export * from './loot.ts';
 export * from './gold.ts';
@@ -17,6 +18,7 @@ export {
   defaultConfig,
   findHuntingSpot,
   hpFraction,
+  memberUnit,
   normalizeParty,
   type CreatePartyOptions,
 } from './sim.ts';

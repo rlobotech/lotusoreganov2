@@ -8,7 +8,7 @@ export const SCALING = {
   /** maxHp = (hpBase + hpPerVit * vit) * hpMult(level). */
   hpBase: 18,
   hpPerVit: 3.5,
-  hpPerLevel: 0.2,
+  hpPerLevel: 0.13,
   /** Base value of a spell (and of a weapon of average quality) at level 1, and its growth. */
   spellBase: 6,
   weaponBase: 7,

@@ -132,12 +132,18 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
   },
 };
 
-/** Global difficulty knob for monsters, tuned with `pnpm --filter @game/world balance`. */
-export const MONSTER_POWER = 1.3;
+/**
+ * Global difficulty knob for monsters, tuned with `pnpm --filter @game/world balance:levels`. It
+ * rises a little with level because characters gain more from gear, schools and skills than the
+ * plain attribute growth of monsters does; the curve flattens near level 100.
+ */
+export const MONSTER_POWER = 1.7;
+export const monsterPower = (level: number): number =>
+  MONSTER_POWER + 0.4 * (1 - Math.exp(-level / 25));
 
 export function monsterAttributes(t: MonsterTemplate, level: number): Attributes {
   const at = (k: keyof Attributes) =>
-    Math.max(1, Math.round((t.base[k] + t.growth[k] * level) * MONSTER_POWER));
+    Math.max(1, Math.round((t.base[k] + t.growth[k] * level) * monsterPower(level)));
   return { str: at('str'), dex: at('dex'), int: at('int'), vit: at('vit'), wis: at('wis') };
 }
 
