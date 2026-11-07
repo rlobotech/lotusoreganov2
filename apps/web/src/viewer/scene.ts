@@ -237,15 +237,15 @@ export class Scene {
         if (y < 0 || y >= h) continue;
         const c = gridToScreen(x, y);
         if (tileSet) {
-          // Under the picture, the colour of the grass, so the seams between tiles stay green.
-          g.poly(diamond(c.x, c.y)).fill(0x14a02e);
+          // Under the picture, the colour of the grass (a little smaller than the tile), so a stray gap stays green.
+          g.poly(diamond(c.x, c.y, TILE_W / 2 - 1, TILE_H / 2 - 1)).fill(0x14a02e);
           const tex =
             tileSet.textures[Math.floor(hash(x * 131 + y * 7919) * tileSet.textures.length)]!;
           const tile = new Sprite(tex);
-          // The top of the tile is a diamond of the grid's size: its middle sits on the grid point.
-          tile.anchor.set(0.5, TILE_H / 2 / tex.height);
-          tile.scale.set(TILE_W / tex.width);
-          tile.position.set(c.x, c.y);
+          // The picture is the diamond itself, at its own size: its bottom point sits on the bottom of the cell.
+          // A tuft of grass sticking up goes over the tile behind.
+          tile.anchor.set(0.5, 1);
+          tile.position.set(c.x, c.y + TILE_H / 2);
           tile.zIndex = 0;
           tiles.push(tile);
           continue;
@@ -268,12 +268,14 @@ export class Scene {
       const c = gridToScreen(bx, by);
       const rock = new Graphics();
       const hgt = 12;
+      const hw = TILE_W / 2;
+      const hh = TILE_H / 2;
       const top = diamond(c.x, c.y - hgt);
       rock
-        .poly([c.x - 16, c.y - hgt, c.x, c.y + 8 - hgt, c.x, c.y + 8, c.x - 16, c.y])
+        .poly([c.x - hw, c.y - hgt, c.x, c.y + hh - hgt, c.x, c.y + hh, c.x - hw, c.y])
         .fill(0x4a4a52);
       rock
-        .poly([c.x + 16, c.y - hgt, c.x, c.y + 8 - hgt, c.x, c.y + 8, c.x + 16, c.y])
+        .poly([c.x + hw, c.y - hgt, c.x, c.y + hh - hgt, c.x, c.y + hh, c.x + hw, c.y])
         .fill(0x35353c);
       rock.poly(top).fill(0x6b6b74).stroke({ width: 1, color: 0x22222a });
       rock.zIndex = c.y + 1;

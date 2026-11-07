@@ -1,6 +1,9 @@
-/** Isometric diamond tiles: 32 px wide, 16 px tall (see PLAN.md, Art spec). */
-export const TILE_W = 32;
-export const TILE_H = 16;
+/**
+ * Isometric diamond tiles, the size of the floor art (`battle_tiles/*.png`: 30 px wide, 22 px tall). Neighbouring
+ * tiles sit 15 px across and 11 px down, so their edges meet exactly.
+ */
+export const TILE_W = 30;
+export const TILE_H = 22;
 /** Height of a unit sprite above its feet, used for bounds and depth. */
 export const UNIT_H = 32;
 

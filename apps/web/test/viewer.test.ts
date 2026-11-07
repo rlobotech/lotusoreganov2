@@ -17,9 +17,9 @@ const events = runCombat(samples.input(1)).events;
 describe('iso transform', () => {
   it('maps grid to a 2:1 diamond', () => {
     expect(gridToScreen(0, 0)).toEqual({ x: 0, y: 0 });
-    expect(gridToScreen(1, 0)).toEqual({ x: 16, y: 8 });
-    expect(gridToScreen(0, 1)).toEqual({ x: -16, y: 8 });
-    expect(gridToScreen(1, 1)).toEqual({ x: 0, y: 16 });
+    expect(gridToScreen(1, 0)).toEqual({ x: 15, y: 11 });
+    expect(gridToScreen(0, 1)).toEqual({ x: -15, y: 11 });
+    expect(gridToScreen(1, 1)).toEqual({ x: 0, y: 22 });
   });
 
   it('arena bounds contain every tile', () => {
