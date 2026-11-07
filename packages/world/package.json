@@ -12,12 +12,16 @@
     "balance:levels": "node src/cli/balance-levels.ts",
     "balance:encounters": "node src/cli/balance-encounters.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "map:trace": "node tools/trace-map.ts ../../docs/art/world_map_reference.png",
+    "map:print": "node tools/print-map.ts"
   },
   "dependencies": {
     "@game/engine": "workspace:*"
   },
   "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0",
     "typescript": "^6.0.3",
     "vitest": "^5.1.0"
   }

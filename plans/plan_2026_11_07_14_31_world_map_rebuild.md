@@ -1,9 +1,9 @@
 # World map rebuild
 
-Status: in progress (phase 1 done, phase 2 next)
+Status: in progress (phases 1 and 2 done, phase 3 next)
 
 
-Goal: replace the 14x60 strip with an organic continent of about 40x36 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
+Goal: replace the 14x60 strip with an organic continent of about 40x40 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
 
 ### Decisions
 - **Built by tracing the user's image:** a dev-only tool lays a 40x36 pointy-top hex grid over the map part of the picture, samples each hex's colour, and classifies it against the legend palette. A rules pass (coast, rivers, dense forest) and manual fixes follow; the result is saved as fixed text data (`world-map` file) and is checked by a validator. The tool needs an image library (Pillow or sharp) as a dev dependency only.
@@ -51,6 +51,15 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - The current 14x60 world is converted: map text has a legend (`MAP_CODES`), `R` is plains with a road; mountains are now impassable (everything stays connected, tested); the high regions use themed biomes (snow and ice, desert and ashlands, dense forest). The world has the same size, so saved parties keep working until the new map lands.
 - Renderer: the design palette for biomes, and roads, bridges, fords and passes drawn over them.
 - Tests: `terrain.test.ts` (rules, crossings, heap vs plain search, speed, connectivity of the current world).
+
+### Phase 2 notes (what exists now)
+- The reference picture is kept in `docs/art/world_map_reference.png`.
+- **Grid:** 40 columns by 40 rows (not 36: the continent needs a sea margin on every side, and the picture is taller than wide). Hex 29.4 px wide laid over the picture.
+- **Tracing tool:** `pnpm --filter @game/world map:trace [--preview out.png] [--write]` (`packages/world/tools/trace-map.ts`, dev dependency `pngjs`). Each pixel in a hex votes for a biome by colour; the hex takes the winner. A rules pass makes the outer ring sea, smooths noise, drops lost islands, turns the ground next to lava into ashlands, and keeps only river lines of 4 to 9 hexes. A short list of hand fixes repaints the far-north ice that reads as water. `--write` saves `src/world-map-data.ts`.
+- **Map file:** `src/world-map-data.ts` holds the text (`[biomes]`, `[overlay]`, `[landmarks]`); `src/world-map.ts` parses and formats it (biome characters, overlay characters `. = : # ^`); `src/continent.ts` exposes `CONTINENT`. `pnpm --filter @game/world map:print [--preview out.png]` prints it with its landmarks.
+- **Landmarks:** the picture's eight labelled places (the starting city and the seven bosses) are traced to hexes.
+- **The draft is not final.** Rivers come out as scattered patches (thin lines are hard to read from colour), there are no overlays yet (roads, fords, bridges, passes), and some landmarks sit on plains or ash rather than where the content wants them. Phase 3 fixes the map by hand until the validator passes; the data file is then edited directly, not re-traced.
+- Tests: `continent.test.ts` (size, characters, sea ring, one landmass, ice in the north, lava in the south, desert in the west, landmarks, text format).
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).
