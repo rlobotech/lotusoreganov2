@@ -99,12 +99,16 @@ Most of the learning rules landed with phase 2; phase 3 added what was missing a
 
 - **The skill wheel** (`apps/web/src/lib/manage/SkillWheel.svelte`, an SVG, drawn from the skill catalogue and the member's data): 13 sectors in ring order with Bow at the top, a hub labelled SKILL TREE, a badge with each school's level (0 to 100) and name. Skills are nodes along a branch: starters on the first ring, further out the more a skill asks for (`wheelLayout.ts`: past every skill it needs, and by school level band, 0-19, 20-39 and so on). A crowded ring staggers its nodes outward so they do not overlap.
 - **Nodes:** learned skills are filled with their level, a carried skill has a white ring, a skill that can be learned on its own shows a yellow +, a starting skill you do not have (it comes from a class or a book) is dashed, locked skills are dim, passive masteries are diamonds, a red dot marks a skill that cannot be used with the gear worn. Names show when zoomed in, and always for carried and selected skills; a name marked † is still a proposal.
-- **Lines:** a skill is joined to the skills it needs, in its school's colour (brighter once learned). A line to a skill of another school is dashed, and a dual skill is drawn in both of its sectors, joined by a dashed gold line.
+- **Lines:** a skill is joined to the skills it needs, in its school's colour (brighter once learned). A line to a skill of another school is dashed.
 - **Moving:** drag to pan, pinch, wheel or + and − to zoom, All for the whole wheel, and a tap on a school's circle zooms to that school (tap again to go back). A drag no longer swallows taps (the pointer is captured only once it moves).
 - **Detail panel** under the wheel: schools, level and progress, what raises it, what is still missing (✓ and ✗ per requirement), a note if it is not usable yet, and Carry or Put down (with the carried count).
 - **Spellbook:** a Wheel / List switch (the wheel is the default; the list stays as the second view), and the skill books stay below.
 - **Not done:** checked on a desktop-sized window only (the SVG scales to its width and uses touch gestures, but I did not test a phone); the node positions are computed, not hand-placed like the reference image, so busy schools (Dark) look crowded until more skills fill the tree.
 - Tests: `wheelLayout.test.ts` (ring order, ring distance, dual skills in both sectors, no overlap, lines, loops, missing requirements, sector zoom).
+
+### Wheel layout revision (after the first look)
+
+The user asked for more room, nodes that never cross a sector line, one place for a skill of two schools, and lines that do not run over other skills. Now: every skill is drawn **once**, in the sector of the first of its schools (a skill of two schools sits in one sector; its requirements in the other school are a dashed line across); nodes stay inside their sector with room for the node itself; each sector is laid out as a tree (a ring that is full pushes the next skill one ring out, and the skills of a ring are ordered by where their parents are, so a child sits straight out from its parent); and every line is bent sideways, a little more each try, until it clears all other skills. The wheel is bigger (rings from 230 out in steps of 84), so zoom in to a school to read it; names show when zoomed. Tests cover sector boundaries, spacing in a crowded school, one node per skill, straight branches, and lines clearing nodes.
 
 ## Phase 5 notes (what exists now)
 

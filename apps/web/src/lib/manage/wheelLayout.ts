@@ -4,8 +4,9 @@ import type { SkillInfo } from '@game/shared';
  * Layout of the skill wheel: thirteen sectors (the schools, in ring order, Bow at the top), the
  * skills of each school as nodes along a branch from the centre outward. A skill's distance from the
  * centre grows with what it asks for (other skills first, then the school level), so starters sit
- * near the middle and the most advanced skills near the rim. A dual skill is drawn in both of its
- * schools' sectors. Pure maths, so it can be tested without a screen.
+ * near the middle and the most advanced skills near the rim. A skill of two schools sits in the first
+ * of them, once. Nodes stay inside their sector, apart from each other, and the lines between skills
+ * bend around the skills in their way. Pure maths, so it can be tested without a screen.
  */
 
 /** The schools in ring order (the same order as the game's rules). */
@@ -61,22 +62,22 @@ export const SCHOOL_LABELS: Record<School, string> = {
 /** Geometry of the wheel in its own units (the picture is drawn in a square around the origin). */
 export const WHEEL = {
   /** Radius of the central hub. */
-  hub: 62,
+  hub: 90,
   /** Where the first ring of skills sits, and the distance between rings. */
-  firstRing: 128,
-  ringStep: 60,
+  firstRing: 230,
+  ringStep: 84,
   /** Outer edge of the sectors. */
-  rim: 480,
+  rim: 1000,
   /** Where the school names and level badges sit. */
-  badge: 516,
-  size: 580,
+  badge: 1050,
+  size: 1150,
 } as const;
 
 export const SECTOR = 360 / RING.length;
 
-/** The room one node needs along a ring, and how far a crowded ring staggers its nodes outward. */
-const NODE_SPACE = 34;
-const STAGGER = 20;
+/** Radius of a skill's node, and the room a node needs beside its neighbours (its name is below). */
+export const NODE_R = 17;
+const NODE_SPACE = 56;
 
 /** Angle (radians, 0 = right, clockwise on screen) of the middle of a school's sector. Bow is at the top. */
 export const sectorAngle = (school: School): number =>
@@ -95,11 +96,13 @@ const polar = (angle: number, r: number): Point => ({
 /** The point for a school's badge (its level circle), outside the sector. */
 export const badgePoint = (school: School): Point => polar(sectorAngle(school), WHEEL.badge);
 
+/** The radius of a ring (0 is the first, next to the hub). */
+export const ringRadius = (ring: number): number => WHEEL.firstRing + ring * WHEEL.ringStep;
+
 export interface Placed {
   id: string;
+  /** The skill's sector. A skill of two schools sits in the first of them, and only there. */
   school: School;
-  /** The skill's home sector, as opposed to the copy a dual skill has in its second school. */
-  home: boolean;
   ring: number;
   x: number;
   y: number;
@@ -108,10 +111,12 @@ export interface Placed {
 export interface Edge {
   from: string;
   to: string;
-  /** Joins nodes of different schools (drawn dashed). */
+  /** Joins skills of different schools (drawn dashed). */
   cross: boolean;
   /** The school whose colour it takes (the skill's own). */
   school: School;
+  /** The SVG path of the line, bent where a straight line would run over another skill. */
+  d: string;
 }
 
 export interface WheelLayout {
@@ -123,7 +128,7 @@ type LayoutSkill = Pick<SkillInfo, 'id' | 'schools' | 'requires'>;
 
 const isSchool = (s: string): s is School => (RING as readonly string[]).includes(s);
 
-/** How far out a skill is: past every skill it needs, and further the higher the school level it asks for. */
+/** How far out a skill is at least: past every skill it needs, and further the higher the school level it asks for. */
 function ringOf(
   skill: LayoutSkill,
   byId: Map<string, LayoutSkill>,
@@ -145,60 +150,153 @@ function ringOf(
   return ring;
 }
 
-/** Positions of every skill in every sector it belongs to, and the lines between them. */
+/** Half the width (in degrees) a node may use on a ring: the sector, less the node's own size. */
+function halfWidth(r: number): number {
+  const margin = ((NODE_R + 8) / r) * (180 / Math.PI);
+  return Math.max(0, SECTOR / 2 - margin);
+}
+
+/** How many nodes fit side by side on a ring inside the sector. */
+function capacity(r: number): number {
+  const chord = 2 * r * Math.sin((halfWidth(r) * Math.PI) / 180);
+  return Math.max(1, Math.floor(chord / NODE_SPACE) + 1);
+}
+
+/** Distance from a point to a segment. */
+function nearSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const quad = (a: Point, c: Point, b: Point) =>
+  `M ${r1(a.x)} ${r1(a.y)} Q ${r1(c.x)} ${r1(c.y)} ${r1(b.x)} ${r1(b.y)}`;
+const line = (a: Point, b: Point) => `M ${r1(a.x)} ${r1(a.y)} L ${r1(b.x)} ${r1(b.y)}`;
+
+/**
+ * A line from one skill to another that keeps clear of every other skill: straight when it can be,
+ * otherwise bent sideways, a little more each try, until nothing is in the way.
+ */
+export function edgePath(a: Point, b: Point, others: readonly Point[]): string {
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  // The side direction, perpendicular to the line.
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  const clearance = NODE_R + 8;
+  let best = { bend: 0, room: -1 };
+  for (const bend of [0, 36, -36, 72, -72, 108, -108, 150, -150]) {
+    // A quadratic bend: its control point sits twice as far out as the curve's middle.
+    const c = { x: mid.x + nx * bend * 2, y: mid.y + ny * bend * 2 };
+    const curve: Point[] = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      curve.push({
+        x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * c.x + t * t * b.x,
+        y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
+      });
+    }
+    let room = Infinity;
+    for (const o of others) {
+      for (let i = 0; i < curve.length - 1; i++) {
+        room = Math.min(room, nearSegment(o, curve[i]!, curve[i + 1]!));
+      }
+    }
+    if (room > best.room) best = { bend, room };
+    if (room >= clearance) return bend === 0 ? line(a, b) : quad(a, c, b);
+  }
+  const c = { x: mid.x + nx * best.bend * 2, y: mid.y + ny * best.bend * 2 };
+  return best.bend === 0 ? line(a, b) : quad(a, c, b);
+}
+
+/**
+ * Positions every skill once, in the sector of its first school (a skill of two schools picks one
+ * sector and sits there), and the lines between skills. Each sector is laid out as a tree: a skill
+ * goes on a ring past the skills it needs, a ring that is full pushes the next skill one ring out, and
+ * the skills of a ring are spread across the sector in the order of their parents so branches run
+ * straight out and rarely cross. Nodes stay inside their sector.
+ */
 export function wheelLayout(skills: readonly LayoutSkill[]): WheelLayout {
   const byId = new Map(skills.map((s) => [s.id, s]));
   const memo = new Map<string, number>();
-  const rings = new Map(skills.map((s) => [s.id, ringOf(s, byId, memo)]));
-
-  // Group by sector and ring, so nodes on one ring can be spread across the sector.
-  const slots = new Map<string, Array<{ skill: LayoutSkill; home: boolean }>>();
-  for (const s of skills) {
-    s.schools.filter(isSchool).forEach((school, i) => {
-      const key = `${school}:${rings.get(s.id)}`;
-      slots.set(key, [...(slots.get(key) ?? []), { skill: s, home: i === 0 }]);
-    });
-  }
+  const base = new Map(skills.map((s) => [s.id, ringOf(s, byId, memo)]));
+  const order = new Map(skills.map((s, i) => [s.id, i]));
+  const home = (s: LayoutSkill): School | undefined => s.schools.find(isSchool);
 
   const nodes: Placed[] = [];
-  for (const [key, list] of slots) {
-    const [school, ringText] = key.split(':') as [School, string];
-    const ring = Number(ringText);
-    const r = WHEEL.firstRing + ring * WHEEL.ringStep;
-    // Spread across most of the sector. When too many fit no more side by side, every other node
-    // sits a little further out, so labels and nodes stay apart.
-    const spread = Math.min(SECTOR * 0.8, 8 + list.length * 7);
-    const arc = (r * (spread * Math.PI)) / 180;
-    const capacity = Math.max(1, Math.floor(arc / NODE_SPACE) + 1);
-    const levels = Math.min(4, Math.ceil(list.length / capacity));
-    list.forEach(({ skill, home }, i) => {
-      const offset = list.length === 1 ? 0 : -spread / 2 + (spread * i) / (list.length - 1);
-      const angle = sectorAngle(school) + (offset * Math.PI) / 180;
-      const p = polar(angle, r + (levels > 1 ? (i % levels) * STAGGER : 0));
-      nodes.push({ id: skill.id, school, home, ring, x: p.x, y: p.y });
-    });
+  for (const school of RING) {
+    const mine = skills
+      .filter((s) => home(s) === school)
+      .sort((a, b) => base.get(a.id)! - base.get(b.id)! || order.get(a.id)! - order.get(b.id)!);
+    // Rings: the earliest ring a skill may take, pushed out while that ring is full.
+    const ringOfId = new Map<string, number>();
+    const used = new Map<number, number>();
+    for (const s of mine) {
+      let ring = base.get(s.id)!;
+      for (const dep of Object.keys(s.requires.skills ?? {})) {
+        const d = ringOfId.get(dep);
+        if (d !== undefined) ring = Math.max(ring, d + 1);
+      }
+      while ((used.get(ring) ?? 0) >= capacity(ringRadius(ring))) ring++;
+      ringOfId.set(s.id, ring);
+      used.set(ring, (used.get(ring) ?? 0) + 1);
+    }
+    // Along each ring: in the order of the parents' places, spread as little as the nodes need.
+    const offset = new Map<string, number>(); // degrees from the middle of the sector
+    const rings = [...new Set(ringOfId.values())].sort((x, y) => x - y);
+    for (const ring of rings) {
+      const r = ringRadius(ring);
+      const ids = mine.filter((s) => ringOfId.get(s.id) === ring);
+      const key = (s: LayoutSkill): number => {
+        const ps = Object.keys(s.requires.skills ?? {})
+          .map((d) => offset.get(d))
+          .filter((v): v is number => v !== undefined);
+        return ps.length ? ps.reduce((x, y) => x + y, 0) / ps.length : 0;
+      };
+      const sorted = [...ids].sort(
+        (x, y) => key(x) - key(y) || order.get(x.id)! - order.get(y.id)!,
+      );
+      const half = halfWidth(r);
+      const gap = Math.min(
+        (NODE_SPACE / r) * (180 / Math.PI),
+        sorted.length > 1 ? (2 * half) / (sorted.length - 1) : 0,
+      );
+      const span = gap * (sorted.length - 1);
+      // Centre the group on its parents, kept inside the sector.
+      const want = sorted.reduce((x, s) => x + key(s), 0) / sorted.length;
+      const centre = Math.max(-half + span / 2, Math.min(half - span / 2, want));
+      sorted.forEach((s, i) => {
+        const off = centre - span / 2 + gap * i;
+        offset.set(s.id, off);
+        const p = polar(sectorAngle(school) + (off * Math.PI) / 180, r);
+        nodes.push({ id: s.id, school, ring, x: p.x, y: p.y });
+      });
+    }
   }
 
+  const at = new Map(nodes.map((n) => [n.id, n]));
   const edges: Edge[] = [];
   for (const s of skills) {
-    const school = s.schools.find(isSchool);
-    if (!school) continue;
+    const school = home(s);
+    const to = at.get(s.id);
+    if (!school || !to) continue;
     for (const dep of Object.keys(s.requires.skills ?? {})) {
-      const parent = byId.get(dep);
-      if (!parent) continue;
-      const shared = parent.schools.some((p) => s.schools.includes(p));
-      edges.push({ from: dep, to: s.id, cross: !shared, school });
+      const from = at.get(dep);
+      if (!from) continue;
+      const others = nodes.filter((n) => n.id !== s.id && n.id !== dep);
+      edges.push({
+        from: dep,
+        to: s.id,
+        cross: from.school !== school,
+        school,
+        d: edgePath(from, to, others),
+      });
     }
   }
   return { nodes, edges };
-}
-
-/** The node of a skill that a line should join: its copy in `school` if it has one, else its home. */
-export function nodeIn(layout: WheelLayout, id: string, school?: School): Placed | undefined {
-  return (
-    layout.nodes.find((n) => n.id === id && n.school === school) ??
-    layout.nodes.find((n) => n.id === id && n.home)
-  );
 }
 
 /** What a character still lacks for a skill (empty when it can be learned), in words. */
@@ -218,8 +316,9 @@ export function missingFor(
   }
   for (const [school, need] of Object.entries(r.schools ?? {})) {
     const have = state.schoolLevel(school);
-    if (have < need)
+    if (have < need) {
       out.push(`${SCHOOL_LABELS[school as School] ?? school} level ${need} (have ${have})`);
+    }
   }
   for (const [id, need] of Object.entries(r.skills ?? {})) {
     const have = state.skillLevels[id]?.level ?? 0;
@@ -228,12 +327,30 @@ export function missingFor(
   return out;
 }
 
-/** The view box that frames one sector (to zoom into a school), or the whole wheel. */
-export function sectorBox(school: School | null): { x: number; y: number; w: number; h: number } {
+/**
+ * The view box that frames one sector (to zoom into a school), or the whole wheel. With the layout it
+ * fits the skills of that school, with room for their names; without, the middle of the sector.
+ */
+export function sectorBox(
+  school: School | null,
+  layout?: WheelLayout,
+): { x: number; y: number; w: number; h: number } {
   const whole = { x: -WHEEL.size, y: -WHEEL.size, w: WHEEL.size * 2, h: WHEEL.size * 2 };
   if (!school) return whole;
-  // Centred where the skills are (the first rings), wide enough for the whole branch.
-  const mid = polar(sectorAngle(school), 235);
-  const side = 400;
-  return { x: mid.x - side / 2, y: mid.y - side / 2, w: side, h: side };
+  const mine = layout?.nodes.filter((n) => n.school === school) ?? [];
+  if (mine.length === 0) {
+    const mid = polar(sectorAngle(school), 320);
+    return { x: mid.x - 300, y: mid.y - 300, w: 600, h: 600 };
+  }
+  // The hub side too, so the branch is seen starting from the middle.
+  const hubSide = polar(sectorAngle(school), WHEEL.hub + 20);
+  const xs = [...mine.map((n) => n.x), hubSide.x];
+  const ys = [...mine.map((n) => n.y), hubSide.y];
+  const pad = 80;
+  const x0 = Math.min(...xs) - pad;
+  const x1 = Math.max(...xs) + pad;
+  const y0 = Math.min(...ys) - pad;
+  const y1 = Math.max(...ys) + pad;
+  const side = Math.max(x1 - x0, y1 - y0, 420);
+  return { x: (x0 + x1) / 2 - side / 2, y: (y0 + y1) / 2 - side / 2, w: side, h: side };
 }

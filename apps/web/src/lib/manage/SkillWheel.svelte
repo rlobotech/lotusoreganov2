@@ -3,7 +3,6 @@
   import {
     badgePoint,
     missingFor,
-    nodeIn,
     RING,
     SCHOOL_COLORS,
     SCHOOL_LABELS,
@@ -12,7 +11,6 @@
     sectorBox,
     WHEEL,
     wheelLayout,
-    type Placed,
     type School,
   } from './wheelLayout.ts';
 
@@ -70,11 +68,6 @@
     return `M ${pt(a0, WHEEL.hub)} L ${pt(a0, WHEEL.rim)} A ${WHEEL.rim} ${WHEEL.rim} 0 0 1 ${pt(a1, WHEEL.rim)} L ${pt(a1, WHEEL.hub)} A ${WHEEL.hub} ${WHEEL.hub} 0 0 0 ${pt(a0, WHEEL.hub)} Z`;
   }
 
-  /** The node a line to `id` ends on, in the sector of the skill it starts from. */
-  function end(id: string, school: School): Placed | undefined {
-    return nodeIn(layout, id, school);
-  }
-
   // ---------- zoom and pan ----------
 
   let svg: SVGSVGElement | undefined = $state();
@@ -93,7 +86,7 @@
   }
   function focus(school: School) {
     zoomedSchool = school;
-    box = sectorBox(school);
+    box = sectorBox(school, layout);
   }
 
   const pts = new Map<number, { x: number; y: number }>();
@@ -158,7 +151,7 @@
   }
 
   // Names are drawn only when they can be read: zoomed in, or for the skill that is selected.
-  const showNames = $derived(box.w < 440);
+  const showNames = $derived(box.w < 950);
   const MEASURE: Record<string, string> = {
     damage: 'the damage it causes',
     healing: 'the health it restores',
@@ -189,46 +182,23 @@
       />
     {/each}
     <circle r={WHEEL.hub} fill="#1a1722" stroke="#c9a85a" stroke-width="3" />
-    <text class="hub" y="-6">SKILL</text>
-    <text class="hub" y="16">TREE</text>
+    <text class="hub" y="-8">SKILL</text>
+    <text class="hub" y="20">TREE</text>
 
     <!-- lines between skills -->
     {#each layout.edges as e (e.from + e.to)}
-      {@const a = end(e.from, e.school)}
-      {@const b = end(e.to, e.school)}
-      {#if a && b}
-        <line
-          x1={a.x}
-          y1={a.y}
-          x2={b.x}
-          y2={b.y}
-          stroke={colorOf(e.school)}
-          stroke-width={known(e.to) ? 3 : 1.6}
-          stroke-opacity={known(e.to) ? 0.9 : 0.4}
-          stroke-dasharray={e.cross ? '6 5' : undefined}
-        />
-      {/if}
-    {/each}
-    <!-- a dual skill is joined to its copy in the other school -->
-    {#each skills.filter((s) => s.schools.length === 2) as s (s.id)}
-      {@const a = layout.nodes.find((n) => n.id === s.id && n.home)}
-      {@const b = layout.nodes.find((n) => n.id === s.id && !n.home)}
-      {#if a && b}
-        <line
-          x1={a.x}
-          y1={a.y}
-          x2={b.x}
-          y2={b.y}
-          stroke="#f0b050"
-          stroke-width="2"
-          stroke-dasharray="4 5"
-          stroke-opacity="0.7"
-        />
-      {/if}
+      <path
+        d={e.d}
+        fill="none"
+        stroke={colorOf(e.school)}
+        stroke-width={known(e.to) ? 3 : 1.6}
+        stroke-opacity={known(e.to) ? 0.9 : 0.4}
+        stroke-dasharray={e.cross ? '6 5' : undefined}
+      />
     {/each}
 
     <!-- skills -->
-    {#each layout.nodes as n (n.id + n.school)}
+    {#each layout.nodes as n (n.id)}
       {@const s = byId.get(n.id)}
       {#if s}
         {@const st = statusOf(s)}
@@ -236,7 +206,6 @@
         <g
           class="node"
           class:locked={st === 'locked'}
-          class:ghost={!n.home}
           transform="translate({n.x} {n.y})"
           role="button"
           tabindex="0"
@@ -299,9 +268,9 @@
         onclick={() => (zoomedSchool === school ? whole() : focus(school))}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && focus(school)}
       >
-        <circle r="26" fill="#1a1722" stroke={colorOf(school)} stroke-width="4" />
-        <text class="lvl" y="6">{schoolLevel(school)}</text>
-        <text class="school" fill={colorOf(school)} y="-36">{SCHOOL_LABELS[school]}</text>
+        <circle r="38" fill="#1a1722" stroke={colorOf(school)} stroke-width="5" />
+        <text class="lvl" y="9">{schoolLevel(school)}</text>
+        <text class="school" fill={colorOf(school)} y="-52">{SCHOOL_LABELS[school]}</text>
       </g>
     {/each}
   </svg>
@@ -318,7 +287,7 @@
   <span><i class="dot ring"></i> carried</span>
   <span><i class="dot plus"></i> ready to learn (+)</span>
   <span><i class="dot dash"></i> from a class or a book</span>
-  <span><i class="dot line"></i> dual skill or other school</span>
+  <span><i class="dot line"></i> needs a skill of another school</span>
   <span>◆ passive · † proposed name</span>
 </div>
 
@@ -403,7 +372,7 @@
   }
   .hub {
     fill: #e0c878;
-    font-size: 15px;
+    font-size: 22px;
     font-weight: bold;
     text-anchor: middle;
     letter-spacing: 1px;
@@ -413,9 +382,6 @@
   }
   .node.locked {
     opacity: 0.55;
-  }
-  .node.ghost {
-    opacity: 0.75;
   }
   .node:focus-visible circle,
   .badge:focus-visible circle {
@@ -446,13 +412,13 @@
   }
   .lvl {
     fill: #f4ecd8;
-    font-size: 20px;
+    font-size: 28px;
     font-weight: bold;
     text-anchor: middle;
     pointer-events: none;
   }
   .school {
-    font-size: 15px;
+    font-size: 24px;
     font-weight: bold;
     text-anchor: middle;
     paint-order: stroke;
