@@ -81,11 +81,21 @@
             : ` · ${s.xp - s.levelXp}/${s.nextXp - s.levelXp}`}
         </span>
       </div>
-      <progress
-        max={s.nextXp === null ? 1 : s.nextXp - s.levelXp}
-        value={s.nextXp === null ? 1 : s.xp - s.levelXp}
+      <div
+        class="bar"
+        role="progressbar"
         aria-label="{s.name} progress"
-      ></progress>
+        aria-valuenow={s.xp - s.levelXp}
+        aria-valuemin={0}
+        aria-valuemax={s.nextXp === null ? s.xp - s.levelXp : s.nextXp - s.levelXp}
+      >
+        <div
+          class="fill xp"
+          style:width="{s.nextXp === null
+            ? 100
+            : ((s.xp - s.levelXp) / (s.nextXp - s.levelXp)) * 100}%"
+        ></div>
+      </div>
     </div>
   {/each}
   <div class="muted small">
@@ -159,10 +169,6 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted, #8a8494);
-  }
-  .school progress {
-    width: 100%;
-    height: 8px;
   }
   .book {
     align-items: center;

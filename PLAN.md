@@ -242,7 +242,7 @@ Goal: a combat system that mixes Baldur's Gate 3 (action economy, opportunity at
 2. **(done) Items and gear (`packages/world`, shared, web):** new slots and hand types, requirements, resistances and attributes on items, weapons with damage range/type/school, extra damage affixes, loot and shop rebuilt, rarity scaling to level 100, inventory screen updated (two-handed handling, requirement checks, resistance lines in the item card).
 3. **(done) AI rules and editor:** the new rule model, movement nodes linked to rules, kiting and retreat defaults weighing opportunity attacks, validation, and the AI tab rebuilt with the new conditions.
 4. **(done) Schools, skills, learning, classes:** school data and levels, school XP, weapon requirements, prerequisite and book learning, skill catalogue for the starting schools, the five classes with starting schools and skills, monsters rebuilt with attributes, resistances and weapons.
-5. **Character sheet UI:** the Attributes tab described above, Spellbook updated to schools and unlock progress.
+5. **(done) Character sheet UI:** the Attributes tab described above, Spellbook updated to schools and unlock progress.
 6. **Content and balance:** the level 1 to 100 curve for characters and monsters, zone and dungeon levels, loot tables, a balance simulator report (time to level, survival per level, damage per level), and tuning.
 
 ### Phase 1 notes (what exists now)
@@ -275,6 +275,12 @@ Goal: a combat system that mixes Baldur's Gate 3 (action economy, opportunity at
 - Classes: Rogue added (move 5, dagger kit, Stab, Quick Cut (free), Vanish Strike (retreat), Shoot; AI uses Vanish Strike when an enemy is adjacent). Each class lists its starting `schools`. Existing parties must be reset (member fields `schools`/`uses` are backfilled, but old skill ids and balance are not preserved).
 - UI: Spellbook shows schools with progress bars, known skills grouped by school, locked skills with what is missing, and books with a read button. Create-party accepts the Rogue.
 - Not done: books in shops or quest rewards, skills from monsters' schools (dark/earth/water have one starter skill each), school levels in the Attributes sheet (phase 5), tuning of school XP pace (phase 6), item actions for the AI, skill upgrades past school level.
+
+### Phase 5 notes (what exists now)
+- The Attributes tab is now one character at a time: the portrait strip on top (your characters first, others look-only), then a card with name, race, class, HP and MP bars, points to spend, and the sprite on the right. The strip and that card are pinned while the sections below scroll.
+- Sections (two columns from 820px, one on phones): Attributes with sources (base, spent points, gear) and the plus buttons, Combat (accuracy, evasion, crit, speed, move, weapon, extra damage, condition), Resistances (physical and magical, percent and points), Schools with progress bars, and Skills as chips (details stay in the Spellbook tab). The selected character is shared with the Inventory, Spellbook and AI tabs.
+- Conditions: only Fallen, Hurt, Scratched and Healthy for now, since status effects exist only inside fights.
+- Not done: items worn shown on the sheet (the Inventory tab has them), skill points beyond attributes, real phone hardware test.
 
 ### Open for later (the user will add details)
 Skill slots and how many skills a character can use in the AI at once, status and condition catalogue, summons and pets in combat, dual wielding, ammunition, skill upgrades past school level, the blood damage type, extra slots, boss mechanics, stealth and surprise, and any BG3 features not named above.

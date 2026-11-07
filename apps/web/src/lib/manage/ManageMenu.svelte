@@ -66,7 +66,7 @@
     {#if tab === 'inventory'}
       <InventoryTab bind:memberId />
     {:else if tab === 'attributes'}
-      <AttributesTab />
+      <AttributesTab bind:memberId />
     {:else if tab === 'spellbook'}
       <SpellbookTab bind:memberId />
     {:else if tab === 'quests'}
