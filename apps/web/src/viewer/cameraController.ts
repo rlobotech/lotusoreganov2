@@ -6,6 +6,8 @@ export interface CameraHost {
   size(): { width: number; height: number };
   /** Extent of the content in world pixels. */
   bounds(): Bounds;
+  /** The part of the content `fit` shows, when that is less than all of it (a tall map). */
+  fitBounds?(): Bounds;
   /** A tap or click (not a drag) at a screen position. */
   onTap?(p: Vec): void;
   onZoom?(zoom: number): void;
@@ -43,7 +45,7 @@ export class CameraController {
   fit() {
     this.mode = 'fit';
     const { width, height } = this.host.size();
-    const bounds = this.host.bounds();
+    const bounds = this.host.fitBounds?.() ?? this.host.bounds();
     this.zoom = fitZoom(width, height, bounds);
     Object.assign(this, centerOn(width, height, bounds, this.zoom));
     this.host.onZoom?.(this.zoom);

@@ -104,9 +104,9 @@ describe('starter world data', () => {
     }
   });
 
-  it('zone unlocks point at real boss dungeons', () => {
+  it('zone unlocks point at real dungeons', () => {
     for (const z of Object.values(W.zones)) {
-      if (z.unlockedBy) expect(W.sites[z.unlockedBy]?.kind).toBe('boss_dungeon');
+      if (z.unlockedBy) expect(['dungeon', 'boss_dungeon']).toContain(W.sites[z.unlockedBy]?.kind);
     }
   });
 });

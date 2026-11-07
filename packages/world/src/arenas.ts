@@ -31,4 +31,8 @@ export const ARENAS: Record<string, ArenaDef> = {
   forest: makeArena('forest', 9, 8, pillars([3, 2], [3, 5], [4, 3], [5, 4], [6, 2], [6, 5])),
   crypt: makeArena('crypt', 12, 8, pillars([4, 2], [4, 5], [7, 2], [7, 5], [5, 3], [6, 4])),
   keep: makeArena('keep', 12, 9, pillars([5, 3], [6, 3], [5, 5], [6, 5], [3, 1], [8, 7])),
+  fen: makeArena('fen', 11, 8, pillars([3, 3], [4, 5], [5, 2], [6, 4], [7, 6], [8, 3])),
+  ice: makeArena('ice', 12, 8, pillars([4, 1], [4, 6], [5, 3], [6, 4], [7, 1], [7, 6])),
+  dunes: makeArena('dunes', 13, 8, pillars([5, 2], [6, 5], [8, 3], [9, 6])),
+  spire: makeArena('spire', 12, 9, pillars([4, 2], [4, 6], [7, 2], [7, 6], [5, 4], [6, 4])),
 };

@@ -10,6 +10,7 @@
     "simulate": "node src/cli/simulate-party.ts",
     "balance": "node src/cli/balance-zone.ts",
     "balance:levels": "node src/cli/balance-levels.ts",
+    "balance:encounters": "node src/cli/balance-encounters.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

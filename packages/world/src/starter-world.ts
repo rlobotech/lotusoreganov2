@@ -1,8 +1,9 @@
+import { highContent, highMapRows, tierOfRow, TIERS } from './high-world.ts';
 import { shopItem } from './loot.ts';
 import type { EncounterDef, QuestDef, SiteDef, Terrain, WorldDef, ZoneDef } from './types.ts';
 
 // r = road, . = plains, f = forest, h = hills, s = swamp, m = mountain, ~ = water
-const MAP = [
+const BASE_MAP = [
   'mmmhh.ffff~~~~',
   'mmhh..fRfffh~~',
   'mh..ffRR.ffhh~',
@@ -14,6 +15,9 @@ const MAP = [
   '.f.R..sssh.mmm',
   'ffRR.ss.hh.mmm',
 ];
+
+// The high-level regions continue the map to the south, one block of rows each.
+const MAP = [...BASE_MAP, ...highMapRows()];
 
 const TERRAIN_CODES: Record<string, Terrain> = {
   R: 'road',
@@ -29,8 +33,10 @@ const WIDTH = MAP[0]!.length;
 const HEIGHT = MAP.length;
 
 // Columns 0-7 are Greenwood, 8-13 are the Ashen Hills (closed until the Goblin King falls).
-const zoneOf = MAP.flatMap((row) =>
-  [...row].map((_, col) => (col < 8 ? 'greenwood' : 'ashen_hills')),
+const zoneOf = MAP.flatMap((row, r) =>
+  [...row].map((_, col) =>
+    r >= BASE_MAP.length ? TIERS[tierOfRow(r)]!.id : col < 8 ? 'greenwood' : 'ashen_hills',
+  ),
 );
 
 const enc = (e: Omit<EncounterDef, 'weight'> & { weight?: number }): EncounterDef => ({
@@ -101,6 +107,9 @@ const lichCourt = enc({
   ],
 });
 
+// The Fen opens when the Old Crypt is cleared; each region after it opens with the last boss.
+const high = highContent('old_crypt', 'into_the_crypt');
+
 const zones: Record<string, ZoneDef> = {
   greenwood: {
     id: 'greenwood',
@@ -113,7 +122,7 @@ const zones: Record<string, ZoneDef> = {
     id: 'ashen_hills',
     name: 'Ashen Hills',
     minLevel: 6,
-    maxLevel: 100,
+    maxLevel: 20,
     encounters: [orcPatrol, boneWalkers, wolfPack],
     unlockedBy: 'goblin_keep',
   },
@@ -342,8 +351,8 @@ export const STARTER_WORLD: WorldDef = {
     }),
   ),
   zoneOf,
-  zones,
-  sites,
+  zones: { ...zones, ...high.zones },
+  sites: { ...sites, ...high.sites },
   startCity: 'oakhaven',
-  quests,
+  quests: { ...quests, ...high.quests },
 };

@@ -132,6 +132,321 @@ export const MONSTERS: Record<string, MonsterTemplate> = {
   },
 };
 
+// ---------- high-level monsters (levels 20 to 100) ----------
+
+type Family = 'tank' | 'skirmisher' | 'archer' | 'caster' | 'knight' | 'boss';
+
+/** Attribute shapes of the monster families, tuned with the balance tool. */
+const FAMILIES: Record<Family, { base: Attributes; growth: Attributes; move: number }> = {
+  tank: { base: a(9, 4, 1, 9, 2), growth: a(0.9, 0.2, 0.05, 0.9, 0.1), move: 3 },
+  skirmisher: { base: a(6, 9, 1, 5, 1), growth: a(0.7, 0.6, 0.02, 0.6, 0.05), move: 4 },
+  archer: { base: a(3, 8, 1, 3, 2), growth: a(0.4, 0.7, 0.05, 0.5, 0.1), move: 3 },
+  caster: { base: a(3, 5, 10, 7, 7), growth: a(0.1, 0.2, 0.95, 0.75, 0.5), move: 3 },
+  knight: { base: a(8, 5, 2, 8, 3), growth: a(0.85, 0.3, 0.05, 0.85, 0.15), move: 3 },
+  boss: { base: a(12, 6, 6, 15, 6), growth: a(1.05, 0.35, 0.5, 1.2, 0.4), move: 3 },
+};
+
+function monster(
+  id: string,
+  name: string,
+  family: Family,
+  weapon: DamageType,
+  skills: string[],
+  ai: AIRule[],
+  armor: Partial<Record<DamageType, number>>,
+): MonsterTemplate {
+  const f = FAMILIES[family];
+  return {
+    id,
+    name,
+    sprite: id,
+    base: f.base,
+    growth: f.growth,
+    move: f.move,
+    skills,
+    ai,
+    weapon,
+    armor,
+  };
+}
+
+const HIGH: MonsterTemplate[] = [
+  // Mirewood Fen (21 to 35): earth, poison and dark
+  monster(
+    'bog_lurker',
+    'Bog Lurker',
+    'tank',
+    'smash',
+    ['attack', 'crushing_blow'],
+    [{ skill: 'crushing_blow' }, { skill: 'attack' }],
+    { earth: 1, water: 0.6, smash: 0.5, fire: -0.5, cut: 0.2 },
+  ),
+  monster(
+    'fen_wisp',
+    'Fen Wisp',
+    'caster',
+    'smash',
+    ['staff_bolt'],
+    [{ skill: 'staff_bolt', order: 'lowest_hp' }],
+    { electric: 1.2, light: 0.6, earth: -0.5, dark: -0.3, piercing: 0.3 },
+  ),
+  monster(
+    'fen_witch',
+    'Fen Witch',
+    'caster',
+    'smash',
+    ['shadow_bolt', 'stone_spike', 'heal'],
+    [
+      { skill: 'heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 50 } },
+      { skill: 'stone_spike' },
+      { skill: 'shadow_bolt' },
+    ],
+    { dark: 0.9, earth: 0.7, light: -0.6, fire: -0.2 },
+  ),
+  monster(
+    'bog_hag',
+    'Bog Hag',
+    'boss',
+    'smash',
+    ['shadow_bolt', 'stone_spike', 'heal', 'war_cry', 'attack'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 40 } },
+      { skill: 'stone_spike', order: 'crowded' },
+      { skill: 'shadow_bolt' },
+    ],
+    { dark: 1, earth: 1, light: -0.5, fire: -0.3, cut: 0.4 },
+  ),
+
+  // Frostpeak Reach (36 to 50): water, ice and heavy smash
+  monster(
+    'frost_wolf',
+    'Frost Wolf',
+    'skirmisher',
+    'piercing',
+    ['attack'],
+    [{ skill: 'attack', order: 'lowest_hp' }],
+    { water: 1, piercing: 0.3, fire: -0.6, cut: -0.1 },
+  ),
+  monster(
+    'frost_archer',
+    'Frost Archer',
+    'archer',
+    'piercing',
+    ['shoot', 'volley', 'backstep_shot'],
+    [
+      { skill: 'backstep_shot', when: { enemyAdjacent: true } },
+      { skill: 'volley', order: 'crowded' },
+      { skill: 'shoot', order: 'lowest_hp' },
+    ],
+    { water: 0.8, piercing: 0.4, fire: -0.4 },
+  ),
+  monster(
+    'ice_golem',
+    'Ice Golem',
+    'tank',
+    'smash',
+    ['attack', 'crushing_blow'],
+    [{ skill: 'crushing_blow' }, { skill: 'attack' }],
+    { water: 1.2, smash: 0.8, cut: 0.6, piercing: 0.8, fire: -0.6, electric: -0.2 },
+  ),
+  monster(
+    'frost_giant',
+    'Frost Giant',
+    'boss',
+    'smash',
+    ['attack', 'crushing_blow', 'stun_bash', 'frost_shard', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'stun_bash' },
+      { skill: 'crushing_blow' },
+      { skill: 'frost_shard' },
+      { skill: 'attack' },
+    ],
+    { water: 1.2, smash: 0.7, cut: 0.6, piercing: 0.6, fire: -0.5 },
+  ),
+
+  // Scorched Wastes (51 to 65): fire, blades and sand
+  monster(
+    'dune_raider',
+    'Dune Raider',
+    'knight',
+    'cut',
+    ['attack', 'lunge', 'whirlwind'],
+    [{ skill: 'whirlwind', when: { enemiesAtLeast: 2 } }, { skill: 'lunge' }, { skill: 'attack' }],
+    { cut: 0.5, piercing: 0.4, smash: 0.2, fire: 0.5, water: -0.4 },
+  ),
+  monster(
+    'sand_scorpion',
+    'Sand Scorpion',
+    'skirmisher',
+    'cut',
+    ['attack', 'power_strike'],
+    [{ skill: 'power_strike' }, { skill: 'attack', order: 'lowest_hp' }],
+    { piercing: 0.6, cut: 0.6, earth: 0.5, water: -0.5, smash: -0.2 },
+  ),
+  monster(
+    'flame_elemental',
+    'Flame Elemental',
+    'caster',
+    'smash',
+    ['ember'],
+    [{ skill: 'ember', order: 'lowest_hp' }],
+    { fire: 1.5, earth: 0.4, water: -0.9, electric: 0.2 },
+  ),
+  monster(
+    'ash_drake',
+    'Ash Drake',
+    'boss',
+    'cut',
+    ['attack', 'whirlwind', 'fireball', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'fireball', order: 'crowded' },
+      { skill: 'whirlwind', when: { enemiesAtLeast: 2 } },
+      { skill: 'attack' },
+    ],
+    { fire: 1.5, cut: 0.8, piercing: 0.6, smash: 0.4, water: -0.6 },
+  ),
+
+  // Shadowmarch (66 to 80): dark, undead and plate
+  monster(
+    'shadow_wraith',
+    'Shadow Wraith',
+    'caster',
+    'smash',
+    ['shadow_bolt'],
+    [{ skill: 'shadow_bolt', order: 'lowest_hp' }],
+    { dark: 1.3, piercing: 1, cut: 1, smash: 0.2, light: -0.9, fire: -0.3 },
+  ),
+  monster(
+    'bone_knight',
+    'Bone Knight',
+    'knight',
+    'cut',
+    ['attack', 'power_strike', 'whirlwind', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'whirlwind', when: { enemiesAtLeast: 2 } },
+      { skill: 'power_strike' },
+      { skill: 'attack' },
+    ],
+    { piercing: 1, cut: 0.8, dark: 1, smash: -0.4, light: -0.7, fire: -0.2 },
+  ),
+  monster(
+    'shade_archer',
+    'Shade Archer',
+    'archer',
+    'piercing',
+    ['shoot', 'volley', 'backstep_shot'],
+    [
+      { skill: 'backstep_shot', when: { enemyAdjacent: true } },
+      { skill: 'volley', order: 'crowded' },
+      { skill: 'shoot', order: 'lowest_hp' },
+    ],
+    { dark: 0.9, piercing: 0.7, light: -0.6 },
+  ),
+  monster(
+    'death_knight',
+    'Death Knight',
+    'boss',
+    'cut',
+    ['attack', 'power_strike', 'whirlwind', 'shadow_bolt', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'whirlwind', when: { enemiesAtLeast: 2 } },
+      { skill: 'power_strike' },
+      { skill: 'shadow_bolt' },
+      { skill: 'attack' },
+    ],
+    { dark: 1.2, cut: 1, piercing: 1, smash: 0.2, light: -0.6 },
+  ),
+
+  // The Spire (81 to 100): light, void and arcane
+  monster(
+    'spire_seraph',
+    'Spire Seraph',
+    'caster',
+    'smash',
+    ['smite'],
+    [{ skill: 'smite', order: 'lowest_hp' }],
+    { light: 1.3, electric: 0.7, dark: -0.8, earth: -0.2 },
+  ),
+  monster(
+    'void_stalker',
+    'Void Stalker',
+    'skirmisher',
+    'piercing',
+    ['stab', 'quick_cut', 'vanish_strike'],
+    [
+      { skill: 'vanish_strike', when: { enemyAdjacent: true } },
+      { skill: 'quick_cut' },
+      { skill: 'stab', order: 'lowest_hp' },
+    ],
+    { dark: 1, piercing: 0.4, light: -0.6, electric: -0.2 },
+  ),
+  monster(
+    'arcane_construct',
+    'Arcane Construct',
+    'tank',
+    'smash',
+    ['attack', 'crushing_blow'],
+    [{ skill: 'crushing_blow' }, { skill: 'attack' }],
+    {
+      cut: 1,
+      piercing: 1,
+      smash: 0.9,
+      fire: 0.5,
+      water: 0.5,
+      electric: 0.5,
+      earth: 0.5,
+      dark: -0.4,
+    },
+  ),
+  monster(
+    'void_lord',
+    'Void Lord',
+    'boss',
+    'smash',
+    ['shadow_bolt', 'chain_lightning', 'crushing_blow', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'chain_lightning', order: 'crowded' },
+      { skill: 'crushing_blow', when: { enemyAdjacent: true } },
+      { skill: 'shadow_bolt' },
+    ],
+    { dark: 1.4, electric: 0.8, cut: 0.6, piercing: 0.6, smash: 0.6, light: -0.6 },
+  ),
+  monster(
+    'the_eternal',
+    'The Eternal',
+    'boss',
+    'smash',
+    ['attack', 'crushing_blow', 'stun_bash', 'smite', 'shadow_bolt', 'big_heal', 'war_cry'],
+    [
+      { skill: 'war_cry', when: { selfManaAbovePct: 30 } },
+      { skill: 'big_heal', order: 'lowest_hp_pct', filter: { hpBelowPct: 30 } },
+      { skill: 'stun_bash' },
+      { skill: 'shadow_bolt', order: 'lowest_hp' },
+      { skill: 'smite', order: 'crowded' },
+      { skill: 'crushing_blow' },
+      { skill: 'attack' },
+    ],
+    {
+      dark: 0.9,
+      light: 0.9,
+      fire: 0.6,
+      water: 0.6,
+      electric: 0.6,
+      earth: 0.6,
+      cut: 0.7,
+      piercing: 0.7,
+      smash: 0.7,
+    },
+  ),
+];
+for (const t of HIGH) MONSTERS[t.id] = t;
+
 /**
  * Global difficulty knob for monsters, tuned with `pnpm --filter @game/world balance:levels`. It
  * rises a little with level because characters gain more from gear, schools and skills than the

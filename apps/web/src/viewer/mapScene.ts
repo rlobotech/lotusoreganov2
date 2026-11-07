@@ -97,6 +97,7 @@ export class MapScene {
     this.camera = new CameraController(app.canvas, {
       size: () => this.app.screen,
       bounds: () => this.bounds,
+      fitBounds: () => this.windowBounds(),
       onTap: (p) => this.tap(p),
       onZoom: (z) => this.opts.onZoom?.(z),
     });
@@ -159,9 +160,29 @@ export class MapScene {
     this.camera.fit();
   }
 
+  /**
+   * A tall map is not shown whole (it would be too small to read): the view fits the width and a
+   * band of rows around the party, and follows the party while the player has not moved the camera.
+   */
+  private windowBounds(): Bounds {
+    const info = this.info;
+    const all = this.bounds;
+    const ROWS = 11;
+    if (!info || info.height <= ROWS + 1) return all;
+    const row = this.party?.pos.row ?? 0;
+    const first = Math.max(0, Math.min(info.height - ROWS, row - Math.floor(ROWS / 2)));
+    return {
+      ...all,
+      minY: first * ROW_STEP - 4,
+      maxY: (first + ROWS - 1) * ROW_STEP + 2 * S + 4,
+    };
+  }
+
   setParty(party: PartySummary | null) {
+    const moved = party?.pos.row !== this.party?.pos.row;
     this.party = party;
     this.redrawLocks();
+    if (moved && this.camera?.mode === 'fit') this.camera.fit();
   }
 
   private zoneLocked(zoneId: string): boolean {

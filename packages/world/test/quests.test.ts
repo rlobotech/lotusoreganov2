@@ -84,7 +84,7 @@ describe('quest data', () => {
     for (const q of quests) {
       for (const o of q.objectives) {
         if (o.type === 'kill') {
-          expect(zonesWithMonster(W, o.template, ['goblin_keep']).length).toBeGreaterThan(0);
+          expect(zonesWithMonster(W, o.template, Object.keys(W.sites)).length).toBeGreaterThan(0);
         }
       }
     }
