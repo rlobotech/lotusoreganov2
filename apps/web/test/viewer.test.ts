@@ -1,7 +1,14 @@
 import { runCombat, samples } from '@game/engine';
 import { describe, expect, it } from 'vitest';
 import { arenaBounds, gridToScreen } from '../src/viewer/iso.ts';
-import { clampPan, fitZoom, snapZoom, stepZoom, zoomAbout } from '../src/viewer/camera.ts';
+import {
+  clampPan,
+  fitZoom,
+  followWindow,
+  snapZoom,
+  stepZoom,
+  zoomAbout,
+} from '../src/viewer/camera.ts';
 import { Playback } from '../src/viewer/playback.ts';
 import { buildTimeline, eventDuration } from '../src/viewer/state.ts';
 
@@ -169,5 +176,29 @@ describe('camera maths', () => {
     expect(b.minY * 2 + far.y).toBeLessThanOrEqual(600);
     const ok = clampPan({ x: 400, y: 300 }, 800, 600, b, 2);
     expect(ok).toEqual({ x: 400, y: 300 });
+  });
+});
+
+describe('following the party on a big map', () => {
+  const all = { minX: 0, minY: 0, maxX: 1200, maxY: 1200 };
+
+  it('shows a window around the party shaped like the screen', () => {
+    const w = followWindow(all, { x: 600, y: 600 }, 400, 400, 800);
+    expect(w).toEqual({ minX: 400, minY: 200, maxX: 800, maxY: 1000 });
+    const wide = followWindow(all, { x: 600, y: 600 }, 400, 800, 400);
+    expect(wide.maxX - wide.minX).toBe(400);
+    expect(wide.maxY - wide.minY).toBe(200);
+  });
+
+  it('slides along the edge instead of showing empty space', () => {
+    const corner = followWindow(all, { x: 5, y: 1190 }, 400, 400, 400);
+    expect(corner).toEqual({ minX: 0, minY: 800, maxX: 400, maxY: 1200 });
+    const far = followWindow(all, { x: 1195, y: 3 }, 400, 400, 400);
+    expect(far).toEqual({ minX: 800, minY: 0, maxX: 1200, maxY: 400 });
+  });
+
+  it('shows everything when the map is smaller than the window', () => {
+    const small = { minX: 0, minY: 0, maxX: 300, maxY: 200 };
+    expect(followWindow(small, { x: 150, y: 100 }, 400, 400, 800)).toEqual(small);
   });
 });

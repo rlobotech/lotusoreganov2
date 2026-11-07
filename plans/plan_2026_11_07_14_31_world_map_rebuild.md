@@ -1,6 +1,6 @@
 # World map rebuild
 
-Status: in progress (phases 1 to 5 done, phase 6 next)
+Status: done (all six phases)
 
 
 Goal: replace the 14x60 strip with an organic continent of about 40x40 hexes, like the picture the user generated (kept as the reference): the starter city in the centre-right, an irregular coast, bosses guarding passes, regions that unlock in a winding order (east, then south, then north of that, then west of the start) instead of one line south.
@@ -86,6 +86,13 @@ North: snow, ice, frozen forest. South: warmer, ending in volcanic mountains, la
 - **Data tests:** every tagged encounter has walkable ground of its biome in its region, and every region has at least one untagged encounter (no ground is ever empty).
 - **Not changed:** `balance:encounters` plays each encounter on its own, so ground does not change its numbers.
 - Tests: `biome.test.ts` (weights, home share, one search equals the single-target search, hunting spot choice by ground, data checks, wolves met in forest far more than on plains).
+
+### Phase 6 notes (what exists now)
+- **Map view:** the camera follows the party and shows a window of 14 hexes across (as tall as the screen asks for; `followWindow` in `camera.ts`, which slides along the edges), so hexes stay readable on a phone (checked at 375 px wide). A new **Map** button next to the zoom buttons shows the whole continent and goes back; the middle button centres on the party again.
+- **Fog:** hexes of a region that is still closed are covered by a dark fog (80%), and the places in it are drawn dimmed. Every region's name and level band is written over the middle of its land (stronger while closed, faint once open).
+- **Reset:** done in phase 4 (migration 0003).
+- **Still open:** tile art for the biomes (the colours are drawn in code), a minimap, tapping a hex to send the party there (only sites can be tapped), monster and region art, and the balance notes of phase 4.
+- Tests: `viewer.test.ts` covers the window maths.
 
 ### Open until the draft map exists
 The exact unlock order and which image area each region becomes (to be proposed from the traced map and confirmed with the user), how many extra zones, their level bands, and whether to add real tile art later (the picture is the style target).

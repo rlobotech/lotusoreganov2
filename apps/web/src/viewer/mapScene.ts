@@ -1,5 +1,6 @@
 import type { PartySummary, WorldInfo } from '@game/shared';
 import { Application, Container, Graphics, Text } from 'pixi.js';
+import { followWindow } from './camera.ts';
 import { CameraController } from './cameraController.ts';
 import type { Bounds, Vec } from './iso.ts';
 
@@ -76,6 +77,10 @@ export class MapScene {
   private party: PartySummary | null = null;
   private bounds: Bounds = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
   private selected: string | null = null;
+  /** Show the whole continent instead of the part around the party. */
+  private whole = false;
+  /** Where each region's name is written (the middle of its land), in world pixels. */
+  private regionAt = new Map<string, Vec>();
   private disposed = false;
   private cleanup: Array<() => void> = [];
   private time = 0;
@@ -172,7 +177,29 @@ export class MapScene {
       }
     }
     this.drawOverlays(info);
+    this.findRegionNames(info);
     this.camera.fit();
+  }
+
+  /** The middle of each region's land, where its name is written. */
+  private findRegionNames(info: WorldInfo) {
+    const sums = new Map<string, { x: number; y: number; n: number }>();
+    for (let row = 0; row < info.height; row++) {
+      for (let col = 0; col < info.width; col++) {
+        const i = row * info.width + col;
+        const t = info.terrain[i];
+        if (t === 'water' || t === 'mountains' || t === 'river') continue;
+        const z = info.zoneOf[i]!;
+        const c = hexCenter(col, row);
+        const sum = sums.get(z) ?? { x: 0, y: 0, n: 0 };
+        sum.x += c.x;
+        sum.y += c.y;
+        sum.n++;
+        sums.set(z, sum);
+      }
+    }
+    this.regionAt.clear();
+    for (const [z, sum] of sums) this.regionAt.set(z, { x: sum.x / sum.n, y: sum.y / sum.n });
   }
 
   /** Roads, fords, bridges and passes on top of the biome colours. */
@@ -222,26 +249,31 @@ export class MapScene {
     }
   }
 
+  /** How many hexes wide the view around the party is (hexes stay readable on a phone). */
+  private static readonly VIEW_COLS = 14;
+
   /**
-   * A tall map is not shown whole (it would be too small to read): the view fits the width and a
-   * band of rows around the party, and follows the party while the player has not moved the camera.
+   * The continent is too big to read whole, so the view fits a window of a few hexes around the
+   * party (shaped like the screen) and follows the party while the player has not moved the camera.
+   * "Whole continent" shows everything instead.
    */
   private windowBounds(): Bounds {
-    const info = this.info;
     const all = this.bounds;
-    const ROWS = 11;
-    if (!info || info.height <= ROWS + 1) return all;
-    const row = this.party?.pos.row ?? 0;
-    const first = Math.max(0, Math.min(info.height - ROWS, row - Math.floor(ROWS / 2)));
-    return {
-      ...all,
-      minY: first * ROW_STEP - 4,
-      maxY: (first + ROWS - 1) * ROW_STEP + 2 * S + 4,
-    };
+    if (!this.info || this.whole) return all;
+    const { width, height } = this.app.screen;
+    const at = this.party ? hexCenter(this.party.pos.col, this.party.pos.row) : null;
+    const center = at ?? { x: (all.minX + all.maxX) / 2, y: (all.minY + all.maxY) / 2 };
+    return followWindow(all, center, MapScene.VIEW_COLS * HEX_W, width, height);
+  }
+
+  /** Switches between the part around the party and the whole continent. */
+  setWhole(whole: boolean) {
+    this.whole = whole;
+    this.camera.fit();
   }
 
   setParty(party: PartySummary | null) {
-    const moved = party?.pos.row !== this.party?.pos.row;
+    const moved = party?.pos.row !== this.party?.pos.row || party?.pos.col !== this.party?.pos.col;
     this.party = party;
     this.redrawLocks();
     if (moved && this.camera?.mode === 'fit') this.camera.fit();
@@ -260,7 +292,7 @@ export class MapScene {
       for (let col = 0; col < info.width; col++) {
         if (!this.zoneLocked(info.zoneOf[row * info.width + col]!)) continue;
         const c = hexCenter(col, row);
-        this.locks.poly(hexPoints(c.x, c.y, S - 0.5)).fill({ color: 0x0d0b10, alpha: 0.62 });
+        this.locks.poly(hexPoints(c.x, c.y, S - 0.5)).fill({ color: 0x0d0b10, alpha: 0.8 });
       }
     }
   }
@@ -369,7 +401,26 @@ export class MapScene {
 
       const below = this.camera.toScreen({ x: c.x, y: c.y + 10 });
       const n = ordered.get(s.id);
-      this.label(`s-${s.id}`, n ? `${n}. ${s.name}` : s.name, below, used, 1, true);
+      // Places in a region that is still closed are shown dimmed, like the fog over them.
+      const closed = this.zoneLocked(info.zoneOf[s.row * info.width + s.col]!);
+      this.label(`s-${s.id}`, n ? `${n}. ${s.name}` : s.name, below, used, closed ? 0.45 : 1, true);
+    }
+
+    // The name of every region (with its levels), written over the middle of its land.
+    const { width: vw, height: vh } = this.app.screen;
+    for (const z of info.zones) {
+      const at = this.regionAt.get(z.id);
+      if (!at) continue;
+      const pos = this.camera.toScreen(at);
+      if (pos.x < -80 || pos.y < -20 || pos.x > vw + 80 || pos.y > vh + 20) continue;
+      const text = `${z.name.toUpperCase()}  ${z.minLevel}-${z.maxLevel}`;
+      this.label(
+        `z-${z.id}`,
+        text,
+        { x: pos.x, y: pos.y - 6 },
+        used,
+        this.zoneLocked(z.id) ? 0.9 : 0.5,
+      );
     }
 
     const p = this.party;

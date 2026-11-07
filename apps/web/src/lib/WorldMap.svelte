@@ -12,6 +12,7 @@
   let host: HTMLDivElement;
   let scene = $state.raw<MapScene | null>(null);
   let zoom = $state(1);
+  let whole = $state(false);
 
   onMount(() => {
     let alive = true;
@@ -38,6 +39,9 @@
   $effect(() => {
     scene?.select(selected);
   });
+  $effect(() => {
+    scene?.setWhole(whole);
+  });
 
   const fmt = (z: number) => (Number.isInteger(z) ? `${z}x` : `${z.toFixed(2)}x`);
 </script>
@@ -46,8 +50,15 @@
   <div class="stage" bind:this={host}></div>
   <div class="zoom">
     <button onclick={() => scene?.zoomStep(1)} aria-label="Zoom in">+</button>
-    <button onclick={() => scene?.fit()} aria-label="Fit map">{fmt(zoom)}</button>
+    <button onclick={() => scene?.fit()} aria-label="Centre on the party">{fmt(zoom)}</button>
     <button onclick={() => scene?.zoomStep(-1)} aria-label="Zoom out">&minus;</button>
+    <button
+      class:on={whole}
+      aria-pressed={whole}
+      aria-label={whole ? 'Back to the party' : 'Show the whole continent'}
+      title={whole ? 'Back to the party' : 'Show the whole continent'}
+      onclick={() => (whole = !whole)}>Map</button
+    >
   </div>
 </div>
 
@@ -74,5 +85,8 @@
   }
   .zoom button {
     background: rgba(23, 20, 28, 0.9);
+  }
+  .zoom button.on {
+    border-color: var(--gold);
   }
 </style>

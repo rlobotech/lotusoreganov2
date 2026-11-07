@@ -66,3 +66,23 @@ export function zoomAbout(
   const wy = (anchor.y - pos.y) / oldZoom;
   return { x: anchor.x - wx * newZoom, y: anchor.y - wy * newZoom };
 }
+
+/**
+ * The part of a big map to show: a window `spanX` wide around `center`, as tall as the screen's
+ * shape asks for, kept inside `all` (so near an edge it slides instead of showing empty space).
+ */
+export function followWindow(
+  all: Bounds,
+  center: { x: number; y: number },
+  spanX: number,
+  viewW: number,
+  viewH: number,
+): Bounds {
+  const totalW = all.maxX - all.minX;
+  const totalH = all.maxY - all.minY;
+  const w = Math.min(totalW, spanX);
+  const h = Math.min(totalH, (w * viewH) / Math.max(1, viewW));
+  const minX = Math.max(all.minX, Math.min(all.maxX - w, center.x - w / 2));
+  const minY = Math.max(all.minY, Math.min(all.maxY - h, center.y - h / 2));
+  return { minX, minY, maxX: minX + w, maxY: minY + h };
+}
