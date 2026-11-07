@@ -1,4 +1,9 @@
 # Tile Prompts: Arena (isometric) and World (hex)
+
+## Where the game looks for the tiles
+
+Battle floors are sheets in `apps/web/public/sprites/battle_tiles/<name>.png`, **4 by 4 tiles** (16 variations), each tile about 30 pixels wide with an isometric diamond top (about 15 to 16 pixels high) and a little thickness, tiles starting at x = 1, 34, 67, 100 and y = 5, 37, 70, 103. The scene scales a tile to the grid's 32 pixel width, picks a variation by position, and puts a plain grass colour under it so the seams stay green. `grass.png` is used for every arena for now; if the file is missing the floor is drawn in code. World (hex) tiles are not used yet: the map is drawn in code with flat biome colours.
+
 32x32 tiles for the Pixel Lab "Tiles" tool. One generation (10 credits) makes a set of interchangeable variations of ONE material, which we pick between with the seeded RNG.
 
 ## Settings

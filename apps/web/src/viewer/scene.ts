@@ -11,7 +11,7 @@ import {
 import { CameraController } from './cameraController.ts';
 import { arenaBounds, gridToScreen, TILE_H, TILE_W, type Bounds, type Vec } from './iso.ts';
 import type { Playback } from './playback.ts';
-import { loadSprite } from './sprites.ts';
+import { loadSprite, loadTileSet, type TileSet } from './sprites.ts';
 import type { UnitView } from './state.ts';
 
 // Crisp pixel art: never smooth textures.
@@ -162,7 +162,7 @@ export class Scene {
     this.pb = pb;
     const first = pb.states[0]!;
     this.clearUnits();
-    this.buildArena(first.arena.width, first.arena.height, first.arena.blocked);
+    await this.buildArena(first.arena.width, first.arena.height, first.arena.blocked);
     for (const id of first.order) await this.buildUnit(first.units[id]!, first.order.indexOf(id));
     this.select(null);
     this.fit();
@@ -214,9 +214,12 @@ export class Scene {
     this.tiles.removeChildren().forEach((c) => c.destroy());
   }
 
-  private buildArena(w: number, h: number, blocked: Array<{ x: number; y: number }>) {
+  private async buildArena(w: number, h: number, blocked: Array<{ x: number; y: number }>) {
     this.bounds = arenaBounds(w, h);
+    // The floor is drawn from the sprite sheet when there is one, and in code when there is not.
+    const tileSet: TileSet | null = await loadTileSet('grass');
     const g = new Graphics();
+    const tiles: Sprite[] = [];
     const block = new Set(blocked.map((p) => `${p.x},${p.y}`));
     const diamond = (cx: number, cy: number, hw = TILE_W / 2, hh = TILE_H / 2) => [
       cx,
@@ -233,6 +236,20 @@ export class Scene {
         const y = s - x;
         if (y < 0 || y >= h) continue;
         const c = gridToScreen(x, y);
+        if (tileSet) {
+          // Under the picture, the colour of the grass, so the seams between tiles stay green.
+          g.poly(diamond(c.x, c.y)).fill(0x14a02e);
+          const tex =
+            tileSet.textures[Math.floor(hash(x * 131 + y * 7919) * tileSet.textures.length)]!;
+          const tile = new Sprite(tex);
+          // The top of the tile is a diamond of the grid's size: its middle sits on the grid point.
+          tile.anchor.set(0.5, TILE_H / 2 / tex.height);
+          tile.scale.set(TILE_W / tex.width);
+          tile.position.set(c.x, c.y);
+          tile.zIndex = 0;
+          tiles.push(tile);
+          continue;
+        }
         const col = GREENS[Math.floor(hash(x * 131 + y * 7919) * GREENS.length)]!;
         g.poly(diamond(c.x, c.y)).fill(col).stroke({ width: 1, color: 0x1c2c20, alpha: 0.7 });
         if (hash(x * 17 + y * 31 + 5) > 0.7) {
@@ -242,6 +259,8 @@ export class Scene {
       }
     }
     this.tiles.addChild(g);
+    // The floor pictures go on top of the colour, in the order the diamonds were walked (back to front).
+    for (const t of tiles) this.tiles.addChild(t);
     this.tiles.zIndex = -1;
 
     for (const key of block) {

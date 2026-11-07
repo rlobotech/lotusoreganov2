@@ -379,3 +379,20 @@ describe('stealth and unseen steps in a replay', () => {
     expect(eventDuration(step)).toBeGreaterThan(eventDuration(walk));
   });
 });
+
+describe('where the art is', () => {
+  it('heroes use the south-east picture in the characters folder, everything else the plain name', async () => {
+    const { spriteUrl } = await import('../src/viewer/sprites.ts');
+    expect(spriteUrl('dwarf_warrior')).toBe('/sprites/characters/dwarf_warrior_se.png');
+    expect(spriteUrl('orc_necromancer')).toBe('/sprites/characters/orc_necromancer_se.png');
+    expect(spriteUrl('goblin')).toBe('/sprites/goblin.png');
+    expect(spriteUrl('imp')).toBe('/sprites/imp.png');
+    // Not a race: a monster with an underscore in its name stays a plain sprite.
+    expect(spriteUrl('ice_golem')).toBe('/sprites/ice_golem.png');
+  });
+
+  it('the inventory and party creation use the front picture', async () => {
+    const { characterSprite } = await import('../src/lib/inventory/layout.ts');
+    expect(characterSprite('elf', 'mage')).toBe('/sprites/characters/elf_mage_front.png');
+  });
+});

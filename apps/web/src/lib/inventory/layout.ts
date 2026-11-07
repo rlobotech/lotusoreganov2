@@ -33,4 +33,6 @@ export function figureColors(race: string, cls: string) {
 }
 
 /** The file name of a character sprite: the same name the combat viewer loads. */
-export const characterSprite = (race: string, cls: string) => `/sprites/${race}_${cls}.png`;
+/** The front view of a hero (sprites/characters/<race>_<class>_front.png), for the inventory and party creation. */
+export const characterSprite = (race: string, cls: string) =>
+  `/sprites/characters/${race}_${cls}_front.png`;

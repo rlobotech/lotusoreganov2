@@ -1,4 +1,9 @@
 # RPG Character Prompts: Race x Class
+
+## Where the game looks for the pictures
+
+Character pictures go in `apps/web/public/sprites/characters/`, one pair per hero: `<race>_<class>_se.png` (the south-east view the battle scene uses; it is flipped to face west, so enemies and anything walking left look left) and `<race>_<class>_front.png` (the front view of the inventory, the character sheet and party creation). Race is human, elf, dwarf or orc; class is the lowercase class id (warrior, barbarian, paladin, priest, mage, warlock, necromancer, shaman, druid, ranger, rogue). A missing file is skipped: a drawn placeholder figure is used instead, so art can be added one hero at a time. Monsters and summons are `apps/web/public/sprites/<name>.png` (for example `goblin.png`, `imp.png`, `skeleton.png`).
+
 32x32 characters for the Pixel Lab style generator (all 8 directions are generated; we only use the south-east one).
 
 ## Generator settings (same for every character)

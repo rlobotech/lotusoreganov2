@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, ApiError } from './api.ts';
+  import CharacterFigure from './inventory/CharacterFigure.svelte';
   import { session } from './session.svelte.ts';
 
   const RACES = ['human', 'elf', 'dwarf', 'orc'];
@@ -69,6 +70,8 @@
 
   {#each members as m, i}
     <div class="member">
+      <!-- The front view of the hero; a placeholder figure shows when there is no art yet. -->
+      <CharacterFigure race={m.race} cls={m.cls} size={48} />
       <input type="text" bind:value={m.name} maxlength="20" required aria-label="Name" />
       <select bind:value={m.race} aria-label="Race">
         {#each RACES as r}<option value={r}>{cap(r)}</option>{/each}
@@ -150,8 +153,9 @@
   }
   .member {
     display: grid;
-    grid-template-columns: 1fr 100px 100px 44px;
+    grid-template-columns: 48px 1fr 100px 100px 44px;
     gap: 6px;
+    align-items: center;
   }
   select {
     font: inherit;
@@ -169,10 +173,10 @@
   }
   @media (max-width: 480px) {
     .member {
-      grid-template-columns: 1fr 1fr 44px;
+      grid-template-columns: 48px 1fr 1fr 44px;
     }
     .member input {
-      grid-column: 1 / -1;
+      grid-column: 2 / -1;
     }
   }
 </style>
